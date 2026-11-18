@@ -330,6 +330,13 @@ export async function POST(req: NextRequest) {
 
     // Cancel pickup (revert)
     if (action === 'cancel') {
+      if (order.status !== 'COMPLETED' && !order.pickup?.pickedUp) {
+        return await secureJsonResponse(
+          { status: 'error', message: 'Order has not been picked up yet. Only completed pickup orders can be reverted.' },
+          { status: 400 }
+        );
+      }
+
       const updatedOrder = {
         ...order,
         status: 'READY',

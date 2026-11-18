@@ -37,7 +37,7 @@ import { cn } from '@/lib/utils';
 
 interface LiveStreamSettingsProps {
   config: ShopConfig;
-  saveConfig: (config: ShopConfig) => Promise<void>;
+  saveConfig: (config: ShopConfig) => Promise<unknown>;
   showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
   userEmail?: string | null;
 }
@@ -176,7 +176,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
           <div
             className={cn(
               'flex size-12 items-center justify-center rounded-[14px]',
-              live.enabled && 'animate-pulse bg-gradient-to-br from-red-500 to-red-600',
+              live.enabled && 'animate-pulse bg-destructive',
               !live.enabled && 'bg-[var(--surface-2)]',
             )}
           >
@@ -186,7 +186,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
             <h2 className="flex items-center gap-2 text-xl font-bold text-[var(--foreground)]">
               ไลฟ์สด
               {live.enabled && (
-                <Badge className="h-[22px] animate-pulse border-0 bg-red-500 text-[0.7rem] font-bold text-white">
+                <Badge className="h-[22px] animate-pulse border-0 bg-destructive text-[0.7rem] font-bold text-white">
                   LIVE
                 </Badge>
               )}
@@ -204,7 +204,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
             'rounded-[14px] px-6 py-3 text-[0.9rem] font-bold',
             live.enabled
               ? 'bg-gradient-to-br from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700'
-              : 'bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700',
+              : 'bg-destructive',
           )}
         >
           {saving ? (
@@ -271,10 +271,10 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
           </div>
 
           {live.streamType === 'hls' && (
-            <Alert className="rounded-xl border-blue-500/20 bg-blue-500/10 text-blue-300">
-              <Info className="text-blue-400" />
-              <AlertTitle className="font-semibold text-blue-300">วิธีใช้ OBS → HLS:</AlertTitle>
-              <AlertDescription className="text-xs text-blue-300/90">
+            <Alert className="rounded-xl border-primary/20 bg-primary/10 text-primary">
+              <Info className="text-primary" />
+              <AlertTitle className="font-semibold text-primary">วิธีใช้ OBS → HLS:</AlertTitle>
+              <AlertDescription className="text-xs text-primary/90">
                 1. ตั้ง RTMP Server (เช่น nginx-rtmp หรือ Cloudflare Stream)<br />
                 2. ใน OBS → Settings → Stream → Service: Custom → Server: rtmp://your-server/live<br />
                 3. ใส่ Stream Key<br />
@@ -284,10 +284,10 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
           )}
 
           {live.streamType === 'youtube' && (
-            <Alert className="rounded-xl border-red-500/20 bg-red-500/10 text-red-300">
-              <Info className="text-red-400" />
-              <AlertTitle className="font-semibold text-red-300">วิธีใช้ OBS → YouTube Live:</AlertTitle>
-              <AlertDescription className="text-xs text-red-300/90">
+            <Alert className="rounded-xl border-destructive/20 bg-destructive/10 text-destructive">
+              <Info className="text-destructive" />
+              <AlertTitle className="font-semibold text-destructive">วิธีใช้ OBS → YouTube Live:</AlertTitle>
+              <AlertDescription className="text-xs text-destructive/90">
                 1. ไปที่ YouTube Studio → Go Live → Stream<br />
                 2. คัดลอก Stream Key ไปใส่ใน OBS → Settings → Stream → YouTube<br />
                 3. เริ่มสตรีมใน OBS แล้วคัดลอก Live URL มาใส่ในช่องด้านบน<br />
@@ -361,7 +361,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
               variant="ghost"
               size="sm"
               onClick={() => setShowPreview(!showPreview)}
-              className="rounded-[10px] text-indigo-500"
+              className="rounded-[10px] text-primary"
             >
               {showPreview ? 'ซ่อน' : 'แสดงตัวอย่าง'}
             </Button>
@@ -407,11 +407,11 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
 
       {/* Status Info */}
       {config.liveStream?.startedAt && config.liveStream?.enabled && (
-        <Card className={cn(glassCardClass, 'border-red-500/30 bg-red-500/5')}>
+        <Card className={cn(glassCardClass, 'border-destructive/30 bg-destructive/5')}>
           <div className="flex items-center gap-3">
-            <Radio size={18} className="text-red-500" />
+            <Radio size={18} className="text-destructive" />
             <div>
-              <p className="text-sm font-semibold text-red-300">กำลังไลฟ์สดอยู่</p>
+              <p className="text-sm font-semibold text-destructive">กำลังไลฟ์สดอยู่</p>
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock size={12} />
                 เริ่มเมื่อ {new Date(config.liveStream.startedAt)?.toLocaleString('th-TH')}
@@ -427,7 +427,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="rounded-[14px] bg-gradient-to-br from-indigo-500 to-violet-500 px-8 py-3 font-semibold hover:from-indigo-600 hover:to-violet-600"
+          className="rounded-[14px] bg-primary px-8 py-3 font-semibold"
         >
           {saving && <Loader2 className="mr-2 size-[18px] animate-spin" />}
           บันทึกการตั้งค่า

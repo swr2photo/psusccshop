@@ -191,6 +191,16 @@ function OptimizedImageComponent({
     onError?.();
   };
 
+  // Images that finish loading before React hydrates (cached / priority images)
+  // never deliver onLoad to React — without this they stay at opacity 0.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img || loaded || !img.complete) return;
+    if (img.naturalWidth > 0) handleLoad();
+    else if (img.currentSrc) handleError();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per mounted source
+  }, [src, isInView]);
+
   // Combined styles
   const containerStyles: CSSProperties = {
     position: 'relative',

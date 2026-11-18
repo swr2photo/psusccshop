@@ -10,8 +10,10 @@
 
 import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { fetcher, postFetcher } from './useSWRConfig';
+import { DEFAULT_SHIPPING_CONFIG, type ShippingConfig as ShippingConfigType } from '@/lib/shipping';
+import { DEFAULT_PAYMENT_CONFIG, type PaymentConfig as PaymentConfigType } from '@/lib/payment';
 
 // ============== CACHE KEYS ==============
 
@@ -22,6 +24,7 @@ export const PAGE_CACHE_KEYS = {
   CART: (email: string) => `/api/cart?email=${encodeURIComponent(email)}`,
   ORDERS: (email: string) => `/api/orders?email=${encodeURIComponent(email)}`,
   SHIPPING: '/api/shipping/options',
+  PAYMENT: '/api/payment/config',
   REVIEWS: (productId: string, viewerEmail?: string) => `/api/reviews?productId=${encodeURIComponent(productId)}${viewerEmail ? `&viewerEmail=${encodeURIComponent(viewerEmail)}` : ''}`,
 };
 
@@ -146,9 +149,9 @@ export function usePageConfig() {
 
 // ============== SHOP CATALOG HOOK ==============
 
-export function useShopCatalog() {
+export function useShopCatalog(enabled = true) {
   const { data, error, isLoading, isValidating, mutate } = useSWR(
-    PAGE_CACHE_KEYS.CATALOG,
+    enabled ? PAGE_CACHE_KEYS.CATALOG : null,
     fetcher,
     {
       revalidateOnFocus: false,
@@ -197,14 +200,13 @@ export function useProductReviews(productId: string | undefined | null, viewerEm
 
 // ============== SHIPPING CONFIG HOOK ==============
 
-interface ShippingConfig {
-  options?: any[];
-  [key: string]: any;
-}
+type PageShippingConfig = ShippingConfigType;
 
-export function usePageShipping() {
-  const { data, error, isLoading, mutate } = useSWR<ShippingConfig>(
-    PAGE_CACHE_KEYS.SHIPPING,
+type ShippingApiConfig = Partial<ShippingConfigType>;
+
+export function usePageShipping(enabled = true) {
+  const { data, error, isLoading, mutate } = useSWR<PageShippingConfig | { success?: boolean; data?: ShippingApiConfig }>(
+    enabled ? PAGE_CACHE_KEYS.SHIPPING : null,
     fetcher,
     {
       revalidateOnFocus: false,
@@ -213,9 +215,63 @@ export function usePageShipping() {
     }
   );
 
+  const shippingConfig = useMemo<PageShippingConfig | null>(() => {
+    if (!data) return null;
+    const payload = data as { success?: boolean; data?: ShippingApiConfig };
+    const rawConfig = (payload.success && payload.data ? payload.data : payload) as ShippingApiConfig;
+    return {
+      ...DEFAULT_SHIPPING_CONFIG,
+      ...rawConfig,
+      options: Array.isArray(rawConfig.options) ? rawConfig.options : DEFAULT_SHIPPING_CONFIG.options,
+    };
+  }, [data]);
+
   return {
-    shippingConfig: data || null,
-    shippingOptions: data?.options || [],
+    shippingConfig,
+    shippingOptions: shippingConfig?.options || [],
+    isLoading,
+    error,
+    refresh: () => mutate(),
+  };
+}
+
+// ============== PAYMENT CONFIG HOOK ==============
+
+type PagePaymentConfig = PaymentConfigType & {
+  stripePromptPayEnabled?: boolean;
+  stripeCardEnabled?: boolean;
+};
+
+type PaymentApiConfig = Partial<PaymentConfigType> & {
+  stripePromptPayEnabled?: boolean;
+  stripeCardEnabled?: boolean;
+};
+
+export function usePagePaymentConfig(enabled = true) {
+  const { data, error, isLoading, mutate } = useSWR<PagePaymentConfig | { success?: boolean; data?: PaymentApiConfig }>(
+    enabled ? PAGE_CACHE_KEYS.PAYMENT : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      refreshInterval: 5 * 60 * 1000, // 5 minutes
+      dedupingInterval: 30000,
+    }
+  );
+
+  const paymentConfig = useMemo<PagePaymentConfig | null>(() => {
+    if (!data) return null;
+    const payload = data as { success?: boolean; data?: PaymentApiConfig };
+    const rawConfig = (payload.success && payload.data ? payload.data : payload) as PaymentApiConfig;
+    return {
+      ...DEFAULT_PAYMENT_CONFIG,
+      ...rawConfig,
+      options: Array.isArray(rawConfig.options) ? rawConfig.options : DEFAULT_PAYMENT_CONFIG.options,
+      gateways: Array.isArray(rawConfig.gateways) ? rawConfig.gateways : DEFAULT_PAYMENT_CONFIG.gateways,
+    };
+  }, [data]);
+
+  return {
+    paymentConfig,
     isLoading,
     error,
     refresh: () => mutate(),

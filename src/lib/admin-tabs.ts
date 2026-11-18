@@ -20,6 +20,7 @@ export const ADMIN_TAB_SECTIONS = [
   'live',
   'shops',
   'flagship',
+  'forms',
 ] as const;
 
 export type AdminSection = (typeof ADMIN_TAB_SECTIONS)[number];
@@ -44,6 +45,7 @@ export const ADMIN_TAB_TO_SECTION: Record<number, AdminSection> = {
   16: 'live',
   17: 'shops',
   18: 'flagship',
+  19: 'forms',
 };
 
 export const ADMIN_SECTION_TO_TAB: Record<string, number> = Object.fromEntries(

@@ -4,8 +4,13 @@
  * When unpaid orders expire or are cancelled, stock must be restored exactly once.
  */
 
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { shops } from '@/db/schema';
+import { getJson, putJson } from '@/lib/filebase';
+import { restoreStockAtomic } from '@/lib/stock';
+import { invalidateCacheKey, PUBLIC_CONFIG_CACHE_KEY } from '@/lib/server-cache';
+import type { Product, ShopConfig } from '@/lib/config';
 
 /** Default unpaid reservation window (hours). Override with ORDER_RESERVATION_HOURS. */
 export const DEFAULT_RESERVATION_HOURS = 24;
@@ -109,28 +114,118 @@ export async function releaseOrderStock(order: any): Promise<ReleaseStockResult>
   }
 
   const ref = String(order.ref || '');
+  const targetShopId = typeof order.shopId === 'string' ? order.shopId.trim() : typeof order.shop_id === 'string' ? order.shop_id.trim() : '';
+  const targetShopSlug = typeof order.shopSlug === 'string' ? order.shopSlug.trim() : typeof order.shop_slug === 'string' ? order.shop_slug.trim() : '';
+  const redisShopKey = targetShopId || 'main';
   const lines = cartLines(order);
   let restored = 0;
   let failed = 0;
 
+  const validLines: Array<{ prodId: string; size: string; qty: number }> = [];
   for (const item of lines) {
     const prodId = String(item.productId || item.id || '').trim();
     const size = String(item.size || 'FREE').trim() || 'FREE';
     const qty = Number(item.quantity ?? item.qty ?? 1);
     if (!prodId || !Number.isFinite(qty) || qty <= 0) continue;
+    validLines.push({ prodId, size, qty });
+  }
 
+  if (validLines.length === 0) {
+    return { restored: 0, failed: 0, skipped: false };
+  }
+
+  // 1. Restore Redis atomic stock counters (if present in Redis)
+  for (const { prodId, size, qty } of validLines) {
+    const stockKey = `stock:${redisShopKey}:${prodId}:${size}`;
+    await restoreStockAtomic(stockKey, qty).catch((err) => {
+      console.warn(`[reservation] Redis restoreStockAtomic skipped/failed for ${stockKey}:`, err);
+    });
+  }
+
+  // 2. Restore persistent product stock in shops table (sub-shop) or config/shop-settings.json (main shop)
+  const restoredInJson = new Set<string>();
+  try {
+    let shopCondition;
+    if (targetShopId && targetShopId !== 'main') shopCondition = eq(shops.id, targetShopId);
+    else if (targetShopSlug && targetShopSlug !== 'main') shopCondition = eq(shops.slug, targetShopSlug);
+
+    if (shopCondition) {
+      const shopRow = await db
+        .select({ products: shops.products, id: shops.id })
+        .from(shops)
+        .where(shopCondition)
+        .limit(1);
+      if (shopRow && shopRow.length > 0) {
+        const products = (shopRow[0].products as Product[]) || [];
+        let updated = false;
+        for (const { prodId, size, qty } of validLines) {
+          const product = products.find((p) => p.id === prodId);
+          if (!product) continue;
+          if (product.variants && product.variants.length > 0) {
+            const variant = product.variants.find((v) => v.id === size || v.name === size);
+            if (variant && typeof variant.stock === 'number' && variant.stock >= 0) {
+              variant.stock += qty;
+              updated = true;
+              restoredInJson.add(`${prodId}:${size}`);
+            }
+          } else if (typeof product.stock === 'number' && product.stock >= 0) {
+            product.stock += qty;
+            updated = true;
+            restoredInJson.add(`${prodId}:${size}`);
+          }
+        }
+        if (updated) {
+          await db.update(shops).set({ products, updatedAt: new Date() }).where(eq(shops.id, shopRow[0].id));
+          invalidateCacheKey('shops:public-catalog-v2');
+        }
+      }
+    } else {
+      const cfg = await getJson<ShopConfig>('config/shop-settings.json');
+      if (cfg && Array.isArray(cfg.products)) {
+        let updated = false;
+        for (const { prodId, size, qty } of validLines) {
+          const product = cfg.products.find((p) => p.id === prodId);
+          if (!product) continue;
+          if (product.variants && product.variants.length > 0) {
+            const variant = product.variants.find((v) => v.id === size || v.name === size);
+            if (variant && typeof variant.stock === 'number' && variant.stock >= 0) {
+              variant.stock += qty;
+              updated = true;
+              restoredInJson.add(`${prodId}:${size}`);
+            }
+          } else if (typeof product.stock === 'number' && product.stock >= 0) {
+            product.stock += qty;
+            updated = true;
+            restoredInJson.add(`${prodId}:${size}`);
+          }
+        }
+        if (updated) {
+          await putJson('config/shop-settings.json', cfg);
+          invalidateCacheKey(PUBLIC_CONFIG_CACHE_KEY);
+        }
+      }
+    }
+  } catch (jsonErr) {
+    console.warn('[reservation] Failed to restore stock in shop JSON config:', jsonErr);
+  }
+
+  // 3. Also attempt legacy SQL inventory table restore & audit logging
+  for (const { prodId, size, qty } of validLines) {
+    const lineKey = `${prodId}:${size}`;
+    const alreadyRestoredJson = restoredInJson.has(lineKey);
     try {
       const restoreRes: any = await db.execute(
         sql`SELECT restore_stock(${prodId}, ${size}, ${qty}) as success`,
       );
       const rows = restoreRes.rows || restoreRes;
       const ok = Boolean(rows?.[0]?.success);
-      if (!ok) {
+      if (ok || alreadyRestoredJson) {
+        restored += 1;
+      } else {
         console.warn(`[reservation] restore_stock failed for ${prodId} size ${size} qty ${qty}`);
         failed += 1;
         continue;
       }
-      restored += 1;
       try {
         await db.execute(sql`
           INSERT INTO inventory_logs (product_id, size, previous_quantity, new_quantity, change_type, order_ref, changed_by)
@@ -140,6 +235,18 @@ export async function releaseOrderStock(order: any): Promise<ReleaseStockResult>
         console.warn('[reservation] inventory_logs insert failed:', logErr);
       }
     } catch (e) {
+      if (alreadyRestoredJson) {
+        restored += 1;
+        try {
+          await db.execute(sql`
+            INSERT INTO inventory_logs (product_id, size, previous_quantity, new_quantity, change_type, order_ref, changed_by)
+            VALUES (${prodId}, ${size}, 0, 0, 'ORDER_RESTORE', ${ref}, 'reservation-timeout-json')
+          `);
+        } catch {
+          /* ignore log failure */
+        }
+        continue;
+      }
       // restore_stock may not exist yet — try inline UPDATE as fallback
       console.warn('[reservation] restore_stock RPC error, trying fallback UPDATE:', e);
       try {

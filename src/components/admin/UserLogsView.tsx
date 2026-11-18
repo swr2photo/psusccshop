@@ -246,8 +246,8 @@ export default function UserLogsView({ showToast }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-2">
-      <Alert className="border-[var(--border)] bg-blue-500/8 text-[0.75rem] text-[var(--foreground)]">
-        <FileText className="size-[18px] text-blue-600" />
+      <Alert className="border-[var(--border)] bg-primary/8 text-[0.75rem] text-[var(--foreground)]">
+        <FileText className="size-[18px] text-primary" />
         <AlertDescription>
           เก็บประวัติกิจกรรม / audit / ความปลอดภัย 2 ปี (730 วัน) ตามนโยบายความเป็นส่วนตัวและข้อกำหนดทางบัญชี
           — คลิกอีเมลเพื่อเปิดไทม์ไลน์รวมทุกลายละเอียด
@@ -265,7 +265,7 @@ export default function UserLogsView({ showToast }: Props) {
           <Button
             variant="outline"
             size="icon"
-            className="size-8 border-[var(--border)] bg-blue-500/10 text-blue-600"
+            className="size-8 border-[var(--border)] bg-primary/10 text-primary"
             onClick={fetchData}
             disabled={loading}
           >
@@ -328,7 +328,7 @@ export default function UserLogsView({ showToast }: Props) {
 
       {loading ? (
         <div className="flex justify-center py-4">
-          <Loader2 className="size-8 animate-spin text-blue-600" />
+          <Loader2 className="size-8 animate-spin text-primary" />
         </div>
       ) : (
         <div className="flex flex-col gap-1">
@@ -367,7 +367,7 @@ export default function UserLogsView({ showToast }: Props) {
 
                 <div className="mb-0.5 flex items-center gap-0.5">
                   <Avatar className="size-5">
-                    <AvatarFallback className="bg-blue-600 text-[0.65rem] text-white">
+                    <AvatarFallback className="bg-primary text-[0.65rem] text-white">
                       {(log.name || log.email).charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -377,7 +377,7 @@ export default function UserLogsView({ showToast }: Props) {
                       e.stopPropagation();
                       openTimeline(log.email);
                     }}
-                    className="cursor-pointer text-[0.75rem] font-semibold text-blue-600 underline underline-offset-2"
+                    className="cursor-pointer text-[0.75rem] font-semibold text-primary underline underline-offset-2"
                   >
                     {log.name || log.email.split('@')[0]}
                   </button>
@@ -451,7 +451,7 @@ export default function UserLogsView({ showToast }: Props) {
 
           {timelineLoading ? (
             <div className="flex justify-center py-6">
-              <Loader2 className="size-7 animate-spin text-blue-600" />
+              <Loader2 className="size-7 animate-spin text-primary" />
             </div>
           ) : timelineEvents.length === 0 ? (
             <p className="py-4 text-center text-[0.85rem] text-[var(--muted-foreground)]">ไม่พบเหตุการณ์</p>

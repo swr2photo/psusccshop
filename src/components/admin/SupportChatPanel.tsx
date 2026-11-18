@@ -84,7 +84,7 @@ import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-
 import { fetchChatSync, mergeChatMessages, mergeNewestWindow, fetchOlderChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
 import { formatStickerMessage } from '@/lib/chat-stickers';
 import { formatVoiceMessage, VOICE_DATA_URL_FALLBACK_MAX } from '@/lib/chat-voice';
-import { parseChatMessage } from '@/lib/chat-message';
+import { formatChatPreview, parseChatMessage } from '@/lib/chat-message';
 
 const TAB_KEYS = ['all', 'pending', 'my', 'closed'] as const;
 
@@ -140,7 +140,7 @@ function StarRating({ value }: { value: number }) {
           key={star}
           className={cn(
             'size-4',
-            star <= value ? 'fill-amber-500 text-amber-500 dark:fill-amber-400 dark:text-amber-400' : 'text-muted-foreground/30'
+            star <= value ? 'fill-warning text-warning dark:fill-warning dark:text-warning' : 'text-muted-foreground/30'
           )}
         />
       ))}
@@ -162,14 +162,31 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const { warning: toastWarning, error: toastError } = useNotification();
   const { isSupported: pushSupported, isSubscribed: pushSubscribed, subscribe: pushSubscribe } = usePushNotification();
 
-  const [isMobile, setIsMobile] = useState(false);
+  // Layout follows the width of the chat area itself (not the window): the admin
+  // sidebar can take 250px+, so a 960px window leaves only ~680px for chat.
+  const [isNarrowWindow, setIsNarrowWindow] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 899px)');
-    const update = () => setIsMobile(mq.matches);
+    const update = () => setIsNarrowWindow(mq.matches);
     update();
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
   }, []);
+  const [layoutWidth, setLayoutWidth] = useState(0);
+  const layoutObserverRef = useRef<ResizeObserver | null>(null);
+  // Callback ref: starts measuring whenever the layout box mounts (it is not rendered while loading)
+  const layoutRef = useCallback((el: HTMLDivElement | null) => {
+    layoutObserverRef.current?.disconnect();
+    layoutObserverRef.current = null;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => setLayoutWidth(Math.round(entries[0]?.contentRect.width || 0)));
+    ro.observe(el);
+    layoutObserverRef.current = ro;
+  }, []);
+  /** Single pane (list OR chat) */
+  const isMobile = layoutWidth > 0 ? layoutWidth < 640 : isNarrowWindow;
+  /** Customer panel sits beside the chat only when there is room; otherwise it slides over it */
+  const inlineContextPanel = layoutWidth >= 1040;
 
   const [loading, setLoading] = useState(true);
   const [loadingChatDetail, setLoadingChatDetail] = useState(false);
@@ -253,6 +270,10 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   });
   const [adminNote, setAdminNote] = useState('');
+  /** Narrow layouts: chat id the sliding customer panel is open for (auto-closes on chat switch) */
+  const [overlayPanelChatId, setOverlayPanelChatId] = useState<string | null>(null);
+  const overlayPanelChatIdRef = useRef<string | null>(null);
+  const toggleContextPanelRef = useRef<() => void>(() => undefined);
 
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   useEffect(() => {
@@ -1063,9 +1084,9 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const getChatStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400';
+        return 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning';
       case 'active':
-        return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400';
+        return 'bg-success/10 text-success dark:bg-success/20 dark:text-success';
       case 'closed':
         return 'bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300';
       default:
@@ -1077,16 +1098,16 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     switch (status) {
       case 'CANCELLED':
       case 'cancelled':
-        return 'bg-red-50 text-red-700 dark:bg-red-500/20 dark:text-red-400';
+        return 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive';
       case 'COMPLETED':
       case 'PAID':
       case 'SHIPPED':
       case 'completed':
-        return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400';
+        return 'bg-success/10 text-success dark:bg-success/20 dark:text-success';
       case 'PENDING':
       case 'pending':
       default:
-        return 'bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400';
+        return 'bg-warning/10 text-warning dark:bg-warning/20 dark:text-warning';
     }
   };
 
@@ -1184,15 +1205,13 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
       if (e.altKey && (e.key === 'i' || e.key === 'I') && !typing) {
         e.preventDefault();
-        setContextPanelOpen((v) => {
-          const next = !v;
-          try {
-            window.localStorage.setItem('support-chat-context-panel', next ? '1' : '0');
-          } catch {
-            /* ignore */
-          }
-          return next;
-        });
+        toggleContextPanelRef.current();
+        return;
+      }
+
+      // Esc closes the sliding customer panel
+      if (e.key === 'Escape' && overlayPanelChatIdRef.current) {
+        setOverlayPanelChatId(null);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -1210,6 +1229,11 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   };
 
   const toggleContextPanel = () => {
+    if (!inlineContextPanel) {
+      // Narrow layout: slide the panel over the chat for the current conversation only
+      setOverlayPanelChatId((id) => (id && id === selectedChat?.id ? null : selectedChat?.id ?? null));
+      return;
+    }
     setContextPanelOpen((v) => {
       const next = !v;
       try {
@@ -1220,6 +1244,13 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       return next;
     });
   };
+  // Keyboard shortcut handler reads the latest toggle / overlay state
+  useEffect(() => {
+    toggleContextPanelRef.current = toggleContextPanel;
+    overlayPanelChatIdRef.current = overlayPanelChatId;
+  });
+  const overlayPanelOpen = Boolean(selectedChat && overlayPanelChatId === selectedChat.id);
+  const contextPanelVisible = inlineContextPanel ? contextPanelOpen : overlayPanelOpen;
 
   const handleSendOrderToChat = async (order: any) => {
     if (!selectedChat || selectedChat.status !== 'active') return;
@@ -1357,7 +1388,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
         <DialogContent className="max-w-lg bg-card text-foreground">
           <DialogHeader className="border-b border-border pb-4">
             <DialogTitle className="flex items-center gap-2">
-              <ReceiptIcon className="size-6 text-blue-600" />
+              <ReceiptIcon className="size-6 text-primary" />
               ค้นหาออเดอร์ / ดูประวัติลูกค้า
             </DialogTitle>
           </DialogHeader>
@@ -1375,7 +1406,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
               <Button
                 onClick={handleSearchOrder}
                 disabled={searchingOrder || !orderSearchRef.trim()}
-                className="min-w-20 bg-blue-600 hover:bg-blue-700"
+                className="min-w-20 bg-primary hover:bg-primary/90"
               >
                 {searchingOrder ? <Loader2 className="size-5 animate-spin" /> : <SearchIcon className="size-5" />}
               </Button>
@@ -1384,13 +1415,13 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
             {foundOrder && (
               <div className="rounded-lg bg-[var(--surface)] p-4">
                 {foundOrder.notFound ? (
-                  <p className="text-center text-red-400">ไม่พบออเดอร์ &quot;{orderSearchRef}&quot;</p>
+                  <p className="text-center text-destructive">ไม่พบออเดอร์ &quot;{orderSearchRef}&quot;</p>
                 ) : foundOrder.error ? (
-                  <p className="text-center text-red-400">เกิดข้อผิดพลาดในการค้นหา</p>
+                  <p className="text-center text-destructive">เกิดข้อผิดพลาดในการค้นหา</p>
                 ) : (
                   <div>
                     <div className="mb-3 flex items-center gap-2">
-                      <div className="flex size-10 items-center justify-center rounded-md bg-blue-600 text-xs font-bold text-white">
+                      <div className="flex size-10 items-center justify-center rounded-md bg-primary text-xs font-bold text-white">
                         #{foundOrder.ref?.slice(-3)}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -1418,7 +1449,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                       </Button>
                       <Button
                         size="sm"
-                        className="bg-emerald-600 text-xs text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+                        className="bg-success text-xs text-white hover:bg-success/90 dark:bg-success dark:hover:bg-success"
                         onClick={() => handleSendOrderToChat(foundOrder)}
                         disabled={!selectedChat || selectedChat.status !== 'active'}
                       >
@@ -1443,7 +1474,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                     variant="ghost"
                     onClick={() => fetchCustomerOrders(selectedChat.customer_email)}
                     disabled={loadingCustomerOrders}
-                    className="text-blue-600"
+                    className="text-primary"
                   >
                     {loadingCustomerOrders ? <Loader2 className="size-4 animate-spin" /> : <RefreshIcon className="size-4" />}
                   </Button>
@@ -1457,7 +1488,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                     customerOrders.map((order) => (
                       <div
                         key={order.ref}
-                        className="mb-2 flex cursor-pointer items-center gap-2 rounded-md bg-[var(--surface)] p-3 hover:bg-blue-600/10"
+                        className="mb-2 flex cursor-pointer items-center gap-2 rounded-md bg-[var(--surface)] p-3 hover:bg-primary/10"
                         onClick={() => handleSendOrderToChat(order)}
                       >
                         <div className="min-w-0 flex-1">
@@ -1468,7 +1499,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                             {new Date(order.date || order.createdAt).toLocaleDateString('th-TH')} · {order.status}
                           </p>
                         </div>
-                        <SendIcon className="size-4 shrink-0 text-blue-600" />
+                        <SendIcon className="size-4 shrink-0 text-primary" />
                       </div>
                     ))
                   )}
@@ -1485,14 +1516,14 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
         </DialogContent>
       </Dialog>
 
-      <div className={cn(
+      <div ref={layoutRef} className={cn(
         'flex min-h-[400px] gap-0 overflow-hidden rounded-xl bg-slate-50 dark:bg-[#090D16]',
-        isMobile ? 'h-[calc(100vh-120px)]' : 'h-[calc(100vh-200px)]'
+        isMobile ? 'h-[calc(100dvh-120px)]' : 'h-[calc(100dvh-200px)]'
       )}>
         {/* Chat List Panel */}
         <div className={cn(
           'flex min-h-0 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white dark:border-white/5 dark:bg-[#0c1220]',
-          isMobile ? 'w-full border-r-0' : 'w-[300px]',
+          isMobile ? 'w-full border-r-0' : layoutWidth < 820 ? 'w-[260px]' : 'w-[300px]',
           isMobile && mobileShowChat && 'hidden'
         )}>
           <div className="border-b border-slate-200 p-4 dark:border-white/5">
@@ -1525,17 +1556,17 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
             </div>
             {stats ? (
               <div className="flex flex-wrap gap-2">
-                <Badge className="bg-amber-50 text-[0.7rem] font-medium text-amber-700 dark:bg-amber-400/10 dark:text-amber-400">
-                  <DotIcon className="size-2.5 fill-amber-600 text-amber-600 dark:fill-amber-400 dark:text-amber-400" />
+                <Badge className="bg-warning/10 text-[0.7rem] font-medium text-warning dark:bg-warning/10 dark:text-warning">
+                  <DotIcon className="size-2.5 fill-warning text-warning dark:fill-warning dark:text-warning" />
                   รอ {stats.pendingCount}
                 </Badge>
-                <Badge className="bg-emerald-50 text-[0.7rem] font-medium text-emerald-700 dark:bg-green-500/10 dark:text-green-500">
-                  <DotIcon className="size-2.5 fill-emerald-600 text-emerald-600 dark:fill-green-500 dark:text-green-500" />
+                <Badge className="bg-success/10 text-[0.7rem] font-medium text-success dark:bg-success/10 dark:text-success">
+                  <DotIcon className="size-2.5 fill-success text-success dark:fill-success dark:text-success" />
                   Active {stats.activeCount}
                 </Badge>
                 {stats.avgRating > 0 && (
-                  <Badge className="bg-amber-50 text-[0.7rem] font-medium text-amber-700 dark:bg-amber-400/10 dark:text-amber-400">
-                    <StarIcon className="size-3 fill-amber-600 text-amber-600 dark:fill-amber-400 dark:text-amber-400" />
+                  <Badge className="bg-warning/10 text-[0.7rem] font-medium text-warning dark:bg-warning/10 dark:text-warning">
+                    <StarIcon className="size-3 fill-warning text-warning dark:fill-warning dark:text-warning" />
                     {stats.avgRating.toFixed(1)}
                   </Badge>
                 )}
@@ -1555,21 +1586,21 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
             className="flex min-h-0 flex-1 flex-col gap-0"
           >
             <TabsList variant="line" className="h-9 w-full shrink-0 rounded-none border-b border-slate-200 bg-transparent p-0 dark:border-white/5">
-              <TabsTrigger value="all" className="min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-blue-600 data-[state=active]:text-blue-600 dark:after:bg-sky-400 dark:data-[state=active]:text-sky-400">
+              <TabsTrigger value="all" className="min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-primary data-[state=active]:text-primary dark:after:bg-primary dark:data-[state=active]:text-primary">
                 ทั้งหมด
               </TabsTrigger>
-              <TabsTrigger value="pending" className="relative min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-blue-600 data-[state=active]:text-blue-600 dark:after:bg-sky-400 dark:data-[state=active]:text-sky-400">
+              <TabsTrigger value="pending" className="relative min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-primary data-[state=active]:text-primary dark:after:bg-primary dark:data-[state=active]:text-primary">
                 รอรับ
                 {(stats?.pendingCount ?? 0) > 0 && (
-                  <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-600 px-1 text-[10px] font-bold text-white dark:bg-amber-500">
+                  <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-[10px] font-bold text-white dark:bg-warning">
                     {stats!.pendingCount > 99 ? '99+' : stats!.pendingCount}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="my" className="min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-blue-600 data-[state=active]:text-blue-600 dark:after:bg-sky-400 dark:data-[state=active]:text-sky-400">
+              <TabsTrigger value="my" className="min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-primary data-[state=active]:text-primary dark:after:bg-primary dark:data-[state=active]:text-primary">
                 ของฉัน
               </TabsTrigger>
-              <TabsTrigger value="closed" className="min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-blue-600 data-[state=active]:text-blue-600 dark:after:bg-sky-400 dark:data-[state=active]:text-sky-400">
+              <TabsTrigger value="closed" className="min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-primary data-[state=active]:text-primary dark:after:bg-primary dark:data-[state=active]:text-primary">
                 ปิด
               </TabsTrigger>
             </TabsList>
@@ -1605,7 +1636,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                       onClick={() => handleSelectChat(chat.id)}
                       className={cn(
                         'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04]',
-                        selectedChat?.id === chat.id && 'bg-blue-50 dark:bg-white/[0.06]'
+                        selectedChat?.id === chat.id && 'bg-primary/10 dark:bg-white/[0.06]'
                       )}
                     >
                       <div className="relative shrink-0">
@@ -1632,7 +1663,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                           </Badge>
                         </div>
                         <p className="truncate text-xs text-[var(--text-muted)]">
-                          {chat.last_message_preview || chat.subject}
+                          {formatChatPreview(chat.last_message_preview) || chat.subject}
                         </p>
                         <p className="mt-0.5 text-[0.65rem] text-[var(--text-muted)]">
                           {formatTime(chat.last_message_at || chat.created_at)}
@@ -1685,17 +1716,17 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                       : selectedChat.subject}
                   </p>
                 </div>
-                {!isMobile && (
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={toggleContextPanel}
-                    className="text-muted-foreground"
-                    title="แผงข้อมูลลูกค้า (Alt+I)"
-                  >
-                    {contextPanelOpen ? <PanelRightClose className="size-4" /> : <PanelRight className="size-4" />}
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleContextPanel}
+                  className={cn('text-muted-foreground', contextPanelVisible && 'bg-primary/10 text-primary')}
+                  title="ข้อมูลลูกค้า (Alt+I)"
+                  aria-label="ข้อมูลลูกค้า"
+                  aria-pressed={contextPanelVisible}
+                >
+                  {contextPanelVisible ? <PanelRightClose className="size-4" /> : <PanelRight className="size-4" />}
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -1705,7 +1736,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                     setOrderSearchRef('');
                     fetchCustomerOrders(selectedChat.customer_email);
                   }}
-                  className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-500 dark:hover:bg-emerald-500/10"
+                  className="text-success hover:bg-success/10 dark:text-success dark:hover:bg-success/10"
                   title="ค้นหาออเดอร์"
                 >
                   <ReceiptIcon className="size-5" />
@@ -1714,7 +1745,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                   <Button
                     size="sm"
                     onClick={() => handleAcceptChat(selectedChat.id)}
-                    className="bg-emerald-600 text-xs hover:bg-emerald-700"
+                    className="bg-success text-xs hover:bg-success/90"
                   >
                     <AcceptIcon className="size-4" />
                     รับเคส
@@ -1727,7 +1758,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                     size="sm"
                     variant="outline"
                     onClick={() => handleAcceptChat(selectedChat.id, { force: true })}
-                    className="border-blue-200 text-xs text-blue-700 hover:bg-blue-50 dark:border-blue-500/30 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                    className="border-primary/35 text-xs text-primary hover:bg-primary/10 dark:border-primary/30 dark:text-primary dark:hover:bg-primary/10"
                   >
                     <AcceptIcon className="size-4" />
                     โอนเคสมาให้ฉัน
@@ -1737,7 +1768,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                   <Button
                     size="sm"
                     onClick={() => handleAcceptChat(selectedChat.id, { force: true })}
-                    className="bg-emerald-600 text-xs hover:bg-emerald-700"
+                    className="bg-success text-xs hover:bg-success/90"
                   >
                     <AcceptIcon className="size-4" />
                     รับเคส
@@ -1762,7 +1793,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                 )}
               </div>
 
-              <div className="flex min-h-0 flex-1">
+              <div className="relative flex min-h-0 flex-1">
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <MessageScrollerProvider
                 key={selectedChat.id}
@@ -1874,7 +1905,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                         <MessageAvatar className={cn(!showAvatar && 'invisible')}>
                           <Avatar size="sm" className="size-7 shrink-0 ring-2 ring-background">
                             {msg.sender_avatar && <AvatarImage src={msg.sender_avatar} alt="" />}
-                            <AvatarFallback className={msg.sender === 'admin' ? 'bg-blue-600 text-white' : 'bg-amber-100 text-amber-800 dark:bg-amber-400 dark:text-white'}>
+                            <AvatarFallback className={msg.sender === 'admin' ? 'bg-primary text-white' : 'bg-warning/10 text-warning dark:bg-warning dark:text-white'}>
                               {msg.sender === 'admin'
                                 ? <SupportAgentIcon className="size-3.5 text-white" />
                                 : <PersonIcon className="size-3.5" />}
@@ -1938,8 +1969,8 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                                     className={cn(
                                       'mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 text-[0.7rem] transition',
                                       msg.sender === 'admin'
-                                        ? 'bg-blue-500/15 text-blue-800 hover:bg-blue-500/25 dark:bg-white/10 dark:text-white/90 dark:hover:bg-white/15'
-                                        : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20 dark:hover:bg-emerald-500/15'
+                                        ? 'bg-primary/15 text-primary hover:bg-primary/25 dark:bg-white/10 dark:text-white/90 dark:hover:bg-white/15'
+                                        : 'bg-success/10 text-success ring-1 ring-success/35 hover:bg-success/10 dark:bg-success/10 dark:text-success dark:ring-success/20 dark:hover:bg-success/15'
                                     )}
                                   >
                                     <ReceiptIcon className="size-3 shrink-0 opacity-80" />
@@ -1969,11 +2000,11 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                               {isLastAdminMessage && (
                                 <>
                                   {msg.is_read
-                                    ? <DoneAllIcon className="size-3 text-emerald-600 dark:text-green-500" />
+                                    ? <DoneAllIcon className="size-3 text-success dark:text-success" />
                                     : <DoneIcon className="size-3 text-[var(--text-muted)]" />
                                   }
                                   {msg.is_read && msg.read_at && (
-                                    <span className="text-[0.6rem] text-emerald-600 tabular-nums dark:text-green-500">
+                                    <span className="text-[0.6rem] text-success tabular-nums dark:text-success">
                                       อ่านแล้ว {formatClock(msg.read_at)}
                                     </span>
                                   )}
@@ -1994,8 +2025,8 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                   <MessageScrollerItem messageId="__typing__">
                     <Message align="start" className="mt-1">
                       <MessageAvatar>
-                        <Avatar size="sm" className="size-7 bg-amber-100 ring-2 ring-background dark:bg-amber-400">
-                          <AvatarFallback className="bg-amber-100 text-amber-800 dark:bg-amber-400 dark:text-white">
+                        <Avatar size="sm" className="size-7 bg-warning/10 ring-2 ring-background dark:bg-warning">
+                          <AvatarFallback className="bg-warning/10 text-warning dark:bg-warning dark:text-white">
                             <PersonIcon className="size-3.5" />
                           </AvatarFallback>
                         </Avatar>
@@ -2034,7 +2065,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                       type="button"
                       size="icon-xs"
                       onClick={() => setPreviewImage(null)}
-                      className="absolute -top-2 -right-2 size-5 bg-red-500 text-white hover:bg-red-600"
+                      className="absolute -top-2 -right-2 size-5 bg-destructive text-white hover:bg-destructive"
                     >
                       <CloseIcon className="size-3.5" />
                     </Button>
@@ -2113,8 +2144,23 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
               )}
               </div>
 
-              {/* Customer context panel */}
-              {contextPanelOpen && !isMobile && (
+              {/* Customer context panel — beside the chat when wide, sliding over it when narrow */}
+              {contextPanelVisible && !inlineContextPanel && (
+                <button
+                  type="button"
+                  aria-label="ปิดข้อมูลลูกค้า"
+                  onClick={() => setOverlayPanelChatId(null)}
+                  className="absolute inset-0 z-20 cursor-default bg-black/30 animate-in fade-in-0"
+                />
+              )}
+              {contextPanelVisible && (
+                <div
+                  className={cn(
+                    'flex min-h-0',
+                    !inlineContextPanel &&
+                      'absolute inset-y-0 right-0 z-30 w-[min(340px,100%)] shadow-2xl animate-in slide-in-from-right-8 [&>aside]:w-full',
+                  )}
+                >
                 <CustomerContextPanel
                   customerName={selectedChat.customer_name}
                   customerEmail={selectedChat.customer_email}
@@ -2147,6 +2193,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                   getOrderStatusLabel={getOrderStatusLabel}
                   getOrderStatusBadgeClass={getOrderStatusBadgeClass}
                 />
+                </div>
               )}
               </div>
             </>
@@ -2154,13 +2201,13 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background">
               <div className="flex min-h-full flex-col items-center justify-center p-6 py-8">
                 <div
-                  className="mb-6 flex size-[100px] shrink-0 items-center justify-center rounded-full border-2 border-blue-600/30"
+                  className="mb-6 flex size-[100px] shrink-0 items-center justify-center rounded-full border-2 border-primary/30"
                   style={{
                     background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(30, 64, 175, 0.2) 100%)',
                     animation: 'chat-pulse 2s infinite',
                   }}
                 >
-                  <ChatIcon className="size-12 text-blue-600" />
+                  <ChatIcon className="size-12 text-primary" />
                 </div>
 
                 <h3 className="mb-1 text-center text-xl font-bold">ศูนย์กลางการสนทนา</h3>
@@ -2170,18 +2217,18 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                 </p>
 
                 <div className="flex flex-wrap justify-center gap-4">
-                  <div className="min-w-[90px] rounded-lg bg-amber-50 px-5 py-3 text-center ring-1 ring-amber-100 dark:border dark:border-amber-400/30 dark:bg-amber-400/10 dark:ring-0">
-                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{stats?.pendingCount || 0}</p>
-                    <p className="text-xs text-amber-700/80 dark:text-amber-400/80">รอรับเคส</p>
+                  <div className="min-w-[90px] rounded-lg bg-warning/10 px-5 py-3 text-center ring-1 ring-warning/20 dark:border dark:border-warning/30 dark:bg-warning/10 dark:ring-0">
+                    <p className="text-2xl font-bold text-warning dark:text-warning">{stats?.pendingCount || 0}</p>
+                    <p className="text-xs text-warning/80 dark:text-warning/80">รอรับเคส</p>
                   </div>
-                  <div className="min-w-[90px] rounded-lg bg-emerald-50 px-5 py-3 text-center ring-1 ring-emerald-100 dark:border dark:border-green-500/30 dark:bg-green-500/10 dark:ring-0">
-                    <p className="text-2xl font-bold text-emerald-700 dark:text-green-500">{stats?.activeCount || 0}</p>
-                    <p className="text-xs text-emerald-700/80 dark:text-green-500/80">กำลังสนทนา</p>
+                  <div className="min-w-[90px] rounded-lg bg-success/10 px-5 py-3 text-center ring-1 ring-success/20 dark:border dark:border-success/30 dark:bg-success/10 dark:ring-0">
+                    <p className="text-2xl font-bold text-success dark:text-success">{stats?.activeCount || 0}</p>
+                    <p className="text-xs text-success/80 dark:text-success/80">กำลังสนทนา</p>
                   </div>
                 </div>
 
                 <div className="mt-8 max-w-[320px] rounded-lg bg-slate-100 p-4 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10">
-                  <p className="mb-1 text-xs font-semibold text-blue-600 dark:text-sky-400">คีย์ลัด</p>
+                  <p className="mb-1 text-xs font-semibold text-primary dark:text-primary">คีย์ลัด</p>
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     Alt+↑/↓ สลับแชท · Alt+C ปิดเคส · Alt+I แผงข้อมูล · พิมพ์ / ตอบด่วน · Ctrl+Enter ส่ง
                   </p>

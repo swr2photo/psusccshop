@@ -1,4 +1,4 @@
-import { getRedisClient } from './redis';
+import { getRedisClient, markRedisUnavailable } from './redis';
 import { ShopConfig } from './config';
 
 /**
@@ -13,12 +13,18 @@ export async function mergeRealtimeStock(config: ShopConfig, shopId: string = 'm
     return config;
   }
 
-  // Deep clone to avoid mutating the original cached object if any
-  const mergedConfig: ShopConfig = JSON.parse(JSON.stringify(config));
-
-  if (!mergedConfig.products || mergedConfig.products.length === 0) {
-    return mergedConfig;
+  if (!config.products || config.products.length === 0) {
+    return config;
   }
+
+  // Shallow clone config + products/variants instead of expensive full JSON.parse(JSON.stringify(config))
+  const mergedConfig: ShopConfig = {
+    ...config,
+    products: config.products.map((p) => ({
+      ...p,
+      ...(Array.isArray(p.variants) ? { variants: p.variants.map((v) => ({ ...v })) } : {}),
+    })),
+  };
 
   // Collect all keys and their corresponding references
   const keysToFetch: string[] = [];
@@ -29,7 +35,7 @@ export async function mergeRealtimeStock(config: ShopConfig, shopId: string = 'm
     
     if (product.variants && product.variants.length > 0) {
       for (let vIdx = 0; vIdx < product.variants.length; vIdx++) {
-        const variant: any = product.variants[vIdx];
+        const variant: { id?: string; name?: string; stock?: number | null } = product.variants[vIdx];
         if (typeof variant.stock === 'number' || variant.stock === null) {
           // Note: The key format matches src/app/api/orders/route.ts
           const size = variant.id || variant.name || 'FREE';
@@ -55,6 +61,11 @@ export async function mergeRealtimeStock(config: ShopConfig, shopId: string = 'm
   try {
     // MGET retrieves all stock values in a single network round-trip
     const redisStocks = await redis.mget(...keysToFetch);
+    if (!Array.isArray(redisStocks)) {
+      // Upstash error body (e.g. quota) — keep the stored stock as-is
+      markRedisUnavailable('stock merge: invalid MGET result');
+      return mergedConfig;
+    }
     const keysToSeed: Record<string, number> = {};
 
     for (let i = 0; i < keysToFetch.length; i++) {
@@ -80,15 +91,17 @@ export async function mergeRealtimeStock(config: ShopConfig, shopId: string = 'm
       }
     }
 
-    // Self-healing: seed missing keys in the background
-    if (Object.keys(keysToSeed).length > 0) {
-      Promise.all(
-        Object.entries(keysToSeed).map(([k, v]) => 
-          redis.setnx(k, v) // Only set if it truly doesn't exist, to prevent race conditions
-        )
-      ).catch(e => console.warn('[Realtime Stock] Failed to auto-seed Redis:', e));
+    // Self-healing: seed missing keys in a single Redis pipeline round-trip
+    const seedEntries = Object.entries(keysToSeed);
+    if (seedEntries.length > 0) {
+      const pipe = redis.pipeline();
+      for (const [k, v] of seedEntries) {
+        pipe.setnx(k, v);
+      }
+      pipe.exec().catch((e) => console.warn('[Realtime Stock] Failed to auto-seed Redis:', e));
     }
   } catch (error) {
+    markRedisUnavailable(error instanceof Error ? error.message : error);
     console.error('[Realtime Stock] Failed to fetch stock from Redis:', error);
   }
 

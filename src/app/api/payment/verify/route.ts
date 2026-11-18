@@ -140,16 +140,16 @@ const checkSlipWithSlipOK = async (
   base64: string,
   expectedAmount: number
 ): Promise<SlipVerifyResult> => {
-  const branchId = process.env.SLIPOK_BRANCH_ID;
-  const apiKey = process.env.SLIPOK_API_KEY;
+  const branchId = process.env.SLIPOK_BRANCH_ID?.trim();
+  const apiKey = process.env.SLIPOK_API_KEY?.trim();
 
-  // ถ้าไม่มี credentials ให้ข้าม verification (dev mode)
+  // ถ้าไม่มี credentials ให้ปฏิเสธการตรวจสอบทันที (fail-closed)
   if (!branchId || !apiKey) {
-    console.warn('[payment-verify] SLIPOK credentials missing, skipping verification');
+    console.error('[payment-verify] SLIPOK credentials missing; failing closed');
     return {
-      success: true,
+      success: false,
       verified: false,
-      message: 'ข้ามการตรวจสอบ (dev mode)',
+      message: 'ระบบตรวจสอบสลิปยังไม่พร้อมใช้งาน กรุณาติดต่อแอดมิน',
     };
   }
 

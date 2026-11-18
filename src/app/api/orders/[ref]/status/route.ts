@@ -72,21 +72,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ ref:
           const isComplete = elapsedMs >= TOTAL_PROCESS_MS;
 
           if (isComplete) {
-            // Auto-promote to ready_for_payment & cleanup
-            await Promise.all([
-              redis.set(`order_status:${ref}`, 'ready_for_payment', { ex: 3600 }),
-              redis.del(`order_queue:${ref}`),
-              redis.decr('queue:active').catch(() => {}),
-            ]).catch(() => {});
+            const dbOrder = await getOrderByRef(ref).catch(() => null);
+            if (dbOrder) {
+              // Auto-promote to ready_for_payment & cleanup only after order exists in DB
+              await Promise.all([
+                redis.set(`order_status:${ref}`, 'ready_for_payment', { ex: 3600 }),
+                redis.del(`order_queue:${ref}`),
+                redis.decr('queue:active').catch(() => {}),
+              ]).catch(() => {});
 
-            return NextResponse.json({
-              status: 'ready_for_payment',
-              queue: null,
-              stages: STAGES.map((s) => ({ key: s.key, label: s.label, done: true })),
-            });
+              return NextResponse.json({
+                status: 'ready_for_payment',
+                queue: null,
+                stages: STAGES.map((s) => ({ key: s.key, label: s.label, done: true })),
+              });
+            }
           }
 
-          const remainingMs = Math.max(0, estimatedTotalMs - elapsedMs);
+          const effectiveIdx = isComplete ? Math.min(currentIdx, STAGES.length - 2) : currentIdx;
+          const remainingMs = Math.max(isComplete ? 500 : 0, estimatedTotalMs - elapsedMs);
 
           return NextResponse.json({
             status: 'queued',
@@ -97,14 +101,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ ref:
               elapsedMs,
               estimatedTotalMs,
               remainingMs,
-              stage: STAGES[currentIdx].key,
-              stageLabel: STAGES[currentIdx].label,
+              stage: STAGES[effectiveIdx].key,
+              stageLabel: STAGES[effectiveIdx].label,
             },
             stages: STAGES.map((s, i) => ({
               key: s.key,
               label: s.label,
-              done: i < currentIdx,
-              active: i === currentIdx,
+              done: i < effectiveIdx,
+              active: i === effectiveIdx,
             })),
           });
         }
@@ -128,13 +132,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ ref:
       queue: null,
       stages: [],
     });
-  } catch (error: any) {
-    const url = process.env.UPSTASH_REDIS_REST_URL || 'missing';
-    console.error('[Status API] Error:', error, 'URL:', url);
-    return NextResponse.json({ 
-      error: 'Failed to fetch status', 
-      details: error.message, 
-      cause: error.cause?.message || String(error.cause)
-    }, { status: 500 });
+  } catch (error: unknown) {
+    console.error('[Status API] Error:', error instanceof Error ? error.message : error);
+    return NextResponse.json({ error: 'Failed to fetch status' }, { status: 500 });
   }
 }

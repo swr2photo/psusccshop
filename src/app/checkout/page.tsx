@@ -44,17 +44,20 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useSession } from 'next-auth/react';
 import { apiFetch } from '@/lib/api-client';
 import { ShippingConfig, ShippingOption } from '@/lib/shipping';
+import { usePageShipping, usePagePaymentConfig } from '@/hooks/usePageData';
+import { useHydrated } from '@/hooks/useHydrated';
+import { formatFriendlyError } from '@/utils/error';
 
 export default function StandaloneCheckoutPage() {
   const router = useRouter();
-  const { lang } = useTranslation();
+  const { t, lang } = useTranslation();
   const { data: session } = useSession();
   const cart = useCartStore((s) => s.cart);
   const clearCart = useCartStore((s) => s.clearCart);
+  const shouldLoadCheckoutData = cart.length > 0;
 
   // Wait for Zustand persist hydration from localStorage
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const mounted = useHydrated();
 
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -63,9 +66,12 @@ export default function StandaloneCheckoutPage() {
   const [studentId, setStudentId] = useState('');
 
   // Dynamic Shipping & Payment Config from API
+  const { shippingConfig: swrShippingConfig, isLoading: shipLoading } = usePageShipping(shouldLoadCheckoutData);
+  const { paymentConfig: swrPaymentConfig, isLoading: payLoading } = usePagePaymentConfig(shouldLoadCheckoutData);
+  const loadingConfig = shipLoading || payLoading;
+
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
   const [selectedShippingId, setSelectedShippingId] = useState<string>('pickup');
-  const [loadingConfig, setLoadingConfig] = useState(true);
 
   const [paymentGateway, setPaymentGateway] = useState<'promptpay' | 'credit_card' | 'manual'>('promptpay');
   const [stripePromptPayEnabled, setStripePromptPayEnabled] = useState(true);
@@ -91,44 +97,42 @@ export default function StandaloneCheckoutPage() {
     }
   }, [session]);
 
-  // Fetch Shipping & Payment Configuration
+  // Sync SWR data to state
   useEffect(() => {
-    let active = true;
-    Promise.all([
-      apiFetch('/api/shipping/options').then((r) => r.json()).catch(() => null),
-      apiFetch('/api/payment/config').then((r) => r.json()).catch(() => null),
-    ]).then(([shipData, payData]) => {
-      if (!active) return;
-      if (shipData?.success && shipData?.data) {
-        setShippingConfig(shipData.data);
-        const enabled = (shipData.data.options as ShippingOption[])?.filter((o) => o.enabled) || [];
-        if (enabled.length > 0) {
-          const defaultOpt = enabled.find((o) => o.id === shipData.data.defaultOptionId) || enabled[0];
-          setSelectedShippingId(defaultOpt.id);
-        }
+    if (swrShippingConfig) {
+      setShippingConfig(swrShippingConfig);
+      const enabled = swrShippingConfig.options?.filter((o: ShippingOption) => o.enabled) || [];
+      if (enabled.length > 0) {
+        setSelectedShippingId((current) => (
+          enabled.some((option) => option.id === current)
+            ? current
+            : (enabled.find((option) => option.id === swrShippingConfig.defaultOptionId) || enabled[0]).id
+        ));
       }
+    }
+  }, [swrShippingConfig]);
 
-      if (payData?.success && payData?.data) {
-        const pData = payData.data;
-        const promptPayOk = typeof pData.stripePromptPayEnabled === 'boolean' ? pData.stripePromptPayEnabled : true;
-        const cardOk = typeof pData.stripeCardEnabled === 'boolean' ? pData.stripeCardEnabled : true;
-        const manualOpt = pData.options?.find((o: any) => o.method === 'bank_transfer' || o.id === 'bank_transfer');
-        const manualOk = manualOpt ? manualOpt.enabled !== false : true;
+  useEffect(() => {
+    if (swrPaymentConfig) {
+      const promptPayOk = typeof swrPaymentConfig.stripePromptPayEnabled === 'boolean' ? swrPaymentConfig.stripePromptPayEnabled : true;
+      const cardOk = typeof swrPaymentConfig.stripeCardEnabled === 'boolean' ? swrPaymentConfig.stripeCardEnabled : true;
+      const manualOpt = swrPaymentConfig.options?.find((o: any) => o.method === 'bank_transfer' || o.id === 'bank_transfer');
+      const manualOk = manualOpt ? manualOpt.enabled !== false : true;
 
-        setStripePromptPayEnabled(promptPayOk);
-        setStripeCardEnabled(cardOk);
-        setManualEnabled(manualOk);
+      setStripePromptPayEnabled(promptPayOk);
+      setStripeCardEnabled(cardOk);
+      setManualEnabled(manualOk);
 
-        if (promptPayOk) setPaymentGateway('promptpay');
-        else if (cardOk) setPaymentGateway('credit_card');
-        else if (manualOk) setPaymentGateway('manual');
-      }
-    }).finally(() => {
-      if (active) setLoadingConfig(false);
-    });
-
-    return () => { active = false; };
-  }, []);
+      setPaymentGateway((current) => {
+        if (current === 'promptpay' && promptPayOk) return current;
+        if (current === 'credit_card' && cardOk) return current;
+        if (current === 'manual' && manualOk) return current;
+        if (promptPayOk) return 'promptpay';
+        if (cardOk) return 'credit_card';
+        return 'manual';
+      });
+    }
+  }, [swrPaymentConfig]);
 
   const getItemUnitPrice = (item: any) => Number(item.unitPrice ?? item.price ?? 0);
   const getItemQty = (item: any) => Number(item.quantity ?? item.qty ?? 1);
@@ -190,10 +194,11 @@ export default function StandaloneCheckoutPage() {
         setPromoMsg({ type: 'success', text: `ใช้ส่วนลดสำเร็จ! ลด ฿${data.discount}` });
       } else {
         setPromoDiscount(0);
-        setPromoMsg({ type: 'error', text: data.error || 'โค้ดส่วนลดไม่ถูกต้องหรือหมดอายุ' });
+        const promoError = typeof data.error === 'string' ? data.error : t.checkout.invalidCode;
+        setPromoMsg({ type: 'error', text: formatFriendlyError(promoError) });
       }
     } catch {
-      setPromoMsg({ type: 'error', text: 'ไม่สามารถตรวจสอบโค้ดส่วนลดได้' });
+      setPromoMsg({ type: 'error', text: t.checkout.cannotVerifyCode });
     } finally {
       setPromoLoading(false);
     }
@@ -204,62 +209,23 @@ export default function StandaloneCheckoutPage() {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) {
-      setErrorMsg('ไม่มีสินค้าในตะกร้า');
+      setErrorMsg(t.cart.emptyWarning);
       return;
     }
     if (!customerName.trim() || !customerEmail.trim()) {
-      setErrorMsg('กรุณากรอกชื่อ-นามสกุล และอีเมลให้ครบถ้วน');
+      setErrorMsg(t.checkout.profileRequired);
       return;
     }
     if (!isPickupSelected && !address.trim()) {
-      setErrorMsg('กรุณากรอกที่อยู่สำหรับจัดส่งพัสดุ');
+      setErrorMsg(t.checkout.addressRequired);
       return;
     }
 
     setLoading(true);
     setErrorMsg(null);
 
-    // Validate live stock before placing order
-    try {
-      const catRes = await apiFetch('/api/shops/catalog').then((r) => r.json()).catch(() => null);
-      if (catRes?.shops || catRes?.data) {
-        const shops = catRes.shops || catRes.data || [];
-        const prodMap: Record<string, any> = {};
-        for (const s of shops) {
-          for (const p of s.products || []) {
-            prodMap[p.id] = p;
-          }
-        }
-
-        for (const item of cart) {
-          const pId = item.productId || item.id?.split('-')[0];
-          const prod = prodMap[pId];
-          if (!prod) continue;
-
-          let maxStock: number | null = prod.stock ?? null;
-          const variantId = item.selectedVariant?.id || item.size;
-          if (prod.variants && prod.variants.length > 0 && variantId) {
-            const v = prod.variants.find((x: any) => x.id === variantId);
-            if (v && typeof v.stock === 'number') maxStock = v.stock;
-          }
-
-          const qty = getItemQty(item);
-          if (maxStock !== null && maxStock <= 0) {
-            setLoading(false);
-            setErrorMsg(`สินค้า "${getItemName(item)}" หมดแล้ว ไม่สามารถสั่งซื้อได้`);
-            return;
-          }
-          if (maxStock !== null && qty > maxStock) {
-            setLoading(false);
-            setErrorMsg(`สินค้า "${getItemName(item)}" มีในสต็อกเพียง ${maxStock} ชิ้น (ในตะกร้ามี ${qty} ชิ้น)`);
-            return;
-          }
-        }
-      }
-    } catch {
-      /* continue order creation; backend will also validate */
-    }
-
+    // The order API validates the live catalog and stock atomically.
+    // Avoid a second full-catalog request here so confirmation is not delayed.
     try {
       const formattedCart = cart.map((item: any) => ({
         productId: item.productId || item.id || '',
@@ -316,7 +282,8 @@ export default function StandaloneCheckoutPage() {
 
       const data = await res.json();
       if (!res.ok || data.status === 'error') {
-        throw new Error(data.message || 'สร้างคำสั่งซื้อไม่สำเร็จ');
+        const orderError = typeof data.message === 'string' ? data.message : t.checkout.orderError;
+        throw new Error(orderError);
       }
 
       const orderRef = data.order?.ref || data.ref;
@@ -333,11 +300,12 @@ export default function StandaloneCheckoutPage() {
         clearCart();
         router.push(`/payment/${encodeURIComponent(orderRef)}`);
       } else {
-        throw new Error('ไม่ได้รับรหัสคำสั่งซื้อ');
+        throw new Error(t.checkout.orderError);
       }
     } catch (err: any) {
       console.error('[Checkout] Error:', err);
-      setErrorMsg(err?.message || 'เกิดข้อผิดพลาดในการสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
+      const rawMessage = typeof err?.message === 'string' ? err.message : '';
+      setErrorMsg(formatFriendlyError(rawMessage || t.checkout.orderError));
     } finally {
       setLoading(false);
     }

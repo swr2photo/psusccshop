@@ -155,7 +155,7 @@ function NavButton({
       ) : null}
       <span
         className="grid size-5 shrink-0 place-items-center [&_svg]:size-[18px]"
-        style={{ color: active ? 'var(--primary)' : item.color }}
+        style={{ color: active ? 'var(--primary)' : 'currentColor' }}
       >
         {item.icon}
       </span>
@@ -350,8 +350,7 @@ function CommandPalette({
                     )}
                   >
                     <span
-                      className="grid size-7 shrink-0 place-items-center rounded-md bg-muted [&_svg]:size-4"
-                      style={{ color: entry.color }}
+                      className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-primary [&_svg]:size-4"
                     >
                       {entry.icon}
                     </span>
@@ -820,13 +819,13 @@ export function AdminShell({
                 className={cn(
                   'hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium sm:inline-flex',
                   saving
-                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                    ? 'border-warning/30 bg-warning/10 text-warning dark:text-warning'
                     : 'border-border text-muted-foreground',
                 )}
                 aria-live="polite"
               >
                 <span
-                  className={cn('size-1.5 rounded-full', saving ? 'animate-pulse bg-amber-500' : 'bg-emerald-500')}
+                  className={cn('size-1.5 rounded-full', saving ? 'animate-pulse bg-warning' : 'bg-success')}
                 />
                 {statusText}
               </span>

@@ -258,19 +258,19 @@ export const DashboardView = React.memo(function DashboardView({
       count: stats.pending,
       label: en ? 'Awaiting payment' : 'รอชำระเงิน / ตรวจสลิป',
       icon: <Clock />,
-      tone: 'text-amber-600 dark:text-amber-400 bg-amber-500/12',
+      tone: 'text-warning dark:text-warning bg-warning/12',
     },
     {
       count: stats.paid,
       label: en ? 'Paid — prepare to ship' : 'ชำระแล้ว รอจัดเตรียม/จัดส่ง',
       icon: <PackageCheck />,
-      tone: 'text-sky-600 dark:text-sky-400 bg-sky-500/12',
+      tone: 'text-primary dark:text-primary bg-primary/12',
     },
     {
       count: stats.refund,
       label: en ? 'Refund requests' : 'คำขอคืนเงิน',
       icon: <RefreshCw />,
-      tone: 'text-violet-600 dark:text-violet-400 bg-violet-500/12',
+      tone: 'text-primary dark:text-primary bg-primary/12',
       tab: 13,
     },
   ].filter((t) => t.count > 0);
@@ -285,7 +285,7 @@ export const DashboardView = React.memo(function DashboardView({
           </p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {shopName ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/12 px-2 py-0.5 font-medium text-violet-600 dark:text-violet-400">
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/12 px-2 py-0.5 font-medium text-primary dark:text-primary">
                 <Store className="size-3" /> {shopName}
               </span>
             ) : null}
@@ -293,8 +293,8 @@ export const DashboardView = React.memo(function DashboardView({
               className={cn(
                 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium',
                 realtimeConnected
-                  ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
+                  ? 'bg-success/12 text-success dark:text-success'
+                  : 'bg-warning/12 text-warning dark:text-warning',
               )}
             >
               {realtimeConnected ? <Radio className="size-3" /> : <Timer className="size-3" />}
@@ -526,7 +526,7 @@ export const DashboardView = React.memo(function DashboardView({
                   <span
                     className={cn(
                       'grid size-6 shrink-0 place-items-center rounded-md text-xs font-bold',
-                      i === 0 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-muted text-muted-foreground',
+                      i === 0 ? 'bg-warning/15 text-warning dark:text-warning' : 'bg-muted text-muted-foreground',
                     )}
                   >
                     {i + 1}

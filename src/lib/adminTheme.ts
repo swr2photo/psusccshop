@@ -14,25 +14,26 @@ export const ADMIN_THEME = {
   muted: 'var(--text-muted)',
 
   border: 'var(--glass-border)',
-  borderActive: 'rgba(99,102,241,0.5)',
+  borderActive: 'color-mix(in srgb, var(--primary) 50%, transparent)',
 
   glass: 'var(--glass-bg)',
   glassSoft: 'var(--surface-2)',
   glassHover: 'var(--glass-strong)',
   cardHover: 'var(--surface-2)',
 
-  gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-  gradientAlt: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-  gradientWarm: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
-  gradientCool: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
+  // One base: "gradients" are now the flat shared colors (kept as keys for older callers)
+  gradient: 'var(--primary)',
+  gradientAlt: 'var(--success)',
+  gradientWarm: 'var(--warning)',
+  gradientCool: 'var(--primary)',
 
-  primary: '#6366f1',
-  primaryLight: '#a5b4fc',
-  success: '#10b981',
-  warning: '#f59e0b',
-  error: '#ef4444',
-  info: '#06b6d4',
-  accent: '#8b5cf6',
+  primary: 'var(--primary)',
+  primaryLight: 'color-mix(in srgb, var(--primary) 55%, white)',
+  success: 'var(--success)',
+  warning: 'var(--warning)',
+  error: 'var(--error)',
+  info: 'var(--primary)',
+  accent: 'var(--primary)',
 };
 
 /** Fixed palette for dark dialogs — never use CSS vars (admin may be light theme). */
@@ -43,7 +44,7 @@ export const DIALOG_THEME = {
   label: '#cbd5e1',
   muted: '#94a3b8',
   inputBg: 'rgba(255,255,255,0.06)',
-  section: '#c4b5fd',
+  section: '#64b5ff',
   border: 'rgba(255,255,255,0.12)',
 };
 
@@ -84,8 +85,8 @@ export const adminInputSx = {
     borderRadius: '12px',
     color: ADMIN_THEME.text,
     '& fieldset': { borderColor: ADMIN_THEME.border },
-    '&:hover fieldset': { borderColor: 'rgba(99,102,241,0.4)' },
-    '&.Mui-focused fieldset': { borderColor: ADMIN_THEME.primary, boxShadow: '0 0 0 3px rgba(99,102,241,0.15)' },
+    '&:hover fieldset': { borderColor: 'color-mix(in srgb, var(--primary) 40%, transparent)' },
+    '&.Mui-focused fieldset': { borderColor: ADMIN_THEME.primary, boxShadow: '0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent)' },
   },
   '& .MuiInputLabel-root': { color: ADMIN_THEME.textSecondary },
   '& .MuiInputLabel-root.Mui-focused': { color: ADMIN_THEME.primary },
@@ -101,7 +102,7 @@ export const adminInputSxCompact = {
     color: ADMIN_THEME.text,
     '&:hover': { bgcolor: ADMIN_THEME.cardHover },
     '& fieldset': { borderColor: ADMIN_THEME.border },
-    '&:hover fieldset': { borderColor: 'rgba(99,102,241,0.35)' },
+    '&:hover fieldset': { borderColor: 'color-mix(in srgb, var(--primary) 35%, transparent)' },
     '&.Mui-focused fieldset': { borderColor: ADMIN_THEME.primary },
   },
   '& .MuiInputLabel-root': {
@@ -117,7 +118,7 @@ export const adminSelectSx = {
   backgroundColor: ADMIN_THEME.glassSoft,
   color: ADMIN_THEME.text,
   '& fieldset': { borderColor: ADMIN_THEME.border },
-  '&:hover fieldset': { borderColor: 'rgba(99,102,241,0.35)' },
+  '&:hover fieldset': { borderColor: 'color-mix(in srgb, var(--primary) 35%, transparent)' },
   '&.Mui-focused fieldset': { borderColor: ADMIN_THEME.primary },
 };
 
@@ -129,10 +130,10 @@ export const adminGradientButtonSx = {
   textTransform: 'none',
   px: 3,
   py: 1.2,
-  boxShadow: '0 4px 14px rgba(99,102,241,0.35)',
+  boxShadow: '0 4px 14px color-mix(in srgb, var(--primary) 30%, transparent)',
   '&:hover': {
-    background: 'linear-gradient(135deg, #5458e9 0%, #7c3aed 100%)',
-    boxShadow: '0 6px 20px rgba(99,102,241,0.45)',
+    background: 'color-mix(in srgb, var(--primary) 88%, black)',
+    boxShadow: '0 6px 20px color-mix(in srgb, var(--primary) 40%, transparent)',
     transform: 'translateY(-1px)',
   },
   transition: 'all 0.2s ease',
@@ -175,7 +176,7 @@ export const dialogInputSx = {
     '&.Mui-focused fieldset': { borderColor: ADMIN_THEME.accent },
   },
   '& .MuiInputLabel-root': { color: DIALOG_THEME.label },
-  '& .MuiInputLabel-root.Mui-focused': { color: '#a78bfa' },
+  '& .MuiInputLabel-root.Mui-focused': { color: '#64b5ff' },
   '& .MuiInputBase-input': { color: DIALOG_THEME.text, fontSize: '0.9rem' },
   '& .MuiFormHelperText-root': { color: DIALOG_THEME.muted },
 };

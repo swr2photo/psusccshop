@@ -6,16 +6,17 @@
 import { apiFetch, getCart, saveCart as saveCartApi } from '@/lib/api-client';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  Box, Typography, Button, Chip, Avatar, IconButton, Badge,
-  Dialog, DialogContent, DialogActions, TextField,
+  Box, Typography, Button, Chip, Avatar, IconButton,
+  Dialog, DialogContent, DialogActions, TextField, Popover, Divider,
   useMediaQuery, Skeleton,
   CircularProgress, Tooltip, Drawer,
 } from '@mui/material';
 import {
   Store, ShoppingCart, Plus, Minus, X, ArrowLeft, Search,
   Share2, Heart, Package, Clock, Tag,
-  History, MapPin, User, Phone, Mail, Instagram, Facebook, Palette, Image as ImageOutlinedIcon,
-  CheckCircle2, ChevronLeft, ChevronRight, Zap, Ruler,
+  Phone, Mail, Instagram, Facebook, Palette, Image as ImageOutlinedIcon,
+  CheckCircle2, ChevronLeft, ChevronRight, Zap, Ruler, Bot, Headphones,
+  MessageCircle as ChatIcon,
 } from 'lucide-react';
 import { useSession, signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
@@ -25,22 +26,23 @@ const CheckoutDialog = dynamic(() => import('@/components/CheckoutDialog'), { ss
 const ProfileModal = dynamic(() => import('@/components/ProfileModal'), { ssr: false });
 const CartDrawer = dynamic(() => import('@/components/CartDrawer'), { ssr: false });
 const PaymentFlow = dynamic(() => import('@/components/PaymentFlow'), { ssr: false });
-function TogglePlaceholder() {
-  return <div style={{ display: 'inline-block', width: 40, height: 40, flexShrink: 0 }} aria-hidden />;
-}
-const ThemeToggle = dynamic(() => import('@/components/ThemeToggle'), { ssr: false, loading: TogglePlaceholder });
-const LanguageToggle = dynamic(() => import('@/components/LanguageToggle'), { ssr: false, loading: TogglePlaceholder });
+const ShirtChatBot = dynamic(() => import('@/components/ShirtChatBot'), { ssr: false });
 import { type SavedAddress } from '@/components/ProfileModal';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import StorefrontNavbar from '@/components/StorefrontNavbar';
+import MobileBottomNav from '@/components/MobileBottomNav';
+import { productMatchesSearch, rankProductSearch } from '@/lib/product-search';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useCurrentTime } from '@/hooks/useCurrentTime';
+import { useMinuteClock } from '@/hooks/useCurrentTime';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { usePublicShopQuery, queryKeys } from '@/hooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase-client';
-import OptimizedImage from '@/components/OptimizedImage';
+import { OptimizedBackground } from '@/components/OptimizedImage';
+import ProductImage from '@/components/storefront/ProductImage';
 import { useGalleryImagePreload, isGalleryImageInRange } from '@/hooks/useGalleryImagePreload';
 import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
@@ -53,7 +55,7 @@ import {
 } from '@/components/ShopStatusCard';
 import ServerStatusBanner from '@/components/ServerStatusBanner';
 import type { Product, ShopConfig } from '@/lib/config';
-import type { ShippingConfig } from '@/lib/shipping';
+import { usePageShipping } from '@/hooks/usePageData';
 import type { CartItem as DrawerCartItem } from '@/lib/shop-constants';
 import { zustandCartToDrawerCart, drawerCartToZustandItem } from '@/lib/cart-mapper';
 import { useRealtimeOrdersByEmail } from '@/hooks/useRealtimeOrders';
@@ -208,8 +210,9 @@ const normalizeDigits99 = (value: string) => {
 // ==================== COMPONENT ====================
 export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefrontProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const { t, lang } = useTranslation();
-  const now = useCurrentTime(5000);
+  const now = useMinuteClock(); // minute-precision: avoids re-rendering the whole page every 5s
   const { confirm: showConfirm, ConfirmDialog } = useConfirmDialog();
   const { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo } = useNotification();
   const isMobile = useMediaQuery('(max-width:600px)', { noSsr: true });
@@ -220,12 +223,14 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   // Filter cart items for this shop only
   const shopCart = useMemo(() => cart.filter(item => item.shopSlug === shopSlug), [cart, shopSlug]);
+  const { shippingConfig } = usePageShipping(shopCart.length > 0);
 
   const queryClient = useQueryClient();
   const { data: shopQueryResult, isFetching: isShopFetching } = usePublicShopQuery(initialShop.id, initialShop);
 
   const shop = shopQueryResult?.shop || initialShop;
-  const products: Product[] = (shop as any)?.products || [];
+  // Stable reference: a fresh `[]` each render made every products-based memo/effect re-run
+  const products: Product[] = useMemo(() => (shop as any)?.products || [], [shop]);
   const shopOpenFields = useMemo(() => resolveShopOpenFields(shop), [shop]);
   const shopStatusType = useMemo(
     () => getShopStatus(shopOpenFields.isOpen, shopOpenFields.closeDate, shopOpenFields.openDate, now),
@@ -241,6 +246,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [cartOpen, setCartOpen] = useState(false);
+  const [chatbotOpen, setChatbotOpen] = useState(false);
+  const [supportChatOpen, setSupportChatOpen] = useState(false);
+  const [chatMenuAnchor, setChatMenuAnchor] = useState<HTMLElement | null>(null);
   const [cartPromo, setCartPromo] = useState<{ code: string; discount: number; description?: string } | null>(null);
   const paymentOpenerRef = useRef<((ref: string) => void) | null>(null);
   const cartHoldTimers = useRef<Record<string, ReturnType<typeof setInterval> | null>>({});
@@ -248,7 +256,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const loadOrderHistoryRef = useRef<(opts?: { append?: boolean }) => Promise<void>>(async () => {});
   const historyLoadedRef = useRef(false);
   const [editingCartItem, setEditingCartItem] = useState<DrawerCartItem | null>(null);
-  const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
   const [confirmCancelRef, setConfirmCancelRef] = useState<string | null>(null);
 
   // Product dialog state
@@ -581,16 +588,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       })
       .catch(() => {});
   }, [session?.user?.email, session?.user?.name]);
-
-  // Shipping options preview (same as main store cart drawer)
-  useEffect(() => {
-    apiFetch('/api/shipping/options', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.config) setShippingConfig(data.config);
-      })
-      .catch(() => {});
-  }, []);
 
   // Load order history on mount for badge count
   useEffect(() => {
@@ -1234,16 +1231,15 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   // Grouped products by category
   const filteredGroupedProducts = useMemo(() => {
-    const filtered = sortProductsNewestFirst(products.filter((p) => {
+    // Same search matching + relevance ranking as the main storefront
+    const term = searchQuery.trim();
+    const matched = products.filter((p) => {
       if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        return p.name.toLowerCase().includes(q) ||
-          (p.nameEn && p.nameEn.toLowerCase().includes(q)) ||
-          (p.description && p.description.toLowerCase().includes(q));
-      }
-      return true;
-    }));
+      return term ? productMatchesSearch(p, term, lang, p.category || '') : true;
+    });
+    const filtered = term
+      ? [...matched].sort((a, b) => rankProductSearch(b, term, lang) - rankProductSearch(a, term, lang))
+      : sortProductsNewestFirst(matched);
 
     const grouped: Record<string, Product[]> = {};
     filtered.forEach((p) => {
@@ -1252,7 +1248,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       grouped[cat].push(p);
     });
     return grouped;
-  }, [products, selectedCategory, searchQuery]);
+  }, [products, selectedCategory, searchQuery, lang]);
 
   const totalFilteredCount = Object.values(filteredGroupedProducts).reduce((sum, items) => sum + items.length, 0);
   const cartCount = shopCart.length;
@@ -1469,25 +1465,68 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     } catch { /* User cancelled */ }
   }, [shopSlug, lang, showToast, t]);
 
+  // Shared navbar / bottom-nav tabs behave like the main store, but keep the
+  // shopper inside this sub-shop (its own cart, history and profile drawers).
+  const handleNavTab = useCallback((tab: string) => {
+    switch (tab) {
+      case 'home':
+        router.push('/');
+        break;
+      case 'shop':
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      case 'cart':
+        setCartOpen(true);
+        break;
+      case 'history':
+        if (session?.user?.email) setShowOrderHistory(true);
+        else signIn();
+        break;
+      case 'profile':
+        if (session?.user?.email) setShowProfileModal(true);
+        else signIn();
+        break;
+      case 'support':
+        setSupportChatOpen(true);
+        break;
+      default:
+        break;
+    }
+  }, [router, session?.user?.email]);
+
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background)', color: 'var(--foreground)' }}>
-      {/* ==================== HEADER ==================== */}
-      <Box sx={{ position: 'sticky', top: 0, zIndex: 100, bgcolor: 'var(--background)' }}>
-        <ServerStatusBanner
-          show={serverIssue}
-          onRetry={() => {
-            queryClient.invalidateQueries({ queryKey: [...queryKeys.shop.all, 'public', initialShop.id] });
-          }}
-        />
-        <ProgressiveBlurChrome edge="bottom" fadeExtent={52} intensity="strong">
+    <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background)', color: 'var(--foreground)', pb: { xs: 'calc(72px + env(safe-area-inset-bottom))', md: 0 } }}>
+      {/* ==================== HEADER (shared with the main storefront) ==================== */}
+      <StorefrontNavbar
+        activeTab="shop"
+        cartCount={cartCount}
+        pendingOrderCount={pendingPaymentCount}
+        isLiveActive={isLiveActive}
+        isAuthenticated={Boolean(session?.user?.email)}
+        avatarUrl={orderProfileImage || session?.user?.image || undefined}
+        serverStatusBanner={
+          <ServerStatusBanner
+            show={serverIssue}
+            onRetry={() => {
+              queryClient.invalidateQueries({ queryKey: [...queryKeys.shop.all, 'public', initialShop.id] });
+            }}
+          />
+        }
+        onTabChange={handleNavTab}
+        onShopClick={() => router.push('/shop')}
+        onOpenLive={openLiveStream}
+      />
+
+      {/* Shop identity bar */}
+      <Box sx={{ bgcolor: 'var(--background)', borderBottom: '1px solid var(--glass-border)' }}>
+        <ProgressiveBlurChrome edge="bottom" fadeExtent={24} intensity="strong">
         <Box sx={{
           maxWidth: '1200px', mx: 'auto',
           px: 2,
-          pt: { xs: 'max(0.75rem, env(safe-area-inset-top))', md: 1.5 },
-          pb: 1.5,
+          py: 1.25,
           display: 'flex', alignItems: 'center', gap: 2,
         }}>
-          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link href="/shop" style={{ textDecoration: 'none', color: 'inherit' }} aria-label={lang === 'en' ? 'All shops' : 'ร้านค้าทั้งหมด'}>
             <IconButton sx={{ color: 'var(--text-muted)' }}>
               <ArrowLeft size={20} />
             </IconButton>
@@ -1521,77 +1560,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
               <Heart size={20} fill={isFollowing ? '#ff453a' : 'none'} />
             </IconButton>
           </Tooltip>
-          {isLiveActive && (
-            <Tooltip title={liveTitle || (lang === 'en' ? 'Live now' : 'กำลังไลฟ์')}>
-              <Button
-                size="small"
-                onClick={openLiveStream}
-                sx={{
-                  minWidth: 'auto',
-                  px: 1.2,
-                  py: 0.5,
-                  borderRadius: '999px',
-                  bgcolor: 'rgba(255,69,58,0.15)',
-                  color: '#ff453a',
-                  fontWeight: 800,
-                  fontSize: '0.72rem',
-                  '&:hover': { bgcolor: 'rgba(255,69,58,0.25)' },
-                }}
-              >
-                LIVE
-              </Button>
-            </Tooltip>
-          )}
-          <ThemeToggle />
-          <LanguageToggle />
-          {/* Order History button */}
-          {session?.user?.email && (
-            <Tooltip title={lang === 'en' ? 'Order History' : 'ประวัติคำสั่งซื้อ'}>
-              <IconButton
-                onClick={() => setShowOrderHistory(true)}
-                sx={{ color: 'var(--foreground)' }}
-              >
-                <Badge badgeContent={pendingPaymentCount} color="warning">
-                  <History size={20} />
-                </Badge>
-              </IconButton>
-            </Tooltip>
-          )}
-          <IconButton onClick={() => setCartOpen(true)} sx={{ color: 'var(--foreground)' }}>
-            <Badge badgeContent={cartCount} color="error">
-              <ShoppingCart size={22} />
-            </Badge>
-          </IconButton>
-          {session?.user?.email ? (
-            <Tooltip title={lang === 'en' ? 'Profile' : 'โปรไฟล์'}>
-              <Avatar
-                src={orderProfileImage || session.user?.image || ''}
-                onClick={() => setShowProfileModal(true)}
-                sx={{
-                  width: 32,
-                  height: 32,
-                  cursor: 'pointer',
-                  border: '1px solid var(--glass-border)',
-                  bgcolor: 'var(--surface-2)',
-                }}
-              >
-                {!orderProfileImage && !session.user?.image && (
-                  session.user?.name?.[0] || <User size={16} />
-                )}
-              </Avatar>
-            </Tooltip>
-          ) : (
-            <Tooltip title={lang === 'en' ? 'Sign in' : 'เข้าสู่ระบบ'}>
-              <IconButton
-                onClick={() => signIn()}
-                sx={{ p: 0.25 }}
-              >
-                <Avatar sx={{ width: 32, height: 32, bgcolor: 'var(--surface-2)', border: '1px solid var(--glass-border)' }}>
-                  <User size={16} color="var(--text-muted)" />
-                </Avatar>
-              </IconButton>
-            </Tooltip>
-          )}
         </Box>
         </ProgressiveBlurChrome>
       </Box>
@@ -1607,17 +1575,25 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       <Box sx={{
         position: 'relative',
         height: isMobile ? 160 : 220,
-        background: shop.bannerUrl
-          ? `url(${shop.bannerUrl}) center/cover`
-          : 'linear-gradient(135deg, #0071e3 0%, #0077ED 50%, #34c759 100%)',
+        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 50%, #34c759 100%)',
         display: 'flex', alignItems: 'flex-end',
+        overflow: 'hidden',
       }}>
+        {shop.bannerUrl && (
+          <OptimizedBackground
+            src={shop.bannerUrl}
+            priority
+            fallbackColor="transparent"
+            style={{ position: 'absolute', inset: 0, zIndex: 0 }}
+          />
+        )}
         <Box sx={{
           position: 'absolute', inset: 0,
           background: 'linear-gradient(transparent 30%, var(--background) 100%)',
+          zIndex: 1,
         }} />
         <Box sx={{
-          position: 'relative', px: 3, pb: 2.5, maxWidth: '1200px',
+          position: 'relative', zIndex: 2, px: 3, pb: 2.5, maxWidth: '1200px',
           mx: 'auto', width: '100%',
         }}>
           <Typography sx={{ fontSize: isMobile ? '1.4rem' : '1.8rem', fontWeight: 800, color: 'white', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
@@ -1926,38 +1902,23 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                             bgcolor: 'var(--surface-2)',
                             overflow: 'hidden',
                           }}>
-                            {(product.coverImage || product.images?.[0]) ? (
-                              <OptimizedImage
-                                src={product.coverImage ?? (product.images && product.images[0]) ?? ''}
-                                alt={getProductName(product, lang)}
-                                width="100%"
-                                height="100%"
-                                objectFit="cover"
-                                priority={productIdx < 4}
-                                placeholder="shimmer"
-                                showLoadingIndicator={false}
-                                style={{
-                                  position: 'absolute',
-                                  inset: 0,
-                                  transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                                }}
-                                className={!isProductClosed ? 'product-image-zoom' : ''}
-                              />
-                            ) : (
-                              <Box sx={{
-                                position: 'absolute', inset: 0,
-                                display: 'flex',
-                                alignItems: 'center', justifyContent: 'center',
-                                bgcolor: '#ececef',
-                              }}>
-                                <Box
-                                  component="img"
-                                  src="/favicon.png"
-                                  alt="SCC Shop"
-                                  sx={{ width: 40, height: 40, opacity: 0.4, filter: 'grayscale(1)' }}
-                                />
-                              </Box>
-                            )}
+                            <ProductImage
+                              src={product.coverImage}
+                              fallbackSrcs={product.images}
+                              alt={getProductName(product, lang)}
+                              width="100%"
+                              height="100%"
+                              objectFit="cover"
+                              priority={productIdx < 4}
+                              placeholder="shimmer"
+                              showLoadingIndicator={false}
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                              }}
+                              className={!isProductClosed ? 'product-image-zoom' : ''}
+                            />
 
                             {/* Status Overlay for closed products */}
                             {isProductClosed && (
@@ -2445,8 +2406,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               }}
                             >
                               {isGalleryImageInRange(idx, activeImageIndex) ? (
-                                <OptimizedImage
+                                <ProductImage
                                   src={img}
+                                  fallbackSrcs={productImages.filter((_, imageIndex) => imageIndex !== idx)}
                                   alt={`${getProductName(selectedProduct, lang)} - ${idx + 1}`}
                                   width="100%"
                                   height="100%"
@@ -3188,7 +3150,129 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       />
 
       {/* ==================== SUPPORT CHAT ==================== */}
-      <SupportChatWidget shopId={shop.id} shopName={shop.name} />
+      <Box
+        component="button"
+        type="button"
+        aria-label={t.nav.chat}
+        onClick={(e: React.MouseEvent<HTMLElement>) => setChatMenuAnchor(e.currentTarget)}
+        sx={{
+          position: 'fixed',
+          right: { xs: 12, sm: 20 },
+          bottom: {
+            xs: 'calc(4.75rem + env(safe-area-inset-bottom) + 10px)',
+            md: 24,
+          },
+          zIndex: 1150,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.85,
+          px: 1.75,
+          py: 1.05,
+          borderRadius: '999px',
+          border: '1px solid var(--glass-border)',
+          bgcolor: 'var(--background)',
+          color: 'var(--foreground)',
+          boxShadow: (theme) =>
+            theme.palette.mode === 'dark'
+              ? '0 6px 20px rgba(0,0,0,0.45)'
+              : '0 6px 18px rgba(0,0,0,0.1)',
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+          fontFamily: 'inherit',
+          transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+          '&:hover': {
+            boxShadow: (theme) =>
+              theme.palette.mode === 'dark'
+                ? '0 8px 24px rgba(0,0,0,0.55)'
+                : '0 8px 22px rgba(0,0,0,0.14)',
+          },
+          '&:active': { transform: 'scale(0.97)' },
+        }}
+      >
+        <ChatIcon size={18} strokeWidth={1.75} />
+        <Box component="span" sx={{ fontSize: '0.82rem', fontWeight: 650, letterSpacing: '0.01em', lineHeight: 1 }}>
+          {t.nav.chat}
+        </Box>
+      </Box>
+
+      <Popover
+        open={Boolean(chatMenuAnchor)}
+        anchorEl={chatMenuAnchor}
+        onClose={() => setChatMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transitionDuration={{ enter: 150, exit: 100 }}
+        disableScrollLock
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.97)' : 'rgba(255,255,255,0.98)',
+              color: (theme: any) => theme.palette.mode === 'dark' ? '#f5f5f7' : '#1d1d1f',
+              borderRadius: 3,
+              minWidth: 220,
+              border: (theme: any) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+              boxShadow: (theme: any) => theme.palette.mode === 'dark'
+                ? '0 8px 24px rgba(0,0,0,0.5)'
+                : '0 8px 24px rgba(0,0,0,0.12)',
+              mb: 1,
+              overflow: 'hidden',
+            },
+          },
+        }}
+      >
+        <Box
+          onClick={() => {
+            setChatMenuAnchor(null);
+            setChatbotOpen(true);
+          }}
+          sx={{
+            display: 'flex', alignItems: 'center', gap: 1.5,
+            px: 2.5, py: 1.8,
+            cursor: 'pointer', touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            transition: 'background 0.1s',
+            '&:active': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.1)' },
+          }}
+        >
+          <Bot size={24} color="#30d158" />
+          <Box>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>{t.help.askChatbot}</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.help.chatbotDesc}</Typography>
+          </Box>
+        </Box>
+        <Divider sx={{ borderColor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
+        <Box
+          onClick={() => {
+            setChatMenuAnchor(null);
+            setSupportChatOpen(true);
+          }}
+          sx={{
+            display: 'flex', alignItems: 'center', gap: 1.5,
+            px: 2.5, py: 1.8,
+            cursor: 'pointer', touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            transition: 'background 0.1s',
+            '&:active': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.15)' : 'rgba(0,113,227,0.1)' },
+          }}
+        >
+          <Headphones size={24} color="#0071e3" />
+          <Box>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>{t.help.contactAdmin}</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.help.contactAdminDesc}</Typography>
+          </Box>
+        </Box>
+      </Popover>
+
+      <SupportChatWidget
+        shopId={shop.id}
+        shopName={shop.name}
+        onOpenChatbot={() => setChatbotOpen(true)}
+        hideMobileFab
+        externalOpen={supportChatOpen}
+        onExternalOpenHandled={() => setSupportChatOpen(false)}
+      />
+      <ShirtChatBot open={chatbotOpen} setOpen={setChatbotOpen} />
 
       {/* ==================== SHOP CONTACT ==================== */}
       {hasShopContact && (
@@ -3456,8 +3540,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
               userSelect: 'none',
             }}
           >
-            <OptimizedImage
+            <ProductImage
               src={productImages[lightboxIndex]}
+              fallbackSrcs={productImages.filter((_, imageIndex) => imageIndex !== lightboxIndex)}
               alt={`Fullscreen ${lightboxIndex + 1}`}
               width="100%"
               height="100%"
@@ -3508,8 +3593,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   '&:hover': { opacity: 0.95 },
                 }}
               >
-                <OptimizedImage
+                <ProductImage
                   src={img}
+                  fallbackSrcs={productImages.filter((_, imageIndex) => imageIndex !== idx)}
                   alt={`Thumbnail ${idx + 1}`}
                   width="100%"
                   height="100%"
@@ -3525,6 +3611,13 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       </Dialog>
 
       <ConfirmDialog />
+
+      {/* Same mobile bottom bar as the main storefront */}
+      <MobileBottomNav
+        activeKey={cartOpen ? 'cart' : showOrderHistory ? 'history' : 'shop'}
+        hidden={Boolean(selectedProduct) || lightboxOpen || checkoutOpen}
+        onTabClick={handleNavTab}
+      />
     </Box>
   );
 }

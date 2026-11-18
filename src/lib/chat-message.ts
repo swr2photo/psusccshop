@@ -34,6 +34,26 @@ export function formatReplyPrefix(replyToId: string, preview: string): string {
   return `[ตอบกลับ|#${replyToId}|"${safe}"]\n`;
 }
 
+/**
+ * One-line, human-readable preview of a chat message for lists / notifications.
+ * Handles media tokens even when the stored preview was truncated mid-token
+ * (e.g. "[เสียง: data:audio/webm;codecs=opus;ba…" with no closing bracket).
+ */
+export function formatChatPreview(msg: string | null | undefined, maxLength = 80): string {
+  if (!msg) return '';
+  const token = (name: string) => new RegExp(`\\[${name}:[^\\]]*(?:\\]|$)`, 'gu');
+  const text = msg
+    .replace(/\[ตอบกลับ[^\]]*(?:\]|$)\n?/gu, '')
+    .replace(token('เสียง'), '🎤 ข้อความเสียง')
+    .replace(token('รูปภาพ'), '🖼️ รูปภาพ')
+    .replace(token('สติกเกอร์'), '🙂 สติกเกอร์')
+    .replace(/\[#edited#\]/g, '')
+    .replace(/data:[a-z]+\/[\w.+-]+;[^\s\]]*/giu, '[ไฟล์]')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
 export function stripEditedToken(msg: string): string {
   return msg.replace(/\s*\[#edited#\]\s*$/u, '').trimEnd();
 }

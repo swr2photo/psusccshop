@@ -64,6 +64,7 @@ export const SESSION_BOUND_API_PREFIXES = [
   '/api/gas',
   '/api/pickup',
   '/api/reviews',
+  '/api/forms',
   '/api/inventory',
   '/api/live',
   '/api/chatbot',

@@ -5,7 +5,8 @@ import { apiFetch } from '@/lib/api-client';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveStreamContext } from '@/context/LiveStreamProvider';
-import OptimizedImage, { preloadImages } from '@/components/OptimizedImage';
+import { preloadImages } from '@/components/OptimizedImage';
+import ProductImage from '@/components/storefront/ProductImage';
 import { MessageCircle as ChatIcon, Store as StorefrontIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon, ChevronUp, ChevronDown } from 'lucide-react';
 
 import MobileBottomNav from '@/components/MobileBottomNav';
@@ -199,7 +200,7 @@ import { useThemeStore, ThemeMode } from '@/store/themeStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useCurrentTime } from '@/hooks/useCurrentTime';
+import { useMinuteClock } from '@/hooks/useCurrentTime';
 import { useShopCatalog, useProductReviews, PAGE_CACHE_KEYS } from '@/hooks/usePageData';
 import { mutate } from 'swr';
 import {
@@ -638,7 +639,7 @@ function getProductLink(product: Product): string {
 }
 
 export default function HomePage() {
-  const now = useCurrentTime(5000);
+  const now = useMinuteClock(); // minute-precision: avoids re-rendering the whole page every 5s
   const { data: session, status } = useSession();
   const isMobile = useMediaQuery('(max-width:600px)');
   const theme = useTheme();
@@ -862,7 +863,6 @@ export default function HomePage() {
   const [announcementHistory, setAnnouncementHistory] = useState<ShopConfig['announcementHistory']>([]);
   const [showAnnouncementHistory, setShowAnnouncementHistory] = useState(false);
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(true); // For floating popup
-  const [currentAnnouncementIndex, setCurrentAnnouncementIndex] = useState(0); // For cycling announcements
   const [showAnnouncementImage, setShowAnnouncementImage] = useState(false); // For image lightbox
   // Health of the public config realtime channel — gates fallback polling.
   // (realtimeConnected from useRealtimeOrders only reflects the orders channel)
@@ -1205,6 +1205,9 @@ export default function HomePage() {
         (shippingData?.success === undefined ? (shippingData as ShippingConfig) : null);
       if (next) {
         setShippingConfig(next);
+        // Prime the shared SWR cache so the checkout dialog can reuse the
+        // request that already loaded for the main storefront.
+        mutate(PAGE_CACHE_KEYS.SHIPPING, { success: true, data: next }, false);
         lastShippingRefreshAt.current = Date.now();
       }
     } catch (shippingErr) {
@@ -1762,17 +1765,8 @@ export default function HomePage() {
     [mutateProductReviews, orderData.email, session?.user?.email],
   );
 
-  //  Auto-cycle through announcements
-  useEffect(() => {
-    const enabledAnnouncements = announcements?.filter(a => a.enabled) || [];
-    if (enabledAnnouncements.length <= 1) return;
-    
-    const interval = setInterval(() => {
-      setCurrentAnnouncementIndex(prev => (prev + 1) % enabledAnnouncements.length);
-    }, 8000); // Change every 8 seconds
-    
-    return () => clearInterval(interval);
-  }, [announcements]);
+  // (Removed: an 8-second announcement "cycler" whose index was never rendered —
+  //  it only forced a full re-render of this page every 8 seconds.)
 
   //  Check if announcement was dismissed in this session
   useEffect(() => {
@@ -3732,7 +3726,6 @@ export default function HomePage() {
                     {previewItems.length > 0 ? (
                       <Box sx={{ px: 1, pb: 1.5 }}>
                         {previewItems.map((product) => {
-                          const img = product.coverImage || product.images?.[0];
                           const eventDisc = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined, now);
                           return (
                             <Box
@@ -3761,11 +3754,16 @@ export default function HomePage() {
                                 border: '1px solid', borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                               }}>
-                                {img ? (
-                                  <img src={img} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
-                                ) : (
-                                  <Package size={18} style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-                                )}
+                                <ProductImage
+                                  src={product.coverImage}
+                                  fallbackSrcs={product.images}
+                                  alt={product.name}
+                                  width="100%"
+                                  height="100%"
+                                  objectFit="cover"
+                                  placeholder="none"
+                                  showLoadingIndicator={false}
+                                />
                               </Box>
                               {/* Info */}
                               <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -3869,6 +3867,8 @@ export default function HomePage() {
       {/* Hero → Trust strip (first impression) */}
       <HomeHero
         product={flagshipHeroProduct}
+        isOpen={isShopOpen}
+        closeDate={config?.closeDate}
         onBuy={(product) => {
           handleSelectProduct(product);
         }}
@@ -4361,6 +4361,7 @@ export default function HomePage() {
           <Container
             maxWidth="lg"
             id="product-grid"
+            className="store-type"
             sx={{ px: { xs: 0, sm: 2 }, scrollMarginTop: { xs: '64px', md: '80px' } }}
           >
             
@@ -4508,9 +4509,6 @@ export default function HomePage() {
                               },
                             }}
                           >
-                            {(cat as any).icon ? (
-                              <span style={{ fontSize: '0.85rem', lineHeight: 1 }}>{(cat as any).icon}</span>
-                            ) : null}
                             {cat.label}
                           </Box>
                         );
@@ -4531,7 +4529,11 @@ export default function HomePage() {
                   ? [['__HDR_EVENTS__', [] as Product[]] as const]
                   : []),
                 ...storefrontSections.events,
-              ] as Array<readonly [string, Product[]]>).map(([category, items]) => {
+              ] as Array<readonly [string, Product[]]>).map(([category, items], entryIdx, allEntries) => {
+                // Running number for category blocks (01, 02 …) — section headers don't count
+                const sectionNo = allEntries
+                  .slice(0, entryIdx + 1)
+                  .filter(([c]) => c !== '__HDR_SHOP__' && c !== '__HDR_EVENTS__').length;
                 if (category === '__HDR_SHOP__' || category === '__HDR_EVENTS__') {
                   const isEvents = category === '__HDR_EVENTS__';
                   return (
@@ -4539,23 +4541,33 @@ export default function HomePage() {
                       key={category}
                       id={isEvents ? 'events-section' : 'shop-section'}
                       sx={{
-                        mb: 2.5,
-                        mt: isEvents ? 1 : 0,
+                        mb: 3,
+                        mt: isEvents ? 2 : 0,
+                        pt: 1.25,
+                        borderTop: '1px solid var(--foreground)',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'baseline',
+                        justifyContent: 'space-between',
+                        columnGap: 3,
+                        rowGap: 0.5,
                         scrollMarginTop: { xs: '64px', md: '80px' },
                       }}
                     >
                       <Typography
+                        component="h2"
                         sx={{
-                          fontSize: { xs: '1.25rem', sm: '1.4rem' },
-                          fontWeight: 800,
-                          letterSpacing: '-0.03em',
+                          fontFamily: 'var(--font-store)',
+                          fontSize: { xs: '1.5rem', sm: '1.9rem' },
+                          fontWeight: 700,
+                          letterSpacing: '-0.01em',
                           color: 'var(--foreground)',
-                          lineHeight: 1.2,
+                          lineHeight: 1.15,
                         }}
                       >
                         {isEvents ? t.home.eventsSectionTitle : t.home.shopSectionTitle}
                       </Typography>
-                      <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mt: 0.4, fontWeight: 500 }}>
+                      <Typography sx={{ fontFamily: 'inherit', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: 420 }}>
                         {isEvents ? t.home.eventsSectionSubtitle : t.home.shopSectionSubtitle}
                       </Typography>
                     </Box>
@@ -4564,22 +4576,23 @@ export default function HomePage() {
 
                 return (
                 <Box key={category} sx={{ mb: 5 }}>
-                  {/* Plain category title + view-all link */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  {/* Numbered category title on a hairline + view-all link */}
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, mb: 2, pb: 1, borderBottom: '1px solid var(--border)' }}>
                     <Box
                       component="span"
-                      sx={{ fontSize: '1.05rem', lineHeight: 1, flexShrink: 0, opacity: 0.9 }}
+                      className="store-mono"
+                      sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}
                       aria-hidden
                     >
-                      {category === '__SEARCH__' ? '🔍' : getCategoryIcon(category)}
+                      {category === '__SEARCH__' ? '—' : String(sectionNo).padStart(2, '0')}
                     </Box>
-                    <Typography sx={{
+                    <Typography component="h3" sx={{
                       flex: 1,
                       minWidth: 0,
-                      fontSize: '1.05rem',
-                      fontWeight: 800,
+                      fontFamily: 'var(--font-store)',
+                      fontSize: '1.15rem',
+                      fontWeight: 600,
                       color: 'var(--foreground)',
-                      letterSpacing: '-0.02em',
                       lineHeight: 1.25,
                     }}>
                       {category === '__SEARCH__'
@@ -4598,14 +4611,16 @@ export default function HomePage() {
                           cursor: 'pointer',
                           p: 0,
                           fontFamily: 'inherit',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          color: 'var(--primary)',
+                          fontSize: '0.8rem',
+                          fontWeight: 500,
+                          color: 'var(--foreground)',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 0.35,
-                          letterSpacing: '-0.01em',
-                          '&:hover': { textDecoration: 'underline' },
+                          textDecoration: 'underline',
+                          textUnderlineOffset: '3px',
+                          textDecorationColor: 'var(--border)',
+                          '&:hover': { textDecorationColor: 'currentColor' },
                         }}
                       >
                         {t.search.viewAllCount.replace('{count}', String(items.length))}
@@ -4691,21 +4706,17 @@ export default function HomePage() {
                             display: 'flex',
                             flexDirection: 'column',
                             cursor: isProductAvailable ? 'pointer' : 'default',
-                            borderRadius: 'var(--card-radius)',
+                            borderRadius: '6px',
                             overflow: 'hidden',
                             bgcolor: 'var(--surface)',
-                            boxShadow: 'var(--card-shadow)',
-                            border: isProductClosed
-                              ? '1px solid rgba(255,255,255,0.06)'
-                              : '1px solid transparent',
+                            boxShadow: 'none',
+                            border: '1px solid var(--border)',
                             position: 'relative',
                             opacity: isProductClosed ? 0.6 : 1,
                             filter: isProductClosed ? 'grayscale(1)' : 'none',
-                            transition: 'opacity 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease',
+                            transition: 'opacity 0.2s ease, filter 0.2s ease, border-color 0.15s ease',
                             '&:hover': isProductAvailable ? {
-                              boxShadow: (theme: any) => theme.palette.mode === 'dark'
-                                ? '0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,113,227,0.15)'
-                                : '0 8px 30px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,113,227,0.08)',
+                              borderColor: 'color-mix(in srgb, var(--foreground) 45%, transparent)',
                             } : {},
                           }}
                         >
@@ -4717,42 +4728,24 @@ export default function HomePage() {
                             bgcolor: 'var(--surface-2)',
                             overflow: 'hidden',
                           }}>
-                            {/* Optimized product image with lazy loading - ใช้ coverImage ก่อน */}
-                            {(product.coverImage || product.images?.[0]) ? (
-                              <OptimizedImage
-                                src={product.coverImage ?? (product.images && product.images[0]) ?? ''}
-                                alt={product.name}
-                                width="100%"
-                                height="100%"
-                                objectFit="cover"
-                                priority={productIdx < 4} // First 4 products load eagerly
-                                placeholder="shimmer"
-                                showLoadingIndicator={false}
-                                style={{
-                                  position: 'absolute',
-                                  inset: 0,
-                                  filter: 'none',
-                                  transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                                }}
-                                className={!isProductClosed ? 'product-image-zoom' : ''}
-                              />
-                            ) : (
-                              <Box sx={{ 
-                                position: 'absolute', 
-                                inset: 0, 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                bgcolor: '#ececef',
-                              }}>
-                                <Box
-                                  component="img"
-                                  src="/favicon.png"
-                                  alt="SCC Shop"
-                                  sx={{ width: 40, height: 40, opacity: 0.4, filter: 'grayscale(1)' }}
-                                />
-                              </Box>
-                            )}
+                            <ProductImage
+                              src={product.coverImage}
+                              fallbackSrcs={product.images}
+                              alt={product.name}
+                              width="100%"
+                              height="100%"
+                              objectFit="cover"
+                              priority={productIdx < 4} // First 4 products load eagerly
+                              placeholder="shimmer"
+                              showLoadingIndicator={false}
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                filter: 'none',
+                                transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                              }}
+                              className={!isProductClosed ? 'product-image-zoom' : ''}
+                            />
                             {/* Status Overlay for closed / OOS products */}
                             {isProductClosed && (
                               <Box sx={{
@@ -4877,12 +4870,13 @@ export default function HomePage() {
                                 size="small"
                                 onClick={(e) => { e.stopPropagation(); handleShareProduct(product); }}
                                 sx={{
-                                  bgcolor: 'rgba(0,0,0,0.5)',
-                                  backdropFilter: 'blur(8px)',
-                                  color: 'white',
+                                  bgcolor: 'color-mix(in srgb, var(--surface) 92%, transparent)',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: '4px',
+                                  color: 'var(--foreground)',
                                   width: 30,
                                   height: 30,
-                                  '&:hover': { bgcolor: 'rgba(0,113,227,0.7)' },
+                                  '&:hover': { bgcolor: 'var(--surface)' },
                                 }}
                               >
                                 <Share2 size={14} />
@@ -4900,12 +4894,13 @@ export default function HomePage() {
                                   );
                                 }}
                                 sx={{
-                                  bgcolor: 'rgba(0,0,0,0.5)',
-                                  backdropFilter: 'blur(8px)',
-                                  color: wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'white',
+                                  bgcolor: 'color-mix(in srgb, var(--surface) 92%, transparent)',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: '4px',
+                                  color: wishlistStore.isInWishlist(product.id) ? 'var(--destructive)' : 'var(--foreground)',
                                   width: 30,
                                   height: 30,
-                                  '&:hover': { bgcolor: 'rgba(255,69,58,0.7)' },
+                                  '&:hover': { bgcolor: 'var(--surface)' },
                                   transition: 'all 0.2s ease',
                                 }}
                               >
@@ -4924,14 +4919,11 @@ export default function HomePage() {
                             minHeight: { xs: 148, sm: 156 },
                           }}>
                             {/* Type Label */}
-                            <Typography sx={{
-                              fontSize: '0.62rem',
-                              fontWeight: 700,
-                              color: 'var(--primary)',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.06em',
-                              mb: 0.3,
-                              opacity: isProductClosed ? 0.5 : 0.8,
+                            <Typography className="store-mono" sx={{
+                              fontSize: '0.66rem',
+                              fontWeight: 400,
+                              color: 'var(--text-muted)',
+                              mb: 0.4,
                               minHeight: '0.9rem',
                             }}>
                               {(t.category as Record<string, string>)[((product as any).category || getCategoryFromType(product.type))] || TYPE_LABELS_I18N[product.type] || product.type}
@@ -5030,9 +5022,9 @@ export default function HomePage() {
                                   <>
                                     {eventDiscount ? (
                                       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
-                                        <Typography className="price-glow" sx={{
-                                          fontSize: '1.1rem',
-                                          fontWeight: 800,
+                                        <Typography className="store-mono" sx={{
+                                          fontSize: '1.05rem',
+                                          fontWeight: 600,
                                           color: '#ff453a',
                                           lineHeight: 1,
                                           letterSpacing: '-0.02em',
@@ -5049,9 +5041,9 @@ export default function HomePage() {
                                         </Typography>
                                       </Box>
                                     ) : (
-                                      <Typography className="price-glow" sx={{
-                                        fontSize: '1.1rem',
-                                        fontWeight: 800,
+                                      <Typography className="store-mono" sx={{
+                                        fontSize: '1.05rem',
+                                        fontWeight: 600,
                                         color: 'var(--foreground)',
                                         lineHeight: 1,
                                         letterSpacing: '-0.02em',
@@ -5075,8 +5067,7 @@ export default function HomePage() {
                               {/* Always show ATC for sellable products; opens dialog when options needed */}
                               {!isProductClosed ? (
                                 <Button
-                                  className={isProductAvailable ? 'shimmer-btn' : ''}
-                                  disabled={!isProductAvailable}
+                                                                    disabled={!isProductAvailable}
                                   size="small"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -5098,17 +5089,17 @@ export default function HomePage() {
                                     minWidth: 0,
                                     px: 1.5,
                                     py: 0.7,
-                                    borderRadius: '10px',
+                                    borderRadius: '6px',
                                     bgcolor: isProductAvailable ? 'var(--primary)' : 'var(--surface-3)',
                                     color: isProductAvailable ? 'white' : 'var(--text-muted)',
                                     fontSize: '0.7rem',
                                     fontWeight: 700,
                                     textTransform: 'none',
-                                    boxShadow: isProductAvailable ? '0 3px 10px rgba(0,113,227,0.25)' : 'none',
+                                    boxShadow: 'none',
                                     '&:hover': {
-                                      bgcolor: isProductAvailable ? 'var(--primary)' : 'var(--surface-3)',
-                                      filter: isProductAvailable ? 'brightness(1.1)' : 'none',
-                                      boxShadow: isProductAvailable ? '0 5px 16px rgba(0,113,227,0.35)' : 'none',
+                                      bgcolor: isProductAvailable ? 'color-mix(in srgb, var(--primary) 88%, black)' : 'var(--surface-3)',
+                                      filter: 'none',
+                                      boxShadow: 'none',
                                     },
                                     whiteSpace: 'nowrap',
                                     flexShrink: 0,
@@ -5690,9 +5681,14 @@ export default function HomePage() {
                     }}
                   >
                     <Box sx={{ width: 72, height: 72, borderRadius: '12px', overflow: 'hidden', flexShrink: 0, bgcolor: 'var(--surface-2)' }}>
-                      {(product.coverImage || product.images?.[0]) && (
-                        <OptimizedImage src={product.coverImage ?? product.images![0]} alt={product.name} width={72} height={72} objectFit="cover" />
-                      )}
+                      <ProductImage
+                        src={product.coverImage}
+                        fallbackSrcs={product.images}
+                        alt={product.name}
+                        width={72}
+                        height={72}
+                        objectFit="cover"
+                      />
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -5805,9 +5801,14 @@ export default function HomePage() {
                     }}
                   >
                     <Box sx={{ width: 60, height: 60, borderRadius: '10px', overflow: 'hidden', flexShrink: 0, bgcolor: 'var(--surface-2)' }}>
-                      {(product.coverImage || product.images?.[0]) && (
-                        <OptimizedImage src={product.coverImage ?? product.images![0]} alt={product.name} width={60} height={60} objectFit="cover" />
-                      )}
+                      <ProductImage
+                        src={product.coverImage}
+                        fallbackSrcs={product.images}
+                        alt={product.name}
+                        width={60}
+                        height={60}
+                        objectFit="cover"
+                      />
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -173,7 +173,7 @@ export interface ProductsViewProps {
   config: ShopConfig;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
-  saveFullConfig: (config: ShopConfig) => void;
+  saveFullConfig: (config: ShopConfig, options?: { deletedProductIds?: string[] }) => Promise<boolean> | void;
   showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
   addLog: (action: string, detail: string, overrides?: { config?: ShopConfig }) => void;
   saving: boolean;
@@ -195,9 +195,9 @@ interface ProductPickupSettings {
 type SaleState = 'selling' | 'upcoming' | 'ended' | 'hidden';
 
 const SALE_STATE: Record<SaleState, { label: string; className: string; dot: string }> = {
-  selling: { label: 'กำลังขาย', className: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
-  upcoming: { label: 'รอเปิดขาย', className: 'bg-amber-500/14 text-amber-700 dark:text-amber-400', dot: 'bg-amber-500' },
-  ended: { label: 'หมดเวลาขาย', className: 'bg-rose-500/12 text-rose-700 dark:text-rose-400', dot: 'bg-rose-500' },
+  selling: { label: 'กำลังขาย', className: 'bg-success/12 text-success dark:text-success', dot: 'bg-success' },
+  upcoming: { label: 'รอเปิดขาย', className: 'bg-warning/14 text-warning dark:text-warning', dot: 'bg-warning' },
+  ended: { label: 'หมดเวลาขาย', className: 'bg-destructive/12 text-destructive dark:text-destructive', dot: 'bg-destructive' },
   hidden: { label: 'ปิดขาย / แบบร่าง', className: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground/60' },
 };
 
@@ -370,7 +370,7 @@ const ProductPickupDialog = ({
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible p-6">
         <DialogHeader className="border-b border-[var(--glass-border)] pb-4">
           <DialogTitle className="flex items-center gap-3 text-left">
-            <LocalMall className="text-cyan-400" />
+            <LocalMall className="text-primary" />
             <div>
               <p className="font-bold">ตั้งค่ารับสินค้า</p>
               <p className="text-sm font-normal text-[var(--text-muted)]">{product.name}</p>
@@ -383,7 +383,7 @@ const ProductPickupDialog = ({
             className={cn(
               'flex items-center justify-between rounded-xl p-4',
               pickup.enabled
-                ? 'border border-emerald-500/30 bg-emerald-500/10'
+                ? 'border border-success/30 bg-success/10'
                 : 'border border-[var(--glass-border)] bg-white/[0.03]'
             )}
           >
@@ -396,14 +396,14 @@ const ProductPickupDialog = ({
             <Switch
               checked={pickup.enabled}
               onCheckedChange={(checked) => setPickup({ ...pickup, enabled: checked })}
-              className="data-[state=checked]:bg-emerald-500"
+              className="data-[state=checked]:bg-success"
             />
           </div>
 
           {pickup.enabled && (
             <div className="flex flex-col gap-4">
               <div className="space-y-1.5">
-                <Label className="flex items-center gap-1 text-cyan-400">
+                <Label className="flex items-center gap-1 text-primary">
                   <Crosshair size={14} /> สถานที่รับสินค้า
                 </Label>
                 <Input
@@ -416,7 +416,7 @@ const ProductPickupDialog = ({
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="min-w-0 space-y-1.5">
-                  <Label className="flex items-center gap-1 text-cyan-400">
+                  <Label className="flex items-center gap-1 text-primary">
                     <CalendarDays size={14} /> วันเริ่มรับสินค้า
                   </Label>
                   <DateTimePicker
@@ -428,7 +428,7 @@ const ProductPickupDialog = ({
                   />
                 </div>
                 <div className="min-w-0 space-y-1.5">
-                  <Label className="flex items-center gap-1 text-cyan-400">
+                  <Label className="flex items-center gap-1 text-primary">
                     <CalendarDays size={14} /> วันสิ้นสุดรับสินค้า
                   </Label>
                   <DateTimePicker
@@ -442,7 +442,7 @@ const ProductPickupDialog = ({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="flex items-center gap-1 text-cyan-400">
+                <Label className="flex items-center gap-1 text-primary">
                   <StickyNote size={14} /> หมายเหตุเพิ่มเติม
                 </Label>
                 <Textarea
@@ -454,13 +454,13 @@ const ProductPickupDialog = ({
                 />
               </div>
 
-              <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-4">
+              <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
                 <div className="flex items-start gap-3">
                   <Checkbox
                     id="auto-update-orders"
                     checked={autoUpdateOrders}
                     onCheckedChange={(checked) => setAutoUpdateOrders(checked === true)}
-                    className="mt-0.5 border-indigo-400 data-[state=checked]:bg-indigo-500"
+                    className="mt-0.5 border-primary data-[state=checked]:bg-primary"
                   />
                   <div>
                     <Label htmlFor="auto-update-orders" className="cursor-pointer font-semibold">
@@ -748,8 +748,8 @@ const ProductEditDialog = ({
   const { status: scheduleStatus } = isProductOpen(product);
   const scheduleInfo: Record<string, { icon: React.ReactNode; text: string; color: string }> = {
     upcoming: { icon: <AccessTime size={16} />, text: 'สินค้าจะเปิดขายเมื่อถึงเวลาที่กำหนด', color: '#f59e0b' },
-    active: { icon: <FiberManualRecord size={12} className="text-green-500" />, text: 'สินค้ากำลังเปิดขายอยู่', color: '#10b981' },
-    ended: { icon: <FiberManualRecord size={12} className="text-red-500" />, text: 'หมดเวลาขายแล้ว', color: '#ef4444' },
+    active: { icon: <FiberManualRecord size={12} className="text-success" />, text: 'สินค้ากำลังเปิดขายอยู่', color: '#10b981' },
+    ended: { icon: <FiberManualRecord size={12} className="text-destructive" />, text: 'หมดเวลาขายแล้ว', color: '#ef4444' },
     always: { icon: <DateRange size={16} />, text: 'ไม่มีกำหนดเวลา (เปิดตลอด)', color: 'var(--text-muted)' },
   };
   const schedulePreview = scheduleInfo[scheduleStatus];
@@ -901,8 +901,8 @@ const ProductEditDialog = ({
               </section>
 
               {(category === 'CAMP_FEE' || subType === 'CAMP_REGISTRATION') && (
-                <section id="pe-camp" className="scroll-mt-4 space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
-                  <p className="flex items-center gap-2 text-sm font-bold text-amber-400">
+                <section id="pe-camp" className="scroll-mt-4 space-y-3 rounded-2xl border border-warning/30 bg-warning/10 p-4">
+                  <p className="flex items-center gap-2 text-sm font-bold text-warning">
                     <Tent size={16} /> ข้อมูลค่าย
                   </p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -953,8 +953,8 @@ const ProductEditDialog = ({
               )}
 
               {(category === 'EVENT' || subType === 'EVENT_TICKET') && (
-                <section id="pe-event" className="scroll-mt-4 space-y-3 rounded-2xl border border-pink-500/30 bg-pink-500/10 p-4">
-                  <p className="flex items-center gap-2 text-sm font-bold text-pink-400">
+                <section id="pe-event" className="scroll-mt-4 space-y-3 rounded-2xl border border-primary/30 bg-primary/10 p-4">
+                  <p className="flex items-center gap-2 text-sm font-bold text-primary">
                     <Ticket size={16} /> ข้อมูลอีเวนต์
                   </p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1055,7 +1055,7 @@ const ProductEditDialog = ({
                           options: { ...product.options, requiresSize: checked },
                         } as Product)
                       }
-                      className="data-[state=checked]:bg-emerald-500"
+                      className="data-[state=checked]:bg-success"
                     />
                   </div>
                 </section>
@@ -1075,7 +1075,7 @@ const ProductEditDialog = ({
                           variant="outline"
                           className={cn(
                             'cursor-pointer font-bold',
-                            product.sizePricing?.[size] && 'border-indigo-500/40 bg-indigo-500/15'
+                            product.sizePricing?.[size] && 'border-primary/40 bg-primary/15'
                           )}
                           onClick={() => handleSizePriceChange(size, product.basePrice || 0)}
                         >
@@ -1099,7 +1099,7 @@ const ProductEditDialog = ({
                           variant="ghost"
                           size="icon"
                           onClick={() => handleRemoveSize(size)}
-                          className="text-red-400"
+                          className="text-destructive"
                         >
                           <Delete size={18} />
                         </Button>
@@ -1170,8 +1170,8 @@ const ProductEditDialog = ({
                 )}
 
               {needsVariants() && (
-                <section id="pe-variants" className="scroll-mt-4 space-y-3 rounded-2xl border border-violet-500/30 bg-violet-500/10 p-4">
-                  <p className="flex items-center gap-2 text-sm font-bold text-violet-400">
+                <section id="pe-variants" className="scroll-mt-4 space-y-3 rounded-2xl border border-primary/30 bg-primary/10 p-4">
+                  <p className="flex items-center gap-2 text-sm font-bold text-primary">
                     <Palette size={16} /> ตัวเลือกสินค้า (Variants)
                   </p>
                   {((productAny.variants as unknown as Array<Record<string, unknown>>) || []).map(
@@ -1217,7 +1217,7 @@ const ProductEditDialog = ({
                             onClick={() =>
                               handleUpdateVariant(String(variant.id), 'isActive', !variant.isActive)
                             }
-                            className={variant.isActive ? 'text-green-500' : 'text-slate-500'}
+                            className={variant.isActive ? 'text-success' : 'text-slate-500'}
                           >
                             {variant.isActive ? <Visibility size={18} /> : <VisibilityOff size={18} />}
                           </Button>
@@ -1225,7 +1225,7 @@ const ProductEditDialog = ({
                             variant="ghost"
                             size="icon"
                             onClick={() => handleRemoveVariant(String(variant.id))}
-                            className="text-red-400"
+                            className="text-destructive"
                           >
                             <Delete size={18} />
                           </Button>
@@ -1260,7 +1260,7 @@ const ProductEditDialog = ({
                     />
                     <Button
                       onClick={handleAddVariant}
-                      className="bg-gradient-to-br from-violet-500 to-indigo-500 text-white"
+                      className="bg-primary text-white"
                     >
                       <Add size={16} /> เพิ่ม
                     </Button>
@@ -1285,7 +1285,7 @@ const ProductEditDialog = ({
                             key={preset.name}
                             variant="outline"
                             className={cn(
-                              'cursor-pointer border-dashed border-violet-500/50 text-violet-400',
+                              'cursor-pointer border-dashed border-primary/50 text-primary',
                               exists && 'opacity-50'
                             )}
                             onClick={() => {
@@ -1316,7 +1316,7 @@ const ProductEditDialog = ({
 
               <section id="pe-schedule" className={sectionClass}>
                 <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-amber-600">
+                  <div className="flex size-9 items-center justify-center rounded-lg bg-primary">
                     <DateRange size={20} className="text-white" />
                   </div>
                   <div>
@@ -1327,7 +1327,7 @@ const ProductEditDialog = ({
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="min-w-0 space-y-1.5">
                     <Label className="flex items-center gap-1 text-[var(--text-muted)]">
-                      <FiberManualRecord size={10} className="text-green-500" /> เปิดขายเมื่อ
+                      <FiberManualRecord size={10} className="text-success" /> เปิดขายเมื่อ
                     </Label>
                     <DateTimePicker
                       id="product-sale-start"
@@ -1350,7 +1350,7 @@ const ProductEditDialog = ({
                   </div>
                   <div className="min-w-0 space-y-1.5">
                     <Label className="flex items-center gap-1 text-[var(--text-muted)]">
-                      <FiberManualRecord size={10} className="text-red-500" /> ปิดขายเมื่อ
+                      <FiberManualRecord size={10} className="text-destructive" /> ปิดขายเมื่อ
                     </Label>
                     <DateTimePicker
                       id="product-sale-end"
@@ -1427,18 +1427,18 @@ const ProductEditDialog = ({
                         className={cn(
                           'relative overflow-hidden rounded-xl border',
                           isCover
-                            ? 'border-indigo-500 ring-2 ring-indigo-500/35'
+                            ? 'border-primary ring-2 ring-primary/35'
                             : 'border-[var(--glass-border)]'
                         )}
                       >
                         {isCover && (
-                          <Badge className="absolute left-1.5 top-1.5 z-10 bg-indigo-500">รูปปก</Badge>
+                          <Badge className="absolute left-1.5 top-1.5 z-10 bg-primary">รูปปก</Badge>
                         )}
                         <img src={img} alt={`product-${idx}`} className="block h-[140px] w-full object-cover" />
                         <div className="absolute inset-0 flex flex-col justify-end gap-1 bg-gradient-to-t from-black/70 to-transparent p-2">
                           <Button
                             size="sm"
-                            className="bg-indigo-500/90 text-white"
+                            className="bg-primary/90 text-white"
                             onClick={() => handleSetCover(img)}
                           >
                             ตั้งเป็นปก
@@ -1460,8 +1460,8 @@ const ProductEditDialog = ({
 
               {(category === 'APPAREL' ||
                 (!productAny.category && product.type !== 'OTHER')) && (
-                <section id="pe-patterns" className="scroll-mt-4 space-y-3 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4">
-                  <p className="flex items-center gap-2 text-sm font-bold text-sky-400">
+                <section id="pe-patterns" className="scroll-mt-4 space-y-3 rounded-2xl border border-primary/30 bg-primary/10 p-4">
+                  <p className="flex items-center gap-2 text-sm font-bold text-primary">
                     <Palette size={16} /> ลายเสื้อ (Patterns)
                   </p>
                   {(((productAny.patterns as unknown as Array<Record<string, unknown>>) ||
@@ -1480,13 +1480,13 @@ const ProductEditDialog = ({
                             className={cn(
                               'grid grid-cols-1 items-center gap-2 rounded-lg border bg-[var(--glass-bg)] p-3 sm:grid-cols-[140px_1fr_auto]',
                               isPatternCover
-                                ? 'border-indigo-500 ring-2 ring-indigo-500/35'
+                                ? 'border-primary ring-2 ring-primary/35'
                                 : 'border-[var(--glass-border)]'
                             )}
                           >
                             <div className="relative flex h-[90px] w-full items-center justify-center overflow-hidden rounded-lg border border-[var(--glass-border)] bg-slate-900/40">
                               {isPatternCover && (
-                                <Badge className="absolute left-1 top-1 z-10 h-5 bg-indigo-500 text-[0.65rem]">
+                                <Badge className="absolute left-1 top-1 z-10 h-5 bg-primary text-[0.65rem]">
                                   รูปปก
                                 </Badge>
                               )}
@@ -1527,7 +1527,7 @@ const ProductEditDialog = ({
                                   <Button
                                     size="sm"
                                     disabled={isPatternCover}
-                                    className="bg-indigo-500/90"
+                                    className="bg-primary/90"
                                     onClick={() => handleSetCover(String(pattern.image))}
                                   >
                                     {isPatternCover ? 'เป็นปกแล้ว' : 'ตั้งเป็นปก'}
@@ -1542,7 +1542,7 @@ const ProductEditDialog = ({
                                 onClick={() =>
                                   handleUpdatePattern(String(pattern.id), 'isActive', !isActive)
                                 }
-                                className={isActive ? 'text-green-500' : 'text-slate-500'}
+                                className={isActive ? 'text-success' : 'text-slate-500'}
                               >
                                 {isActive ? <Visibility size={18} /> : <VisibilityOff size={18} />}
                               </Button>
@@ -1550,7 +1550,7 @@ const ProductEditDialog = ({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleRemovePattern(String(pattern.id))}
-                                className="text-red-400"
+                                className="text-destructive"
                               >
                                 <Delete size={18} />
                               </Button>
@@ -1582,7 +1582,7 @@ const ProductEditDialog = ({
                     <Button
                       size="sm"
                       onClick={handleAddPattern}
-                      className="bg-gradient-to-br from-sky-400 to-sky-500 text-white"
+                      className="bg-primary text-white"
                     >
                       <Add size={16} /> เพิ่มลาย
                     </Button>
@@ -1734,7 +1734,7 @@ const ProductEditDialog = ({
                   </div>
                   <Button
                     size="sm"
-                    className="bg-indigo-500"
+                    className="bg-primary"
                     onClick={() => {
                       if (!newTagText.trim()) return;
                       onChange({
@@ -1802,7 +1802,7 @@ const ProductEditDialog = ({
                 <Switch
                   checked={product.isActive}
                   onCheckedChange={(checked) => onChange({ ...product, isActive: checked })}
-                  className="data-[state=checked]:bg-emerald-500"
+                  className="data-[state=checked]:bg-success"
                 />
               </div>
             </div>
@@ -1832,7 +1832,7 @@ const ProductEditDialog = ({
                         <span
                           className={cn(
                             'grid size-4 shrink-0 place-items-center rounded-full',
-                            c.ok ? 'bg-emerald-500 text-white' : 'border border-border',
+                            c.ok ? 'bg-success text-white' : 'border border-border',
                           )}
                         >
                           {c.ok ? <Check size={11} strokeWidth={3} /> : null}
@@ -2057,8 +2057,9 @@ export function ProductsView({
     });
     if (ok) {
       const newProducts = config.products.filter((p) => p.id !== product.id);
-      saveFullConfig({ ...config, products: newProducts });
-      showToast('success', 'ลบสินค้าเรียบร้อยแล้ว');
+      // Name the deleted product so the server accepts removing the last one too
+      const saved = await saveFullConfig({ ...config, products: newProducts }, { deletedProductIds: [product.id] });
+      if (saved !== false) showToast('success', 'ลบสินค้าเรียบร้อยแล้ว');
     }
   };
 

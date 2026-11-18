@@ -1,13 +1,13 @@
 // src/app/api/payment/config/route.ts
 // Payment configuration API — Drizzle ORM
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { config } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { PaymentConfig, DEFAULT_PAYMENT_CONFIG } from '@/lib/payment';
-import { invalidateConfigCache } from '@/lib/config-db';
+import { getConfigValueCached, invalidateConfigCache } from '@/lib/config-db';
+import { CACHE_TTL } from '@/lib/server-cache';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import { isStripePromptPayEnabled, isStripeCardEnabled } from '@/lib/payment-server';
 
@@ -19,12 +19,15 @@ const CONFIG_KEY = 'payment_config';
 // GET - Retrieve payment config
 export async function GET(request: NextRequest) {
   try {
-    const rows = await db.select().from(config).where(eq(config.key, CONFIG_KEY)).limit(1);
-    const data = rows[0];
-
-    const paymentCfg = data ? (data.value as unknown as PaymentConfig) : DEFAULT_PAYMENT_CONFIG;
     const session = await getSession(request);
     const isAdminUser = session?.user?.email ? await isAdminEmailAsync(session.user.email) : false;
+    // The payment config is read by every checkout entry point. Keep one
+    // server-side copy and let the public response be cached at the edge;
+    // admin responses remain private below.
+    const paymentCfg = (await getConfigValueCached<PaymentConfig>(
+      CONFIG_KEY,
+      CACHE_TTL.catalog,
+    )) || DEFAULT_PAYMENT_CONFIG;
 
     const stripePromptPayEnabled = isStripePromptPayEnabled(paymentCfg);
     const stripeCardEnabled = isStripeCardEnabled(paymentCfg);
@@ -40,7 +43,15 @@ export async function GET(request: NextRequest) {
           webhookEndpoint: undefined,
         })),
       };
-      return await secureJsonResponse({ success: true, data: publicConfig });
+      return await secureJsonResponse(
+        { success: true, data: publicConfig },
+        {
+          headers: {
+            'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
+            'CDN-Cache-Control': 'public, max-age=300',
+          },
+        },
+      );
     }
 
     return await secureJsonResponse({
@@ -50,10 +61,13 @@ export async function GET(request: NextRequest) {
         stripePromptPayEnabled,
         stripeCardEnabled,
       },
-    });
+    }, { headers: { 'Cache-Control': 'private, no-cache, no-store' } });
   } catch (error) {
     console.error('[API] Get payment config error:', error);
-    return await secureJsonResponse({ success: false, error: 'Failed to get payment config' }, { status: 500 });
+    return await secureJsonResponse(
+      { success: false, error: 'Failed to get payment config' },
+      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 }
 

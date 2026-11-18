@@ -63,10 +63,10 @@ const glassCardClass =
   'rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[20px]';
 
 const gradientBtnClass =
-  'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90 disabled:opacity-50';
+  'rounded-[10px] bg-primary font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90 disabled:opacity-50';
 
 const secondaryBtnClass =
-  'rounded-[10px] border border-[var(--glass-border)] bg-transparent text-[var(--text-muted)] hover:border-violet-500 hover:text-[var(--foreground)]';
+  'rounded-[10px] border border-[var(--glass-border)] bg-transparent text-[var(--text-muted)] hover:border-primary hover:text-[var(--foreground)]';
 
 const inputClass = 'rounded-[10px] border-[var(--glass-border)] bg-[var(--surface)] text-[var(--foreground)]';
 
@@ -102,7 +102,7 @@ type ToastSeverity = 'success' | 'error' | 'info' | 'warning';
 
 export interface AnnouncementsViewProps {
   config: ShopConfig;
-  saveConfig: (newConfig: ShopConfig) => Promise<void>;
+  saveConfig: (newConfig: ShopConfig) => Promise<unknown>;
   showToast: (type: ToastSeverity, message: string) => void;
   userEmail: string | null | undefined;
   onImageUpload: (file: File) => Promise<string | null>;
@@ -129,7 +129,7 @@ const SettingToggleRow = ({
     <Switch
       checked={checked}
       onCheckedChange={onChange}
-      className="data-[state=checked]:bg-emerald-500"
+      className="data-[state=checked]:bg-success"
     />
   </div>
 );
@@ -199,7 +199,7 @@ function ProductPicker({
                     type="button"
                     className={cn(
                       'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-accent',
-                      product.id === value && 'bg-violet-500/15',
+                      product.id === value && 'bg-primary/15',
                     )}
                     onClick={() => {
                       onSelect(product);
@@ -547,7 +547,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                           className={cn(
                             'rounded-md px-2 py-0.5 text-[0.7rem] font-semibold',
                             ann.enabled
-                              ? 'bg-emerald-500/15 text-emerald-500'
+                              ? 'bg-success/15 text-success'
                               : 'bg-slate-500/15 text-slate-500',
                           )}
                         >
@@ -583,7 +583,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                         className={cn(
                           'h-8 gap-1 border-slate-500/30 px-2 text-xs',
                           ann.enabled
-                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                            ? 'border-success/30 bg-success/10 text-success hover:bg-success/20'
                             : 'bg-slate-500/10 text-slate-400 hover:bg-slate-500/20'
                         )}
                         onClick={() => handleToggleEnabled(ann)}
@@ -597,7 +597,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-8 gap-1 border-blue-500/30 bg-blue-500/10 px-2.5 text-xs text-blue-400 hover:bg-blue-500/20"
+                        className="h-8 gap-1 border-primary/30 bg-primary/10 px-2.5 text-xs text-primary hover:bg-primary/20"
                         onClick={() => handleEdit(ann)}
                       >
                         <Edit size={14} />
@@ -608,7 +608,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-8 gap-1 border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                        className="h-8 gap-1 border-destructive/30 bg-destructive/10 px-2.5 text-xs text-destructive hover:bg-destructive/20 hover:text-destructive"
                         onClick={() => handleDelete(ann)}
                         disabled={saving}
                       >
@@ -633,7 +633,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
               <div
                 className={cn(
                   'flex size-10 items-center justify-center rounded-xl text-white',
-                  isEditingExisting ? 'bg-blue-500' : 'bg-emerald-500',
+                  isEditingExisting ? 'bg-primary' : 'bg-success',
                 )}
               >
                 {isEditingExisting ? <Edit size={18} /> : <Add size={18} />}
@@ -670,8 +670,8 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                           className={cn(
                             'flex-1 rounded-[10px] py-3 text-center transition-all',
                             active
-                              ? 'border-2 border-violet-500 bg-violet-500/30'
-                              : 'border-2 border-transparent bg-white/5 hover:bg-violet-500/15',
+                              ? 'border-2 border-primary bg-primary/30'
+                              : 'border-2 border-transparent bg-white/5 hover:bg-primary/15',
                           )}
                         >
                           <div className={cn('mb-1 flex items-center justify-center gap-1', active ? 'text-white' : 'text-slate-400')}>
@@ -716,7 +716,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                         <Button
                           type="button"
                           size="icon"
-                          className="absolute top-2 right-2 size-8 bg-red-500/90 text-white hover:bg-red-500"
+                          className="absolute top-2 right-2 size-8 bg-destructive/90 text-white hover:bg-destructive"
                           onClick={() =>
                             setEditingAnn({
                               ...editingAnn,
@@ -736,13 +736,13 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                         className={cn(
                           secondaryBtnClass,
                           'h-auto w-full border-2 border-dashed py-6',
-                          'hover:border-violet-500',
+                          'hover:border-primary',
                         )}
                         asChild
                       >
                         <label className="cursor-pointer">
                           {uploadingImage ? (
-                            <Loader2 className="size-6 animate-spin text-violet-500" />
+                            <Loader2 className="size-6 animate-spin text-primary" />
                           ) : (
                             <>
                               <ImageIcon size={24} className="mr-2" />
@@ -781,8 +781,8 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                 />
 
                 {/* Special Announcement */}
-                <div className="rounded-xl border border-amber-400/20 bg-amber-400/8 p-4">
-                  <p className="mb-3 flex items-center gap-1 text-sm font-bold text-amber-400">
+                <div className="rounded-xl border border-warning/20 bg-warning/8 p-4">
+                  <p className="mb-3 flex items-center gap-1 text-sm font-bold text-warning">
                     <Sparkles size={16} />
                     ข้อความพิเศษ
                   </p>
@@ -835,7 +835,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                           }}
                         />
                         {editingAnn.linkedProductId && (
-                          <p className="mt-1 text-xs text-emerald-500">
+                          <p className="mt-1 text-xs text-success">
                             ✓ เชื่อมโยงกับสินค้า — คลิกที่ประกาศจะเปิดหน้าสินค้าโดยตรง
                           </p>
                         )}
@@ -986,7 +986,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
             showCloseButton
           >
             <DialogHeader className="flex-row items-center gap-3 border-b border-[var(--glass-border)] pb-4">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-violet-500 text-white">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-white">
                 <History size={18} />
               </div>
               <div>
@@ -1048,7 +1048,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="size-8 text-emerald-500"
+                                className="size-8 text-success"
                                 onClick={() => handleRestoreFromHistory(item)}
                                 disabled={saving}
                               >
@@ -1063,7 +1063,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="size-8 text-red-500"
+                                className="size-8 text-destructive"
                                 onClick={() => handleDeleteFromHistory(item)}
                                 disabled={saving}
                               >
@@ -1194,7 +1194,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                             className={cn(
                               'rounded-md px-2 py-0.5 text-[0.7rem] font-semibold',
                               news.enabled
-                                ? 'bg-emerald-500/15 text-emerald-500'
+                                ? 'bg-success/15 text-success'
                                 : 'bg-slate-500/15 text-slate-500',
                             )}
                           >
@@ -1263,7 +1263,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                               }}
                             >
                               {news.enabled ? (
-                                <ToggleOn className="size-5 text-emerald-500" />
+                                <ToggleOn className="size-5 text-success" />
                               ) : (
                                 <ToggleOff className="size-5 text-slate-500" />
                               )}
@@ -1277,7 +1277,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="size-8 text-red-500"
+                              className="size-8 text-destructive"
                               onClick={async () => {
                                 const ok = await confirm({
                                   title: 'ลบข่าวนี้?',

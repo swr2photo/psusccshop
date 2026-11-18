@@ -1,7 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrderByRef } from '@/lib/order-lookup';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
-import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { assertShopAccess, resolveAdminSession } from '@/lib/admin-context';
+import { secureJsonResponse } from '@/lib/payload-crypto';
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeImageSrc(rawSrc: string): string {
+  const trimmed = rawSrc.trim();
+  if (/^https:\/\//i.test(trimmed)) {
+    return escapeHtml(trimmed);
+  }
+  if (/^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=\s]+$/i.test(trimmed)) {
+    return escapeHtml(trimmed);
+  }
+  return '';
+}
 
 export async function GET(
   req: NextRequest,
@@ -40,6 +61,20 @@ export async function GET(
       return await secureJsonResponse({ status: 'error', message: 'order not found' }, { status: 404 });
     }
 
+    // Enforce shop-scoped access for shopAdmin accounts
+    const adminSession = await resolveAdminSession(userEmail);
+    const orderShopId = order.shopId || order.shop_id;
+    if (adminSession.userRole === 'shopAdmin') {
+      if (!orderShopId || !assertShopAccess(adminSession, String(orderShopId))) {
+        return new NextResponse(
+          `<!DOCTYPE html><html><head><title>ไม่มีสิทธิ์เข้าถึง</title><meta charset="utf-8"></head><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#1e293b;color:#94a3b8;"><div style="text-align:center;"><h1 style="color:#ef4444;">ไม่มีสิทธิ์เข้าถึงสลิปของร้านค้านี้</h1></div></body></html>`,
+          { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+        );
+      }
+    }
+
+    const safeRef = escapeHtml(ref);
+
     // Support both 'slip' and 'slipData' field names (backward compatibility)
     const slip = order?.slip || order?.slipData;
     // Support both imageUrl (from SlipOK S3) and base64
@@ -52,7 +87,7 @@ export async function GET(
         <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1e293b; color: #94a3b8;">
           <div style="text-align: center;">
             <h1 style="color: #f59e0b;">ไม่พบสลิป</h1>
-            <p>ออเดอร์ #${ref} ยังไม่มีการอัพโหลดสลิป</p>
+            <p>ออเดอร์ #${safeRef} ยังไม่มีการอัพโหลดสลิป</p>
           </div>
         </body>
         </html>`,
@@ -61,19 +96,23 @@ export async function GET(
     }
 
     // Build the image source - prefer imageUrl from SlipOK, fallback to base64
-    let imageSrc: string;
+    let rawImageSrc: string;
     if (slip.imageUrl) {
       // Use SlipOK S3 URL directly
-      imageSrc = slip.imageUrl;
+      rawImageSrc = String(slip.imageUrl);
     } else {
       // Fallback to base64
-      const mime = slip.mime || 'image/png';
-      imageSrc = slip.base64.startsWith('data:') 
-        ? slip.base64 
-        : `data:${mime};base64,${slip.base64}`;
+      const mime = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'].includes(slip.mime)
+        ? slip.mime
+        : 'image/png';
+      const base64Str = String(slip.base64 || '');
+      rawImageSrc = base64Str.startsWith('data:')
+        ? base64Str
+        : `data:${mime};base64,${base64Str}`;
     }
-    
-    const uploadedAt = slip.uploadedAt ? new Date(slip.uploadedAt)?.toLocaleString('th-TH') : '-';
+    const imageSrc = sanitizeImageSrc(rawImageSrc);
+
+    const uploadedAt = escapeHtml(slip.uploadedAt ? new Date(slip.uploadedAt)?.toLocaleString('th-TH') : '-');
     // Support both 'slipCheck.success' (old format) and 'verified' (new format)
     const isVerified = slip.verified === true || slip.slipCheck?.success === true;
     const verified = isVerified ? 'ผ่านการตรวจสอบ' : 'รอตรวจสอบ';
@@ -84,7 +123,7 @@ export async function GET(
     const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>สลิป #${ref}</title>
+  <title>สลิป #${safeRef}</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
@@ -195,7 +234,7 @@ export async function GET(
   <div class="container">
     <div class="header">
       <h1>สลิปการโอนเงิน</h1>
-      <span class="ref">#${ref}</span>
+      <span class="ref">#${safeRef}</span>
     </div>
     
     <div class="info">
@@ -216,14 +255,14 @@ export async function GET(
     ${slipData ? `
     <div class="slip-data">
       <h3>ข้อมูลจากสลิป</h3>
-      ${slipData.sendingBank || slipData.senderBank ? `<div class="row"><span class="label">ธนาคารผู้โอน</span><span class="value">${slipData.sendingBank || slipData.senderBank}</span></div>` : ''}
-      ${slipData.receivingBank || slipData.receiverBank ? `<div class="row"><span class="label">ธนาคารผู้รับ</span><span class="value">${slipData.receivingBank || slipData.receiverBank}</span></div>` : ''}
-      ${slipData.sender?.displayName || slipData.senderName ? `<div class="row"><span class="label">ชื่อผู้โอน</span><span class="value">${slipData.sender?.displayName || slipData.senderName}</span></div>` : ''}
-      ${slipData.receiver?.displayName || slipData.receiverName ? `<div class="row"><span class="label">ชื่อผู้รับ</span><span class="value">${slipData.receiver?.displayName || slipData.receiverName}</span></div>` : ''}
-      ${slipData.amount ? `<div class="row"><span class="label">จำนวนเงิน</span><span class="value">฿${Number(slipData.amount)?.toLocaleString()}</span></div>` : ''}
-      ${slipData.transDate ? `<div class="row"><span class="label">วันที่โอน</span><span class="value">${slipData.transDate}</span></div>` : ''}
-      ${slipData.transTime ? `<div class="row"><span class="label">เวลา</span><span class="value">${slipData.transTime}</span></div>` : ''}
-      ${slipData.transRef ? `<div class="row"><span class="label">เลขอ้างอิง</span><span class="value">${slipData.transRef}</span></div>` : ''}
+      ${slipData.sendingBank || slipData.senderBank ? `<div class="row"><span class="label">ธนาคารผู้โอน</span><span class="value">${escapeHtml(slipData.sendingBank || slipData.senderBank)}</span></div>` : ''}
+      ${slipData.receivingBank || slipData.receiverBank ? `<div class="row"><span class="label">ธนาคารผู้รับ</span><span class="value">${escapeHtml(slipData.receivingBank || slipData.receiverBank)}</span></div>` : ''}
+      ${slipData.sender?.displayName || slipData.senderName ? `<div class="row"><span class="label">ชื่อผู้โอน</span><span class="value">${escapeHtml(slipData.sender?.displayName || slipData.senderName)}</span></div>` : ''}
+      ${slipData.receiver?.displayName || slipData.receiverName ? `<div class="row"><span class="label">ชื่อผู้รับ</span><span class="value">${escapeHtml(slipData.receiver?.displayName || slipData.receiverName)}</span></div>` : ''}
+      ${slipData.amount ? `<div class="row"><span class="label">จำนวนเงิน</span><span class="value">฿${escapeHtml(Number(slipData.amount)?.toLocaleString())}</span></div>` : ''}
+      ${slipData.transDate ? `<div class="row"><span class="label">วันที่โอน</span><span class="value">${escapeHtml(slipData.transDate)}</span></div>` : ''}
+      ${slipData.transTime ? `<div class="row"><span class="label">เวลา</span><span class="value">${escapeHtml(slipData.transTime)}</span></div>` : ''}
+      ${slipData.transRef ? `<div class="row"><span class="label">เลขอ้างอิง</span><span class="value">${escapeHtml(slipData.transRef)}</span></div>` : ''}
     </div>
     ` : ''}
   </div>

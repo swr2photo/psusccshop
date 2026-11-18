@@ -762,8 +762,8 @@ export function Alert({ children, severity = 'info', sx, className, icon, ...res
     <UiAlert
       className={cn(
         severity === 'error' && 'border-destructive/40 text-destructive',
-        severity === 'warning' && 'border-amber-500/40 text-amber-600',
-        severity === 'success' && 'border-emerald-500/40 text-emerald-600',
+        severity === 'warning' && 'border-warning/40 text-warning',
+        severity === 'success' && 'border-success/40 text-success',
         className,
       )}
       style={sxToStyle(sx)}

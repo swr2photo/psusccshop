@@ -69,11 +69,11 @@ export type StatTone = 'default' | 'success' | 'warning' | 'info' | 'danger' | '
 
 const TONE_CLASSES: Record<StatTone, string> = {
   default: 'bg-muted text-foreground',
-  success: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400',
-  warning: 'bg-amber-500/14 text-amber-600 dark:text-amber-400',
-  info: 'bg-sky-500/12 text-sky-600 dark:text-sky-400',
-  danger: 'bg-rose-500/12 text-rose-600 dark:text-rose-400',
-  violet: 'bg-violet-500/12 text-violet-600 dark:text-violet-400',
+  success: 'bg-success/12 text-success dark:text-success',
+  warning: 'bg-warning/14 text-warning dark:text-warning',
+  info: 'bg-primary/12 text-primary dark:text-primary',
+  danger: 'bg-destructive/12 text-destructive dark:text-destructive',
+  violet: 'bg-primary/12 text-primary dark:text-primary',
 };
 
 export function StatCard({

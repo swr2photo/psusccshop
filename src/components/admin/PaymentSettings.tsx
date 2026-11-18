@@ -62,7 +62,7 @@ const glassCardClass =
   'rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-sm';
 
 const gradientBtnClass =
-  'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
+  'rounded-[10px] bg-primary font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
 
 const inputClass = 'rounded-[10px]';
 
@@ -220,7 +220,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <CreditCard size={28} className="text-indigo-500" />
+            <CreditCard size={28} className="text-primary" />
             <h2 className="text-xl font-bold text-[var(--foreground)]">
               ตั้งค่าการชำระเงิน
             </h2>
@@ -250,7 +250,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
         )}
 
         {success && (
-          <Alert className="relative mb-4 border-emerald-500/30 bg-emerald-500/10 pr-10 text-emerald-600">
+          <Alert className="relative mb-4 border-success/30 bg-success/10 pr-10 text-success">
             <AlertDescription>{success}</AlertDescription>
             <button
               type="button"
@@ -264,8 +264,8 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
         )}
 
         {/* Info Alert */}
-        <Alert className="mb-6 border-blue-500/30 bg-blue-500/10">
-          <Info className="text-blue-500" />
+        <Alert className="mb-6 border-primary/30 bg-primary/10">
+          <Info className="text-primary" />
           <AlertDescription className="text-sm text-[var(--foreground)]">
             การชำระเงินผ่านบัตรเครดิตต้องตั้งค่า Payment Gateway ก่อน โดย Secret Key จะเก็บใน Environment Variables เท่านั้น
           </AlertDescription>
@@ -290,7 +290,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
                     className={cn(
                       'gap-0 rounded-[10px] py-0 shadow-none transition-colors',
                       gatewayConfig?.enabled
-                        ? 'border-emerald-500/30 bg-emerald-500/10'
+                        ? 'border-success/30 bg-success/10'
                         : 'border-[var(--glass-border)] bg-[var(--surface-2)]'
                     )}
                   >
@@ -299,19 +299,19 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
                         checked={gatewayConfig?.enabled || false}
                         onCheckedChange={(checked) => updateGateway(gateway, { enabled: checked })}
                         size="sm"
-                        className="data-[state=checked]:bg-emerald-500"
+                        className="data-[state=checked]:bg-success"
                       />
 
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-[var(--foreground)]">{info.name}</p>
                           {gatewayConfig?.testMode && (
-                            <Badge className="h-[18px] bg-amber-500/20 px-1.5 text-[0.65rem] text-amber-500">
+                            <Badge className="h-[18px] bg-warning/20 px-1.5 text-[0.65rem] text-warning">
                               TEST MODE
                             </Badge>
                           )}
                           {gatewayConfig?.enabled && !gatewayConfig?.testMode && (
-                            <Badge className="h-[18px] bg-emerald-500/20 px-1.5 text-[0.65rem] text-emerald-500">
+                            <Badge className="h-[18px] bg-success/20 px-1.5 text-[0.65rem] text-success">
                               LIVE
                             </Badge>
                           )}
@@ -324,7 +324,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="text-indigo-500 hover:text-indigo-400"
+                        className="text-primary hover:text-primary"
                         onClick={() => {
                           if (gateway === 'stripe') {
                             setShowStripeSettings(true);
@@ -355,7 +355,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="border-indigo-500 text-indigo-500 hover:bg-indigo-500/10 hover:text-indigo-400"
+                className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
                 onClick={() => setAddDialogOpen(true)}
               >
                 <Add />
@@ -476,7 +476,7 @@ function PaymentOptionCard({
       className={cn(
         'gap-0 rounded-[10px] py-0 shadow-none transition-all',
         option.enabled
-          ? 'border-indigo-500/30 bg-indigo-500/10'
+          ? 'border-primary/30 bg-primary/10'
           : 'border-[var(--glass-border)] bg-[var(--surface-2)]',
         !canEnable && 'opacity-60'
       )}
@@ -517,7 +517,7 @@ function PaymentOptionCard({
                 </Badge>
               )}
               {!canEnable && (
-                <Badge className="h-[18px] bg-amber-500/20 px-1.5 text-[0.65rem] text-amber-500">
+                <Badge className="h-[18px] bg-warning/20 px-1.5 text-[0.65rem] text-warning">
                   ต้องเปิด Gateway
                 </Badge>
               )}
@@ -528,7 +528,7 @@ function PaymentOptionCard({
           </div>
 
           {(option.feeType && option.feeAmount) && (
-            <p className="text-sm text-orange-400">
+            <p className="text-sm text-warning">
               +{option.feeType === 'percentage' ? `${option.feeAmount}%` : `฿${option.feeAmount}`}
             </p>
           )}
@@ -648,7 +648,7 @@ function PaymentOptionCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-red-500/50 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                  className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={onDelete}
                 >
                   <Delete />
@@ -763,8 +763,8 @@ function AddPaymentOptionDialog({
               </div>
 
               {availableGateways.length === 0 && (
-                <Alert className="border-amber-500/30 bg-amber-500/10">
-                  <AlertDescription className="text-amber-600">
+                <Alert className="border-warning/30 bg-warning/10">
+                  <AlertDescription className="text-warning">
                     ต้องเปิดใช้ Payment Gateway ที่รองรับวิธีนี้ก่อน
                   </AlertDescription>
                 </Alert>
@@ -834,7 +834,7 @@ function GatewayConfigDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-6">
-          <Alert className="border-blue-500/30 bg-blue-500/10">
+          <Alert className="border-primary/30 bg-primary/10">
             <AlertDescription>
               <p className="mb-2 text-sm font-semibold text-[var(--foreground)]">
                 Secret Keys ต้องเก็บใน Environment Variables:
@@ -855,7 +855,7 @@ function GatewayConfigDialog({
             <Switch
               checked={config?.testMode ?? true}
               onCheckedChange={(checked) => onUpdate({ testMode: checked })}
-              className="data-[state=checked]:bg-amber-500"
+              className="data-[state=checked]:bg-warning"
             />
           </div>
 
@@ -889,7 +889,7 @@ function GatewayConfigDialog({
                 <Badge
                   key={method}
                   variant="secondary"
-                  className="bg-indigo-500/20 text-[var(--foreground)]"
+                  className="bg-primary/20 text-[var(--foreground)]"
                 >
                   {PAYMENT_METHODS[method]?.icon} {PAYMENT_METHODS[method]?.nameThai}
                 </Badge>
@@ -897,7 +897,7 @@ function GatewayConfigDialog({
             </div>
           </div>
 
-          <Button variant="outline" className="border-indigo-500 text-indigo-500 hover:bg-indigo-500/10" asChild>
+          <Button variant="outline" className="border-primary text-primary hover:bg-primary/10" asChild>
             <a href={gatewayInfo.docUrl} target="_blank" rel="noopener noreferrer">
               เอกสาร API
             </a>

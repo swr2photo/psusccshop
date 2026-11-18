@@ -22,6 +22,10 @@ export const API_ROUTES: RouteEntry[] = [
     "module": "@/app/api/admin/system/cache-clear/route"
   },
   {
+    "pattern": "/payment/stripe/card",
+    "module": "@/app/api/payment/stripe/card/route"
+  },
+  {
     "pattern": "/payment/stripe/promptpay",
     "module": "@/app/api/payment/stripe/promptpay/route"
   },
@@ -36,6 +40,14 @@ export const API_ROUTES: RouteEntry[] = [
   {
     "pattern": "/support-chat/settings/public",
     "module": "@/app/api/support-chat/settings/public/route"
+  },
+  {
+    "pattern": "/admin/forms/:id",
+    "module": "@/app/api/admin/forms/[id]/route"
+  },
+  {
+    "pattern": "/orders/:ref/status",
+    "module": "@/app/api/orders/[ref]/status/route"
   },
   {
     "pattern": "/shops/:shopId/admins",
@@ -78,12 +90,20 @@ export const API_ROUTES: RouteEntry[] = [
     "module": "@/app/api/support-chat/[sessionId]/read/route"
   },
   {
+    "pattern": "/support-chat/:sessionId/transfer",
+    "module": "@/app/api/support-chat/[sessionId]/transfer/route"
+  },
+  {
     "pattern": "/support-chat/:sessionId/typing",
     "module": "@/app/api/support-chat/[sessionId]/typing/route"
   },
   {
     "pattern": "/admin/api-keys",
     "module": "@/app/api/admin/api-keys/route"
+  },
+  {
+    "pattern": "/admin/audit",
+    "module": "@/app/api/admin/audit/route"
   },
   {
     "pattern": "/admin/bootstrap",
@@ -100,6 +120,10 @@ export const API_ROUTES: RouteEntry[] = [
   {
     "pattern": "/admin/email",
     "module": "@/app/api/admin/email/route"
+  },
+  {
+    "pattern": "/admin/forms",
+    "module": "@/app/api/admin/forms/route"
   },
   {
     "pattern": "/admin/orders",
@@ -130,6 +154,10 @@ export const API_ROUTES: RouteEntry[] = [
     "module": "@/app/api/admin/status/route"
   },
   {
+    "pattern": "/admin/stripe-report-issue",
+    "module": "@/app/api/admin/stripe-report-issue/route"
+  },
+  {
     "pattern": "/admin/stripe-status",
     "module": "@/app/api/admin/stripe-status/route"
   },
@@ -144,6 +172,10 @@ export const API_ROUTES: RouteEntry[] = [
   {
     "pattern": "/admin/user-logs",
     "module": "@/app/api/admin/user-logs/route"
+  },
+  {
+    "pattern": "/admin/user-timeline",
+    "module": "@/app/api/admin/user-timeline/route"
   },
   {
     "pattern": "/admin/webhooks",
@@ -198,6 +230,18 @@ export const API_ROUTES: RouteEntry[] = [
     "module": "@/app/api/support-chat/settings/route"
   },
   {
+    "pattern": "/upload/audio",
+    "module": "@/app/api/upload/audio/route"
+  },
+  {
+    "pattern": "/workers/process-order",
+    "module": "@/app/api/workers/process-order/route"
+  },
+  {
+    "pattern": "/forms/:id",
+    "module": "@/app/api/forms/[id]/route"
+  },
+  {
     "pattern": "/image/:id",
     "module": "@/app/api/image/[id]/route"
   },
@@ -212,6 +256,10 @@ export const API_ROUTES: RouteEntry[] = [
   {
     "pattern": "/support-chat/:sessionId",
     "module": "@/app/api/support-chat/[sessionId]/route"
+  },
+  {
+    "pattern": "/voice/:key",
+    "module": "@/app/api/voice/[key]/route"
   },
   {
     "pattern": "/auto-email",
@@ -234,8 +282,16 @@ export const API_ROUTES: RouteEntry[] = [
     "module": "@/app/api/cron/route"
   },
   {
+    "pattern": "/forms",
+    "module": "@/app/api/forms/route"
+  },
+  {
     "pattern": "/gas",
     "module": "@/app/api/gas/route"
+  },
+  {
+    "pattern": "/gifs",
+    "module": "@/app/api/gifs/route"
   },
   {
     "pattern": "/health",
@@ -264,6 +320,10 @@ export const API_ROUTES: RouteEntry[] = [
   {
     "pattern": "/payment-info",
     "module": "@/app/api/payment-info/route"
+  },
+  {
+    "pattern": "/payment-notice",
+    "module": "@/app/api/payment-notice/route"
   },
   {
     "pattern": "/pickup",

@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { Box, Button, Typography } from '@mui/material';
-import { ArrowRight, ShoppingBag } from 'lucide-react';
-import OptimizedImage from '@/components/OptimizedImage';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import ProductImage from '@/components/storefront/ProductImage';
 import type { Product } from '@/lib/config';
 import { getProductName } from '@/lib/config';
+import { getBasePrice } from '@/lib/shop-constants';
 import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct } from '@/lib/flagship/config';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -14,254 +15,255 @@ const DEFAULT_FLAGSHIP_SLUG = 'scc-jersey-2026';
 export type HomeHeroProps = {
   product?: Product | null;
   onBuy?: (product: Product) => void;
+  /** Shop-level open flag (closed → CTA becomes "view details") */
+  isOpen?: boolean;
+  /** Order deadline shown under the price */
+  closeDate?: string | null;
 };
 
+function formatDeadline(iso: string | null | undefined, lang: 'th' | 'en'): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime()) || d.getTime() < Date.now()) return null;
+  return d.toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 /**
- * Full-bleed storefront hero promoting the SCC 2026 flagship jersey.
- * Lean first viewport: brand · headline · one line · CTAs · product visual.
+ * Storefront opening — laid out like a printed merch-drop sheet:
+ * club line, the actual product name, price + deadline, one action, a framed photo.
+ * No gradients, glows or entrance animation.
  */
-export default function HomeHero({ product, onBuy }: HomeHeroProps) {
+export default function HomeHero({ product, onBuy, isOpen = true, closeDate }: HomeHeroProps) {
   const { t, lang } = useTranslation();
+  const en = lang === 'en';
   const flagshipSlug =
     (product && getFlagshipSlugForProduct(product)) ||
     FLAGSHIP_PRODUCTS[DEFAULT_FLAGSHIP_SLUG]?.slug ||
     DEFAULT_FLAGSHIP_SLUG;
   const flagshipHref = `/flagship/${flagshipSlug}`;
-  const imageSrc =
-    product?.coverImage ||
-    product?.images?.[0] ||
-    '/favicon.png';
-  const brand = 'SCC Shop';
   const productLabel = product ? getProductName(product, lang) : t.home.heroFallbackName;
 
+  const price = product ? getBasePrice(product) : null;
+  const hasPriceRange = Object.keys(product?.sizePricing || {}).length > 1;
+  const deadline = formatDeadline(closeDate || product?.endDate, lang);
+  const canBuy = Boolean(product && isOpen);
+
   const handlePrimary = () => {
-    if (product && onBuy) {
+    if (product && onBuy && canBuy) {
       onBuy(product);
       return;
     }
-    if (typeof window !== 'undefined') {
-      window.location.href = flagshipHref;
-    }
+    if (typeof window !== 'undefined') window.location.href = flagshipHref;
   };
 
   return (
     <Box
       component="section"
       aria-label={t.home.heroAria}
-      sx={{
-        position: 'relative',
-        width: '100%',
-        overflow: 'hidden',
-        minHeight: { xs: 340, sm: 380, md: 440 },
-        display: 'flex',
-        alignItems: 'stretch',
-        bgcolor: 'var(--surface-2)',
-        borderBottom: '1px solid var(--glass-border)',
-        animation: 'homeHeroFade 0.7s cubic-bezier(0.22, 1, 0.36, 1) both',
-        '@keyframes homeHeroFade': {
-          from: { opacity: 0, transform: 'translateY(10px)' },
-          to: { opacity: 1, transform: 'translateY(0)' },
-        },
-      }}
+      className="store-type"
+      sx={{ width: '100%', bgcolor: 'var(--background)', borderBottom: '1px solid var(--border)' }}
     >
-      {/* Atmosphere — soft brand wash, not flat / not purple */}
-      <Box
-        aria-hidden
-        sx={{
-          position: 'absolute',
-          inset: 0,
-          background: (theme) =>
-            theme.palette.mode === 'dark'
-              ? `
-                radial-gradient(ellipse 80% 70% at 85% 40%, color-mix(in srgb, var(--primary) 28%, transparent) 0%, transparent 55%),
-                radial-gradient(ellipse 60% 50% at 10% 90%, color-mix(in srgb, var(--secondary) 14%, transparent) 0%, transparent 50%),
-                linear-gradient(180deg, color-mix(in srgb, var(--background) 40%, transparent) 0%, var(--background) 100%)
-              `
-              : `
-                radial-gradient(ellipse 80% 70% at 90% 30%, color-mix(in srgb, var(--primary) 18%, transparent) 0%, transparent 55%),
-                radial-gradient(ellipse 50% 40% at 5% 95%, color-mix(in srgb, var(--secondary) 10%, transparent) 0%, transparent 50%),
-                linear-gradient(180deg, #f8fafc 0%, var(--background) 100%)
-              `,
-          pointerEvents: 'none',
-        }}
-      />
-
       <Box
         sx={{
-          position: 'relative',
-          zIndex: 1,
-          width: '100%',
           maxWidth: 1200,
           mx: 'auto',
-          px: { xs: 2.5, sm: 4, md: 5 },
-          py: { xs: 3.5, sm: 4, md: 5 },
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '1.05fr 0.95fr' },
-          gap: { xs: 3, md: 4 },
-          alignItems: 'center',
+          px: { xs: 2, sm: 3, md: 4 },
+          pt: { xs: 2, md: 4 },
+          pb: { xs: 3, md: 5 },
         }}
       >
+        {/* Club line — reads like the header of a printed sheet */}
         <Box
+          className="store-mono"
           sx={{
-            animation: 'homeHeroCopy 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both',
-            '@keyframes homeHeroCopy': {
-              from: { opacity: 0, transform: 'translateX(-12px)' },
-              to: { opacity: 1, transform: 'translateX(0)' },
-            },
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 2,
+            pb: 1.25,
+            mb: { xs: 2, md: 4 },
+            borderBottom: '1px solid var(--foreground)',
+            fontSize: { xs: '0.68rem', sm: '0.72rem' },
+            textTransform: 'uppercase',
+            color: 'var(--foreground)',
           }}
         >
-          <Typography
-            component="p"
-            sx={{
-              fontSize: { xs: '1.65rem', sm: '2rem', md: '2.35rem' },
-              fontWeight: 800,
-              letterSpacing: '-0.04em',
-              lineHeight: 1.05,
-              color: 'var(--foreground)',
-              mb: 0.75,
-            }}
-          >
-            {brand}
-          </Typography>
-
-          <Typography
-            component="h1"
-            sx={{
-              fontSize: { xs: '1.15rem', sm: '1.35rem', md: '1.5rem' },
-              fontWeight: 700,
-              letterSpacing: '-0.025em',
-              lineHeight: 1.25,
-              color: 'var(--foreground)',
-              mb: 1,
-            }}
-          >
-            {t.home.heroHeadline}
-          </Typography>
-
-          <Typography
-            sx={{
-              fontSize: { xs: '0.9rem', sm: '0.95rem' },
-              color: 'var(--text-muted)',
-              maxWidth: 420,
-              lineHeight: 1.5,
-              mb: 2.25,
-            }}
-          >
-            {t.home.heroSlogan}
-          </Typography>
-
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'center' }}>
-            <Button
-              onClick={handlePrimary}
-              variant="contained"
-              startIcon={<ShoppingBag size={16} />}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                px: 2.25,
-                py: 1.1,
-                borderRadius: '12px',
-                bgcolor: 'var(--primary)',
-                color: 'var(--primary-foreground)',
-                boxShadow: '0 6px 20px color-mix(in srgb, var(--primary) 35%, transparent)',
-                '&:hover': {
-                  bgcolor: 'var(--primary)',
-                  filter: 'brightness(1.08)',
-                },
-              }}
-            >
-              {t.home.heroCtaBuy}
-            </Button>
-            <Button
-              component={Link}
-              href={flagshipHref}
-              variant="outlined"
-              endIcon={<ArrowRight size={16} />}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                px: 2,
-                py: 1.05,
-                borderRadius: '12px',
-                borderColor: 'var(--glass-border)',
-                color: 'var(--foreground)',
-                bgcolor: 'color-mix(in srgb, var(--surface) 70%, transparent)',
-                backdropFilter: 'blur(8px)',
-                '&:hover': {
-                  borderColor: 'color-mix(in srgb, var(--primary) 40%, var(--glass-border))',
-                  bgcolor: 'var(--surface)',
-                },
-              }}
-            >
-              {t.home.heroCtaDetails}
-            </Button>
+          <span>SCC Shop — {en ? 'PSU Science Computer Club' : 'ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.'}</span>
+          <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, color: 'var(--text-muted)' }}>
+            {en ? 'Merch / 2026' : 'ของชุมนุม / 2026'}
           </Box>
-
-          <Typography
-            sx={{
-              mt: 1.75,
-              fontSize: '0.72rem',
-              fontWeight: 600,
-              color: 'var(--text-muted)',
-              letterSpacing: '0.02em',
-            }}
-          >
-            {productLabel}
-          </Typography>
         </Box>
 
-        {/* Dominant product visual */}
         <Box
           sx={{
-            position: 'relative',
-            width: '100%',
-            aspectRatio: { xs: '5 / 4', md: '1 / 1' },
-            maxHeight: { xs: 280, md: 400 },
-            justifySelf: { md: 'end' },
-            animation: 'homeHeroVisual 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.12s both',
-            '@keyframes homeHeroVisual': {
-              from: { opacity: 0, transform: 'translateX(16px) scale(0.98)' },
-              to: { opacity: 1, transform: 'translateX(0) scale(1)' },
-            },
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: '5fr 7fr' },
+            gap: { xs: 2.5, md: 6 },
+            alignItems: 'end',
           }}
         >
+          {/* Copy */}
           <Box
             sx={{
-              position: 'absolute',
-              inset: 0,
-              borderRadius: { xs: '20px', md: '24px' },
-              overflow: 'hidden',
-              bgcolor: 'var(--surface)',
-              border: '1px solid var(--glass-border)',
-              boxShadow: (theme) =>
-                theme.palette.mode === 'dark'
-                  ? '0 24px 60px rgba(0,0,0,0.45)'
-                  : '0 20px 50px rgba(0,0,0,0.08)',
+              order: { xs: 2, md: 1 },
+              minWidth: 0,
+              alignSelf: 'stretch',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: { md: 'space-between' },
+              gap: { md: 4 },
             }}
           >
-            <OptimizedImage
-              src={imageSrc}
-              alt={productLabel}
-              width="100%"
-              height="100%"
-              objectFit="cover"
-              priority
-              placeholder="skeleton"
-              showLoadingIndicator={false}
-              style={{ position: 'absolute', inset: 0 }}
-            />
-            <Box
-              aria-hidden
+            <Typography
+              className="store-mono"
+              sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mb: 1, textTransform: 'uppercase' }}
+            >
+              {en ? 'No. 01 — New this season' : 'No. 01 — ของใหม่ประจำปี'}
+            </Typography>
+            <Box>
+            <Typography
+              component="h1"
               sx={{
-                position: 'absolute',
-                inset: 0,
-                background:
-                  'linear-gradient(to top, color-mix(in srgb, var(--background) 35%, transparent) 0%, transparent 42%)',
-                pointerEvents: 'none',
+                fontFamily: 'var(--font-store)',
+                fontSize: { xs: '2rem', sm: '2.5rem', md: '3.1rem' },
+                fontWeight: 700,
+                lineHeight: 1.08,
+                letterSpacing: '-0.01em',
+                color: 'var(--foreground)',
+                mb: 1.5,
+                overflowWrap: 'anywhere',
               }}
-            />
+            >
+              {productLabel}
+            </Typography>
+            <Typography sx={{ fontFamily: 'inherit', fontSize: { xs: '0.95rem', md: '1rem' }, color: 'var(--text-muted)', maxWidth: 440, lineHeight: 1.6, mb: 3 }}>
+              {t.home.heroSlogan}
+            </Typography>
+
+            {/* Price + deadline, set like a price list */}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'auto 1fr',
+                columnGap: 2,
+                rowGap: 0.75,
+                py: 1.5,
+                mb: 2.5,
+                borderTop: '1px solid var(--border)',
+                borderBottom: '1px solid var(--border)',
+                maxWidth: 440,
+                alignItems: 'baseline',
+              }}
+            >
+              <Typography className="store-mono" sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                {en ? 'Price' : 'ราคา'}
+              </Typography>
+              <Typography className="store-mono" sx={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                {price != null ? `${hasPriceRange ? (en ? 'from ' : 'เริ่ม ') : ''}฿${price.toLocaleString()}` : '—'}
+              </Typography>
+              <Typography className="store-mono" sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                {en ? 'Orders' : 'สั่งซื้อ'}
+              </Typography>
+              <Typography sx={{ fontFamily: 'inherit', fontSize: '0.9rem', color: isOpen ? 'var(--foreground)' : 'var(--text-muted)' }}>
+                {!isOpen
+                  ? en ? 'Closed for now' : 'ปิดรับชั่วคราว'
+                  : deadline
+                    ? en ? `Open until ${deadline}` : `เปิดจองถึง ${deadline}`
+                    : en ? 'Open now' : 'เปิดจองอยู่'}
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+              <Button
+                onClick={handlePrimary}
+                disableElevation
+                variant="contained"
+                endIcon={<ArrowRight size={16} />}
+                sx={{
+                  fontFamily: 'inherit',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.95rem',
+                  px: 2.5,
+                  py: 1.1,
+                  borderRadius: '6px',
+                  bgcolor: 'var(--primary)',
+                  color: 'var(--primary-foreground)',
+                  boxShadow: 'none',
+                  '&:hover': { bgcolor: 'color-mix(in srgb, var(--primary) 88%, black)', boxShadow: 'none' },
+                }}
+              >
+                {canBuy ? t.home.heroCtaBuy : t.home.heroCtaDetails}
+              </Button>
+              <Button
+                component={Link}
+                href={flagshipHref}
+                endIcon={<ArrowUpRight size={16} />}
+                sx={{
+                  fontFamily: 'inherit',
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  fontSize: '0.95rem',
+                  px: 1.5,
+                  py: 1.1,
+                  borderRadius: '6px',
+                  color: 'var(--foreground)',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: '4px',
+                  textDecorationColor: 'var(--border)',
+                  '&:hover': { bgcolor: 'transparent', textDecorationColor: 'currentColor' },
+                }}
+              >
+                {en ? 'Spin it 360°' : 'หมุนดูแบบ 360°'}
+              </Button>
+            </Box>
+            </Box>
+          </Box>
+
+          {/* Framed photo with a caption, like a catalog plate */}
+          <Box component="figure" sx={{ order: { xs: 1, md: 2 }, m: 0, minWidth: 0 }}>
+            <Box
+              sx={{
+                position: 'relative',
+                width: '100%',
+                // Wider on tablets so the name + price still show above the fold
+                aspectRatio: { xs: '4 / 3', sm: '16 / 10', md: '7 / 5' },
+                borderRadius: '4px',
+                overflow: 'hidden',
+                bgcolor: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <ProductImage
+                src={product?.coverImage}
+                fallbackSrcs={product?.images}
+                alt={productLabel}
+                width="100%"
+                height="100%"
+                objectFit="cover"
+                priority
+                placeholder="skeleton"
+                showLoadingIndicator={false}
+                fallbackImage="/logo.png"
+                style={{ position: 'absolute', inset: 0 }}
+              />
+            </Box>
+            <Box
+              component="figcaption"
+              className="store-mono"
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 2,
+                mt: 1,
+                fontSize: '0.7rem',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {en ? 'Fig. 01' : 'ภาพ 01'} — {productLabel}
+              </Box>
+              <span>{t.home.heroHeadline}</span>
+            </Box>
           </Box>
         </Box>
       </Box>

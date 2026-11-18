@@ -4,6 +4,7 @@ import { getJson, putJson, getOrdersByEmail, getOrderByRef, updateOrderByRef } f
 import { deleteOrderByRef } from '@/lib/order-lookup';
 import crypto from 'crypto';
 import { requireAuth, isAdminEmailAsync, isResourceOwner, normalizeEmail as authNormalizeEmail } from '@/lib/auth';
+import { assertShopAccess, resolveAdminSession } from '@/lib/admin-context';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sanitizeOrderForUser, sanitizeOrdersForUser, sanitizeObjectUtf8, sanitizeUtf8Input } from '@/lib/sanitize';
 import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare-server';
@@ -18,7 +19,7 @@ import { computePromoDiscount } from '@/lib/promo';
 import { dispatchNotification } from '@/lib/notifications';
 import { isValidTransition, dispatchWebhook, OrderStatus } from '@/lib/order-state-machine';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
-import { getQStashClient } from '@/lib/qstash';
+import { getOrderWorkerUrl, getQStashClient } from '@/lib/qstash';
 import { deductStockAtomic, restoreStockAtomic } from '@/lib/stock';
 import { getRedisClient } from '@/lib/redis';
 import { isProductCurrentlyOpen, isProductOutOfStock } from '@/lib/shop-constants';
@@ -349,7 +350,8 @@ export async function POST(req: NextRequest) {
     });
     const totalAmount = Math.max(0, subtotal + shippingFee - promoDiscount);
 
-    const ref = sanitizedBody?.ref ? String(sanitizedBody.ref) : generateRef();
+    const rawRef = sanitizedBody?.ref ? String(sanitizedBody.ref).trim() : '';
+    const ref = /^[A-Za-z0-9_-]{3,128}$/.test(rawRef) ? rawRef : generateRef();
     const now = new Date();
     const { buildReservationExpiresAt, getReservationHours } = await import('@/lib/order-reservation');
     const customerEmail = normalizeEmail(sanitizedBody.customerEmail || sanitizedBody.email);
@@ -404,7 +406,7 @@ export async function POST(req: NextRequest) {
             allStockDeducted = false;
             break; // Stop deducting, we will rollback
           } else if (redisDeduct >= 0) {
-            deductedItems.push({ key: stockKey, qty });
+            deductedItems.push({ key: stockKey, qty, isFallback: false, prodId, size });
           } else {
              // Fallback to JSON-based stock
              const prodIndex = products.findIndex(p => p.id === prodId);
@@ -514,34 +516,49 @@ export async function POST(req: NextRequest) {
     }
 
     const qstash = getQStashClient();
+    const redisDeductedItems = deductedItems
+      .filter((item) => !item.isFallback && item.prodId)
+      .map((item) => ({
+        prodId: item.prodId!,
+        size: item.size || 'FREE',
+        qty: item.qty,
+      }));
+    const userAgent = req.headers.get('user-agent') || undefined;
+
     if (qstash) {
       try {
-        // Enqueue job to QStash
-        const protocol = req.headers.get('x-forwarded-proto') || 'https';
-        const host = req.headers.get('host') || 'sccshop.psuscc.club';
+        // Enqueue job to QStash using canonical configured site URL (never untrusted Host header)
         await qstash.publishJSON({
-          url: `${protocol}://${host}/api/workers/process-order`,
-          body: { order, ref, key },
+          url: getOrderWorkerUrl(),
+          body: {
+            order,
+            ref,
+            key,
+            redisDeductedItems,
+            clientIP,
+            userAgent,
+          },
           retries: 3,
         });
 
-        // ── Queue Tracking ─────────────────────────────────
-        // Record queue position and metadata in Redis so the
-        // status endpoint can return accurate ETA / position.
+        // ── Queue Tracking (single Redis pipeline round-trip) ──────
         const redis = getRedisClient();
         if (redis) {
-          const position = await redis.incr('queue:counter').catch(() => 1);
-          await redis.incr('queue:active').catch(() => {});
-          const queueMeta = {
-            position,
-            queuedAt: new Date().toISOString(),
-            estimatedProcessMs: 2000, // ~2s average worker time
+          const queuedAt = new Date().toISOString();
+          const initialMeta = {
+            position: 1,
+            queuedAt,
+            estimatedProcessMs: 2000,
             stage: 'queued',
           };
-          await Promise.all([
-            redis.set(`order_status:${ref}`, 'queued', { ex: 300 }),
-            redis.set(`order_queue:${ref}`, JSON.stringify(queueMeta), { ex: 300 }),
-          ]).catch(() => {});
+          await redis
+            .pipeline()
+            .incr('queue:counter')
+            .incr('queue:active')
+            .set(`order_status:${ref}`, 'queued', { ex: 300 })
+            .set(`order_queue:${ref}`, JSON.stringify(initialMeta), { ex: 300 })
+            .exec()
+            .catch(() => {});
         }
 
         // Dispatch LINE Notification early for queued order
@@ -563,6 +580,45 @@ export async function POST(req: NextRequest) {
     }
 
     // Fallback: Synchronous save if QStash is not configured or failed
+    // If any items were deducted in Redis (not DB fallback), persist those deductions to DB now
+    if (redisDeductedItems.length > 0) {
+      try {
+        let redisItemsApplied = false;
+        for (const item of redisDeductedItems) {
+          const p = products.find((prod) => prod.id === item.prodId);
+          if (!p) continue;
+          if (p.variants && p.variants.length > 0) {
+            const v = p.variants.find((variant: any) => variant.id === item.size || variant.name === item.size);
+            if (v && typeof v.stock === 'number' && v.stock >= 0) {
+              v.stock = Math.max(0, v.stock - item.qty);
+              redisItemsApplied = true;
+            }
+          } else if (typeof p.stock === 'number' && p.stock >= 0) {
+            p.stock = Math.max(0, p.stock - item.qty);
+            redisItemsApplied = true;
+          }
+        }
+        if (redisItemsApplied) {
+          if (sanitizedBody.shopId || sanitizedBody.shopSlug) {
+            const shopIdToUpdate =
+              sanitizedBody.shopId ||
+              (await db.select().from(shops).where(eq(shops.slug, sanitizedBody.shopSlug)).limit(1))[0]?.id;
+            if (shopIdToUpdate) {
+              await db.update(shops).set({ products }).where(eq(shops.id, shopIdToUpdate));
+            }
+          } else {
+            const cfg = await getJson<any>('config/shop-settings.json');
+            if (cfg) {
+              cfg.products = products;
+              await putJson('config/shop-settings.json', cfg);
+            }
+          }
+        }
+      } catch (syncStockErr) {
+        console.error('[Orders API] Failed to sync Redis-deducted stock to DB:', syncStockErr);
+      }
+    }
+
     await putJson(key, order);
     if (order.customerEmail) {
       await upsertIndexEntry(order.customerEmail, order);
@@ -588,7 +644,6 @@ export async function POST(req: NextRequest) {
     
     // Log user action
     if (order.customerEmail) {
-      const userAgent = req.headers.get('user-agent') || undefined;
       await saveUserLogServer({
         email: order.customerEmail,
         name: order.customerName,
@@ -649,13 +704,24 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin
+    // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin (และถ้าเป็น shopAdmin ต้องตรงกับร้านที่ดูแล)
     const orderEmail = existing.customerEmail || existing.email;
-    if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdmin) {
+    const isOwner = isResourceOwner(orderEmail, currentUserEmail);
+    if (!isOwner && !isAdmin) {
       return await secureJsonResponse(
         { status: 'error', message: 'ไม่มีสิทธิ์แก้ไข order นี้' },
         { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
+    }
+    if (!isOwner && isAdmin) {
+      const adminSession = await resolveAdminSession(currentUserEmail);
+      const orderShopId = existing.shopId || (existing as any).shop_id;
+      if (adminSession.userRole === 'shopAdmin' && (!orderShopId || !assertShopAccess(adminSession, String(orderShopId)))) {
+        return await secureJsonResponse(
+          { status: 'error', message: 'ไม่มีสิทธิ์แก้ไข order ของร้านค้าอื่น' },
+          { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        );
+      }
     }
 
     // User ปกติแก้ไขได้เฉพาะบางฟิลด์
@@ -698,7 +764,7 @@ export async function PUT(req: NextRequest) {
       sanitizedUpdates.receiptIssuedAt = new Date().toISOString();
     }
 
-    const next = { ...existing, ...sanitizedUpdates };
+    let next = { ...existing, ...sanitizedUpdates };
 
     // State machine check if status changed
     if (sanitizedUpdates.status && sanitizedUpdates.status !== existing.status) {
@@ -707,6 +773,30 @@ export async function PUT(req: NextRequest) {
           { status: 'error', message: `Invalid status transition from ${existing.status} to ${sanitizedUpdates.status}` },
           { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
         );
+      }
+      // Restore stock if order is transitioned to CANCELLED via PUT
+      if (
+        String(sanitizedUpdates.status).toUpperCase() === 'CANCELLED' &&
+        String(existing.status || '').toUpperCase() !== 'CANCELLED'
+      ) {
+        try {
+          const {
+            releaseOrderStock,
+            shouldReleaseReservationStock,
+            withStockReleasedFlag,
+          } = await import('@/lib/order-reservation');
+          if (shouldReleaseReservationStock(existing, existing.status)) {
+            const release = await releaseOrderStock(existing);
+            next = withStockReleasedFlag(next, {
+              cancelledAt: next.cancelledAt || new Date().toISOString(),
+              stockRestoreRestored: release.restored,
+              stockRestoreFailed: release.failed,
+              cancelReason: next.cancelReason || 'ยกเลิกโดยแอดมิน/ผู้ใช้ — คืนสต็อกแล้ว',
+            });
+          }
+        } catch (stockErr) {
+          console.error('[Orders API] stock release on PUT cancel failed:', stockErr);
+        }
       }
     }
 
@@ -780,12 +870,23 @@ export async function DELETE(req: NextRequest) {
 
     const orderEmail = existing.customerEmail || existing.email;
 
-    // ตรวจสอบสิทธิ์
-    if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdmin) {
+    // ตรวจสอบสิทธิ์ (และจำกัด shopAdmin เฉพาะร้านที่ดูแล)
+    const isOwner = isResourceOwner(orderEmail, currentUserEmail);
+    if (!isOwner && !isAdmin) {
       return await secureJsonResponse(
         { status: 'error', message: 'ไม่มีสิทธิ์ลบ order นี้' },
         { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
+    }
+    if (!isOwner && isAdmin) {
+      const adminSession = await resolveAdminSession(currentUserEmail);
+      const orderShopId = existing.shopId || (existing as any).shop_id;
+      if (adminSession.userRole === 'shopAdmin' && (!orderShopId || !assertShopAccess(adminSession, String(orderShopId)))) {
+        return await secureJsonResponse(
+          { status: 'error', message: 'ไม่มีสิทธิ์ลบ order ของร้านค้าอื่น' },
+          { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        );
+      }
     }
 
     if (hard) {

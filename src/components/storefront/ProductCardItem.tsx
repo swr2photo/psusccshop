@@ -3,11 +3,11 @@
 import React from 'react';
 import { Box, Typography, IconButton, Chip } from '@mui/material';
 import { Heart, ShoppingCart } from 'lucide-react';
-import Image from 'next/image';
 import { Product, getProductName, getProductDescription } from '@/lib/config';
 import { getProductStatus, ShopStatusType, SHOP_STATUS_CONFIG } from '@/components/ShopStatusCard';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import ProductImage from './ProductImage';
 
 export interface ProductCardItemProps {
   product: Product;
@@ -15,7 +15,7 @@ export interface ProductCardItemProps {
     shopId?: string;
     shopSlug?: string;
     isOpen: boolean;
-    events?: any[];
+    events?: unknown[];
   };
   now: Date;
   lang: 'th' | 'en';
@@ -40,8 +40,6 @@ export function ProductCardItem({
   const productStatus = getProductStatus(product, now);
   const outOfStock = product.stock !== undefined && product.stock !== null && product.stock <= 0;
   const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen;
-  const productImage = product.coverImage || product.images?.[0] || '/placeholder.png';
-
   const handleClick = () => {
     if (!catalogContext.isOpen) {
       onShowToast('warning', t.checkout.shopClosedWarning);
@@ -95,12 +93,14 @@ export function ProductCardItem({
     >
       {/* Product Image Box */}
       <Box sx={{ position: 'relative', pt: '100%', bgcolor: 'var(--surface-2)', overflow: 'hidden' }}>
-        <Image
-          src={productImage}
+        <ProductImage
+          src={product.coverImage}
+          fallbackSrcs={product.images}
           alt={getProductName(product, lang)}
-          fill
-          sizes="(max-width: 600px) 100vw, (max-width: 900px) 50vw, 25vw"
-          style={{ objectFit: 'cover' }}
+          width="100%"
+          height="100%"
+          objectFit="cover"
+          style={{ position: 'absolute', inset: 0 }}
         />
 
         {/* Overlay if unavailable */}

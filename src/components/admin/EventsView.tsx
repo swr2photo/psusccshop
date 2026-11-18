@@ -51,7 +51,7 @@ type ShopEvent = NonNullable<ShopConfig['events']>[number];
 
 export interface EventsViewProps {
   config: ShopConfig;
-  saveConfig: (newConfig: ShopConfig) => Promise<void>;
+  saveConfig: (newConfig: ShopConfig) => Promise<unknown>;
   showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
   userEmail: string | null | undefined;
   onImageUpload: (file: File) => Promise<string | null>;
@@ -333,7 +333,7 @@ export const EventsView = React.memo(function EventsView({
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-[14px] bg-gradient-to-br from-amber-400 to-amber-500 shadow-[0_4px_16px_rgba(251,191,36,0.3)]">
+            <div className="grid size-11 place-items-center rounded-[14px] bg-primary shadow-[0_4px_16px_rgba(251,191,36,0.3)]">
               <Sparkles size={22} className="text-white" />
             </div>
             <div>
@@ -347,7 +347,7 @@ export const EventsView = React.memo(function EventsView({
           </div>
           <Button
             onClick={() => setEditingEvent(createNewEvent())}
-            className="rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 px-5 font-bold text-black hover:from-amber-500 hover:to-amber-600"
+            className="rounded-xl bg-primary px-5 font-bold text-primary-foreground hover:bg-primary/90"
           >
             <Add size={18} />
             สร้างอีเวนต์ใหม่
@@ -435,7 +435,7 @@ export const EventsView = React.memo(function EventsView({
                             </Badge>
                           )}
                           {isExpired && (
-                            <Badge className="h-5 border-transparent bg-red-500/10 text-[0.65rem] font-bold text-red-500">
+                            <Badge className="h-5 border-transparent bg-destructive/10 text-[0.65rem] font-bold text-destructive">
                               หมดอายุ
                             </Badge>
                           )}
@@ -443,7 +443,7 @@ export const EventsView = React.memo(function EventsView({
                             className={cn(
                               'h-5 text-[0.65rem] font-bold',
                               event.enabled
-                                ? 'border-transparent bg-emerald-500/10 text-emerald-500'
+                                ? 'border-transparent bg-success/10 text-success'
                                 : 'border-transparent bg-gray-500/10 text-gray-500',
                             )}
                           >
@@ -481,7 +481,7 @@ export const EventsView = React.memo(function EventsView({
                             <span
                               className={cn(
                                 'flex items-center gap-1 text-[0.7rem]',
-                                isExpired ? 'text-red-500' : 'text-[var(--text-muted)]',
+                                isExpired ? 'text-destructive' : 'text-[var(--text-muted)]',
                               )}
                             >
                               <AccessTime size={11} />
@@ -507,7 +507,7 @@ export const EventsView = React.memo(function EventsView({
                           className={cn(
                             'h-8 gap-1 border-slate-500/30 px-2 text-xs',
                             event.enabled
-                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                              ? 'border-success/30 bg-success/10 text-success hover:bg-success/20'
                               : 'bg-slate-500/10 text-slate-400 hover:bg-slate-500/20'
                           )}
                           onClick={() => handleToggle(event)}
@@ -519,7 +519,7 @@ export const EventsView = React.memo(function EventsView({
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-8 gap-1 border-blue-500/30 bg-blue-500/10 px-2.5 text-xs text-blue-400 hover:bg-blue-500/20"
+                          className="h-8 gap-1 border-primary/30 bg-primary/10 px-2.5 text-xs text-primary hover:bg-primary/20"
                           onClick={() => setEditingEvent({ ...event })}
                         >
                           <Edit size={14} />
@@ -529,7 +529,7 @@ export const EventsView = React.memo(function EventsView({
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-8 gap-1 border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                          className="h-8 gap-1 border-destructive/30 bg-destructive/10 px-2.5 text-xs text-destructive hover:bg-destructive/20 hover:text-destructive"
                           onClick={() => handleDelete(event)}
                         >
                           <Delete size={14} />
@@ -559,7 +559,7 @@ export const EventsView = React.memo(function EventsView({
                 <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible p-6">
                 <DialogHeader className="border-b border-[var(--glass-border)] pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-500">
+                    <div className="grid size-10 place-items-center rounded-xl bg-primary">
                       <Sparkles size={20} className="text-white" />
                     </div>
                     <DialogTitle className="text-[1.1rem] font-bold text-[var(--foreground)]">
@@ -578,7 +578,7 @@ export const EventsView = React.memo(function EventsView({
                       onCheckedChange={(checked) =>
                         setEditingEvent((prev) => (prev ? { ...prev, enabled: checked } : null))
                       }
-                      className="data-[state=checked]:bg-emerald-500"
+                      className="data-[state=checked]:bg-success"
                     />
                   </div>
 
@@ -692,7 +692,7 @@ export const EventsView = React.memo(function EventsView({
                         }
                       />
                       {editingEvent.ctaLink && !editingEvent.ctaLink.startsWith('http') && (
-                        <p className="mt-1 text-[0.7rem] text-emerald-500">
+                        <p className="mt-1 text-[0.7rem] text-success">
                           ✓ เชื่อมโยงกับสินค้า:{' '}
                           {(config.products || []).find((p) => p.id === editingEvent.ctaLink)
                             ?.name || editingEvent.ctaLink}
@@ -736,7 +736,7 @@ export const EventsView = React.memo(function EventsView({
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-red-500/20 bg-red-500/[0.08] p-4">
+                  <div className="rounded-xl border border-destructive/20 bg-destructive/[0.08] p-4">
                     <p className="mb-3 flex items-center gap-1 text-[0.9rem] font-bold text-[#ff453a]">
                       <LocalOffer size={16} />
                       ส่วนลดสินค้า (ลดราคาอัตโนมัติเมื่ออีเวนต์เปิด)
@@ -766,7 +766,7 @@ export const EventsView = React.memo(function EventsView({
                             className={cn(
                               'cursor-pointer rounded-md border px-3 py-1 text-sm font-bold transition-colors',
                               editingEvent.discountType === opt.value
-                                ? 'border-red-500/40 bg-red-500/20 text-[#ff453a]'
+                                ? 'border-destructive/40 bg-destructive/20 text-[#ff453a]'
                                 : 'border-[var(--glass-border)] bg-[var(--surface)] text-[var(--text-muted)]',
                             )}
                           >
@@ -823,7 +823,7 @@ export const EventsView = React.memo(function EventsView({
                             className={cn(
                               'cursor-pointer rounded-md border px-2 py-0.5 text-[0.7rem] transition-colors',
                               isLinked
-                                ? 'border-red-500/40 bg-red-500/15 font-bold text-[#ff453a]'
+                                ? 'border-destructive/40 bg-destructive/15 font-bold text-[#ff453a]'
                                 : 'border-[var(--glass-border)] bg-[var(--surface)] font-medium text-[var(--text-muted)]',
                             )}
                           >
@@ -886,7 +886,7 @@ export const EventsView = React.memo(function EventsView({
                               prev ? { ...prev, imageUrl: undefined } : null,
                             )
                           }
-                          className="absolute top-2 right-2 bg-black/50 text-white hover:bg-red-500/80"
+                          className="absolute top-2 right-2 bg-black/50 text-white hover:bg-destructive/80"
                         >
                           <Close size={14} />
                         </Button>
@@ -895,7 +895,7 @@ export const EventsView = React.memo(function EventsView({
                       <Button
                         variant="outline"
                         disabled={uploadingImage}
-                        className="h-auto w-full rounded-xl border-dashed border-[var(--glass-border)] py-8 font-semibold text-[var(--text-muted)] hover:border-amber-400 hover:text-amber-400"
+                        className="h-auto w-full rounded-xl border-dashed border-[var(--glass-border)] py-8 font-semibold text-[var(--text-muted)] hover:border-warning hover:text-warning"
                         asChild
                       >
                         <label className="cursor-pointer">
@@ -958,7 +958,7 @@ export const EventsView = React.memo(function EventsView({
                   <Button
                     onClick={() => handleSave(editingEvent)}
                     disabled={saving || !editingEvent.title.trim()}
-                    className="rounded-[10px] bg-gradient-to-br from-amber-400 to-amber-500 px-6 font-bold text-black hover:from-amber-500 hover:to-amber-600 disabled:opacity-50"
+                    className="rounded-[10px] bg-primary px-6 font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
                     {saving ? (
                       <>

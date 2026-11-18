@@ -56,3 +56,10 @@ src/generated/
 # Sentry Config File
 .env.sentry-build-plugin
 .env*.local
+
+# Secret & log dumps
+qstash_token.txt
+qstash_curr.txt
+qstash_next.txt
+vercel_logs.txt
+/scratch/

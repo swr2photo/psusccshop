@@ -18,6 +18,7 @@ import {
   createStripePaymentIntent,
 } from '@/lib/payment-server';
 import { isResourceOwner } from '@/lib/auth';
+import { SITE_URL } from '@/lib/site';
 import { rateLimitOrNull } from '@/lib/api-helpers';
 import { RATE_LIMITS } from '@/lib/rate-limit';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
@@ -116,6 +117,12 @@ export async function POST(request: NextRequest) {
     }
 
     const chargeAmount = expectedAmount;
+    const siteBaseUrl = (
+      process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
+      process.env.NEXTAUTH_URL?.trim() ||
+      SITE_URL
+    ).replace(/\/+$/, '');
+    const defaultReturnUrl = `${siteBaseUrl}/payment/complete?ref=${encodeURIComponent(orderId)}`;
 
     // Create charge based on gateway
     let chargeResult: any;
@@ -127,14 +134,14 @@ export async function POST(request: NextRequest) {
         token,
         phoneNumber,
         installmentTerm,
-        returnUrl: returnUrl || `${process.env.NEXTAUTH_URL}/payment/complete?ref=${orderId}`,
+        returnUrl: returnUrl || defaultReturnUrl,
         email: session.user.email,
       });
     } else if (gateway === 'stripe') {
       chargeResult = await createStripeChargeForMethod(method, {
         amount: chargeAmount * 100, // Stripe uses smallest unit
         orderId,
-        returnUrl: returnUrl || `${process.env.NEXTAUTH_URL}/payment/complete?ref=${orderId}`,
+        returnUrl: returnUrl || defaultReturnUrl,
         email: session.user.email,
       });
     } else {

@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!isAdminUser) {
-      return publicJson(source, 'public, s-maxage=300, stale-while-revalidate=600');
+      return publicJson(source, 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
     }
 
     return await secureJsonResponse(

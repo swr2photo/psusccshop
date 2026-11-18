@@ -1,280 +1,352 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import {
-  Box,
-  Container,
-  Typography,
-  Paper,
-  Tabs,
-  Tab,
-  TextField,
-  InputAdornment,
-  Chip,
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-} from '@mui/material';
-import { Search, Package, ExternalLink, QrCode, FileText, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import StorefrontNavbar from '@/components/StorefrontNavbar';
-import MobileBottomNav from '@/components/MobileBottomNav';
-import { useTranslation } from '@/hooks/useTranslation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography } from '@mui/material';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { apiFetch } from '@/lib/api-client';
+import { Clock, MapPin, Package, X } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import MobileBottomNav from '@/components/MobileBottomNav';
+import OrderHistoryDrawer from '@/components/OrderHistoryDrawer';
+import StorefrontNavbar from '@/components/StorefrontNavbar';
+import { getShopStatus } from '@/components/ShopStatusCard';
+import { cancelOrder, getHistory, getPublicConfig } from '@/lib/api-client';
+import type { ShopConfig } from '@/lib/config';
+import type { OrderHistory } from '@/lib/shop-constants';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useNotification } from '@/components/NotificationContext';
+import { useRealtimeOrdersByEmail } from '@/hooks/useRealtimeOrders';
 
-const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-  PENDING: { label: 'รอชำระเงิน', color: '#92400e', bg: '#fef3c7' },
-  PAID: { label: 'ชำระเงินแล้ว', color: '#166534', bg: '#dcfce7' },
-  READY: { label: 'พร้อมรับสินค้า', color: '#0369a1', bg: '#e0f2fe' },
-  SHIPPED: { label: 'จัดส่งแล้ว', color: '#1d4ed8', bg: '#dbeafe' },
-  COMPLETED: { label: 'สำเร็จ', color: '#15803d', bg: '#f0fdf4' },
-  CANCELLED: { label: 'ยกเลิก', color: '#b91c1c', bg: '#fee2e2' },
-};
+type HistoryFilter = 'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED';
 
+const PAGE_SIZE = 20;
+
+function normalizeOrder(order: any): OrderHistory {
+  const items = order.items || order.cart || [];
+  let total = Number(order.total ?? order.totalAmount ?? order.amount ?? 0);
+  if (!total && Array.isArray(items)) {
+    total = items.reduce((sum: number, item: any) => {
+      const qty = Number(item.qty ?? item.quantity ?? 1);
+      const unit = Number(item.unitPrice ?? item.price ?? 0);
+      return sum + Number(item.subtotal ?? unit * qty);
+    }, 0);
+  }
+
+  return {
+    ...order,
+    ref: String(order.ref || ''),
+    status: String(order.status || 'PENDING'),
+    date: order.date || order.createdAt || order.created_at || new Date().toISOString(),
+    total,
+    items,
+  };
+}
+
+/** Standalone route backed by the exact same order-history UI as the home popup. */
 export default function StandaloneOrdersPage() {
-  const { lang } = useTranslation();
-  const { data: session } = useSession();
-  const [tabValue, setTabValue] = useState('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [ordersList, setOrdersList] = useState<any[]>([]);
+  const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
+  const { t, lang } = useTranslation();
+  const notify = useNotification();
+  const email = session?.user?.email;
+  const ordersRef = useRef<OrderHistory[]>([]);
+  const refreshRef = useRef<() => void>(() => undefined);
+
+  const [orders, setOrders] = useState<OrderHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [filter, setFilter] = useState<HistoryFilter>('ALL');
+  const [config, setConfig] = useState<ShopConfig | null>(null);
+  const [confirmCancelRef, setConfirmCancelRef] = useState<string | null>(null);
+  const [cancellingRef, setCancellingRef] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [qrOrderRef, setQrOrderRef] = useState<string | null>(null);
+
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
+
+  const loadPage = useCallback(async (append = false, silent = false) => {
+    if (!email) {
+      if (sessionStatus !== 'loading') setLoading(false);
+      return;
+    }
+
+    if (append) setLoadingMore(true);
+    else if (!silent) setLoading(true);
+    try {
+      const offset = append ? ordersRef.current.length : 0;
+      const response = await getHistory(email, offset, PAGE_SIZE);
+      const raw = response.data?.history ?? (response as any).history;
+      if (response.status !== 'success' || !Array.isArray(raw)) {
+        throw new Error(response.message || t.misc.cannotLoadHistory);
+      }
+
+      const next = raw.map(normalizeOrder).filter((order) => order.ref);
+      const serverHasMore = Boolean(response.data?.hasMore);
+      const existingRefs = new Set(ordersRef.current.map((order) => order.ref));
+      const uniqueNext = append ? next.filter((order) => !existingRefs.has(order.ref)) : next;
+
+      // Keep already-rendered history if a transient API response is empty.
+      if (!append && next.length === 0 && ordersRef.current.length > 0) return;
+      // Avoid repeatedly requesting the same page when the backend returns duplicates.
+      if (append && uniqueNext.length === 0) {
+        setHasMore(false);
+        return;
+      }
+
+      setOrders((previous) => {
+        if (!append) return next;
+        const refs = new Set(previous.map((order) => order.ref));
+        return [...previous, ...uniqueNext.filter((order) => !refs.has(order.ref))];
+      });
+      setHasMore(serverHasMore);
+    } catch (error) {
+      console.error('[StandaloneOrdersPage] Failed to load history:', error);
+      if (!silent) notify.error(t.common.error, t.misc.cannotLoadHistory);
+    } finally {
+      if (append) setLoadingMore(false);
+      else if (!silent) setLoading(false);
+    }
+  }, [email, notify, sessionStatus, t.common.error, t.misc.cannotLoadHistory]);
+
+  useEffect(() => {
+    refreshRef.current = () => { void loadPage(false, true); };
+  }, [loadPage]);
+
+  useEffect(() => {
+    void loadPage();
+  }, [loadPage]);
 
   useEffect(() => {
     let active = true;
-    const fetchOrders = async () => {
-      setLoading(true);
-      try {
-        let localRefs: string[] = [];
-        try {
-          const raw = localStorage.getItem('psu_scc_orders');
-          if (raw) localRefs = JSON.parse(raw);
-        } catch { /* ignore */ }
-
-        const email = session?.user?.email;
-        const fetchedList: any[] = [];
-        const seenRefs = new Set<string>();
-
-        // 1. Fetch user email orders
-        if (email) {
-          try {
-            const res = await apiFetch(`/api/orders?email=${encodeURIComponent(email)}`);
-            if (res.ok) {
-              const data = await res.json();
-              const history = data.data?.history || data.orders || data.history || [];
-              if (Array.isArray(history)) {
-                for (const o of history) {
-                  if (o?.ref && !seenRefs.has(o.ref)) {
-                    seenRefs.add(o.ref);
-                    fetchedList.push(o);
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            console.warn('[OrdersPage] Email fetch error:', e);
-          }
-        }
-
-        // 2. Fetch local storage refs if any missing
-        if (localRefs.length > 0) {
-          const missingRefs = localRefs.filter((r) => !seenRefs.has(r));
-          if (missingRefs.length > 0) {
-            try {
-              const resRefs = await apiFetch(`/api/orders?refs=${encodeURIComponent(missingRefs.join(','))}`);
-              if (resRefs.ok) {
-                const dataRefs = await resRefs.json();
-                const historyRefs = dataRefs.data?.history || dataRefs.orders || dataRefs.history || [];
-                if (Array.isArray(historyRefs)) {
-                  for (const o of historyRefs) {
-                    if (o?.ref && !seenRefs.has(o.ref)) {
-                      seenRefs.add(o.ref);
-                      fetchedList.push(o);
-                    }
-                  }
-                }
-              }
-            } catch (e) {
-              console.warn('[OrdersPage] Refs fetch error:', e);
-            }
-          }
-        }
-
-        if (active) setOrdersList(fetchedList);
-      } catch (err) {
-        console.error('[OrdersPage] Fetch error:', err);
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    fetchOrders();
+    void getPublicConfig().then((response) => {
+      if (!active || response.status !== 'success') return;
+      const nextConfig = (response.data as ShopConfig | undefined) ?? (response.config as ShopConfig | undefined);
+      if (nextConfig) setConfig(nextConfig);
+    });
     return () => { active = false; };
-  }, [session]);
+  }, []);
 
-  const filteredOrders = ordersList.filter((order) => {
-    const matchesTab = tabValue === 'ALL' || order.status?.toUpperCase() === tabValue;
-    const matchesSearch =
-      !searchQuery.trim() ||
-      order.ref?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customerName?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesTab && matchesSearch;
-  });
+  const handleRealtimeChange = useCallback(() => {
+    refreshRef.current();
+  }, []);
+  const realtime = useRealtimeOrdersByEmail(email, handleRealtimeChange);
+
+  const isShopOpen = useMemo(() => {
+    if (!config) return true;
+    return getShopStatus(config.isOpen, config.closeDate, config.openDate) === 'OPEN';
+  }, [config]);
+
+  const confirmCancellation = async () => {
+    if (!confirmCancelRef) return;
+    const ref = confirmCancelRef;
+    setConfirmCancelRef(null);
+    setCancellingRef(ref);
+    try {
+      const response = await cancelOrder(ref);
+      if (response.status !== 'success') throw new Error(response.message || t.common.error);
+      setOrders((previous) => previous.map((order) => (
+        order.ref === ref ? { ...order, status: 'CANCELLED' } : order
+      )));
+      notify.success(t.common.success);
+    } catch (error) {
+      notify.error(t.common.error, error instanceof Error ? error.message : t.common.error);
+    } finally {
+      setCancellingRef(null);
+    }
+  };
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background, #f8fafc)', color: 'var(--foreground, #0f172a)', pb: 10 }}>
-      <StorefrontNavbar />
+    <>
+      <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background)', color: 'var(--foreground)' }}>
+        <StorefrontNavbar />
+        <MobileBottomNav activeKey="history" />
+      </Box>
 
-      <Container maxWidth="lg" sx={{ pt: { xs: 3, md: 5 }, pb: 6 }}>
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: 'var(--navy, #1e3a5f)', fontSize: { xs: '1.5rem', md: '2rem' } }}>
-              {lang === 'en' ? 'My Orders' : 'ประวัติคำสั่งซื้อ'}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'var(--text-muted, #64748b)', mt: 0.5 }}>
-              {lang === 'en' ? 'Track order status and download E-Receipts' : 'ติดตามสถานะคำสั่งซื้อและรับใบเสร็จรับเงินอิเล็กทรอนิกส์'}
-            </Typography>
-          </Box>
+      <OrderHistoryDrawer
+        standalone
+        open
+        onClose={() => router.push('/')}
+        orderHistory={orders}
+        loadingHistory={loading || sessionStatus === 'loading'}
+        loadingHistoryMore={loadingMore}
+        historyHasMore={hasMore}
+        historyFilter={filter}
+        onFilterChange={setFilter}
+        onLoadMore={() => { void loadPage(true); }}
+        onOpenPayment={(ref) => router.push(`/payment/${encodeURIComponent(ref)}`)}
+        onCancelOrder={setConfirmCancelRef}
+        onShowQR={setQrOrderRef}
+        cancellingRef={cancellingRef}
+        isShopOpen={isShopOpen}
+        realtimeConnected={realtime.isConnected}
+        config={config}
+        onImageClick={setLightboxImage}
+        onRefundRequested={() => { void loadPage(false, true); }}
+        onBrowseShop={() => router.push('/shop')}
+      />
 
-          <TextField
-            placeholder="ค้นหาตามรหัสคำสั่งซื้อ..."
-            size="small"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={18} color="#64748b" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ width: { xs: '100%', sm: 260 }, bgcolor: '#ffffff', borderRadius: 2 }}
-          />
-        </Box>
-
-        {/* Filter Tabs */}
-        <Paper elevation={0} sx={{ border: '1px solid #e2e8f0', borderRadius: 3, mb: 3, bgcolor: '#ffffff', overflow: 'hidden' }}>
-          <Tabs
-            value={tabValue}
-            onChange={(_, val) => setTabValue(val)}
-            variant="scrollable"
-            scrollButtons="auto"
-            sx={{ px: 2, '& .MuiTab-root': { fontWeight: 700, textTransform: 'none', py: 2 } }}
-          >
-            <Tab label="ทั้งหมด (All)" value="ALL" />
-            <Tab label="รอชำระเงิน (Pending)" value="PENDING" />
-            <Tab label="ชำระเงินแล้ว (Paid)" value="PAID" />
-            <Tab label="พร้อมรับสินค้า (Ready)" value="READY" />
-            <Tab label="สำเร็จ (Completed)" value="COMPLETED" />
-            <Tab label="ยกเลิก (Cancelled)" value="CANCELLED" />
-          </Tabs>
-        </Paper>
-
-        {/* Orders List */}
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-            <CircularProgress size={36} sx={{ color: '#1e3a5f' }} />
-          </Box>
-        ) : filteredOrders.length === 0 ? (
-          <Paper elevation={0} sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
-            <Package size={48} color="#94a3b8" style={{ marginBottom: 12 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#475569' }}>
-              ไม่พบรายการคำสั่งซื้อ
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5, mb: 3 }}>
-              ลองค้นหาด้วยรหัสอื่น หรือเลือกซื้อสินค้าในร้านค้า
-            </Typography>
-            <Button component={Link} href="/shop" variant="contained" sx={{ bgcolor: '#1e3a5f', borderRadius: 2.5, px: 3 }}>
-              ไปยังหน้าร้านค้า
-            </Button>
-          </Paper>
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {filteredOrders.map((order) => {
-              const statusInfo = STATUS_MAP[order.status?.toUpperCase()] || STATUS_MAP.PENDING;
-              return (
-                <Card
-                  key={order.id || order.ref}
-                  variant="outlined"
-                  sx={{
-                    borderRadius: 3,
-                    borderColor: '#e2e8f0',
-                    transition: 'all 0.2s',
-                    '&:hover': { borderColor: '#cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' },
-                  }}
-                >
-                  <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e3a5f', fontSize: '1.05rem' }}>
-                            #{order.ref}
-                          </Typography>
-                          <Chip
-                            label={statusInfo.label}
-                            size="small"
-                            sx={{ fontWeight: 700, fontSize: '0.75rem', bgcolor: statusInfo.bg, color: statusInfo.color }}
-                          />
-                        </Box>
-                        <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.8rem' }}>
-                          วันที่สั่งซื้อ: {new Date(order.createdAt || order.created_at || Date.now()).toLocaleDateString('th-TH')} | ลูกค้า: {order.customerName}
-                        </Typography>
-                      </Box>
-
-                      <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e3a5f' }}>
-                        ฿{Number(order.totalAmount || order.amount || 0).toLocaleString()}
-                      </Typography>
-                    </Box>
-
-                    {/* Action Buttons */}
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', pt: 1, borderTop: '1px solid #f1f5f9' }}>
-                      <Button
-                        component={Link}
-                        href={`/orders/${encodeURIComponent(order.ref)}`}
-                        variant="contained"
-                        size="small"
-                        endIcon={<ExternalLink size={14} />}
-                        sx={{ bgcolor: '#1e3a5f', borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-                      >
-                        ดูรายละเอียดและติดตามสถานะ
-                      </Button>
-
-                      {['PENDING', 'WAITING_PAYMENT', 'UNPAID'].includes(order.status?.toUpperCase() || '') && (
-                        <Button
-                          component={Link}
-                          href={`/payment/${encodeURIComponent(order.ref)}`}
-                          variant="contained"
-                          size="small"
-                          startIcon={<QrCode size={14} />}
-                          sx={{ bgcolor: '#16a34a', '&:hover': { bgcolor: '#15803d' }, borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-                        >
-                          ชำระเงินทันที
-                        </Button>
-                      )}
-
-                      {(order.status?.toUpperCase() === 'PAID' || order.paymentVerified) && (
-                        <Button
-                          component={Link}
-                          href={`/receipt/${encodeURIComponent(order.ref)}`}
-                          variant="outlined"
-                          size="small"
-                          startIcon={<FileText size={14} />}
-                          sx={{ color: '#166534', borderColor: '#86efac', borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-                        >
-                          ใบเสร็จ E-Receipt
-                        </Button>
-                      )}
-                    </Box>
-                  </CardContent>
-                </Card>
-              );
-            })}
+      <Dialog
+        open={Boolean(lightboxImage)}
+        onClose={() => setLightboxImage(null)}
+        fullScreen
+        PaperProps={{
+          sx: {
+            bgcolor: 'rgba(0, 0, 0, 0.97)',
+            boxShadow: 'none',
+          },
+        }}
+        sx={{ zIndex: 99999 }}
+      >
+        <IconButton
+          onClick={() => setLightboxImage(null)}
+          aria-label={t.common.close}
+          sx={{
+            position: 'absolute',
+            top: { xs: 12, sm: 16 },
+            right: { xs: 12, sm: 16 },
+            color: '#fff',
+            bgcolor: 'rgba(255,255,255,0.12)',
+            zIndex: 1,
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+          }}
+        >
+          <X size={22} />
+        </IconButton>
+        {lightboxImage && (
+          <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', p: { xs: 2, sm: 4 } }}>
+            <Box
+              component="img"
+              src={lightboxImage}
+              alt="Full size product"
+              sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 2, userSelect: 'none' }}
+            />
           </Box>
         )}
-      </Container>
+      </Dialog>
 
-      <MobileBottomNav />
-    </Box>
+      <Dialog
+        open={Boolean(qrOrderRef)}
+        onClose={() => setQrOrderRef(null)}
+        fullScreen
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--background)',
+            backgroundImage: 'radial-gradient(circle at 50% 50%, var(--glow-2), transparent 50%)',
+          },
+        }}
+      >
+        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 3, position: 'relative' }}>
+          <IconButton
+            onClick={() => setQrOrderRef(null)}
+            aria-label={t.common.close}
+            sx={{ position: 'absolute', top: 16, right: 16, bgcolor: 'var(--glass-bg)', color: 'var(--foreground)', '&:hover': { bgcolor: 'var(--glass-bg)' } }}
+          >
+            <X size={24} />
+          </IconButton>
+
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Box sx={{ width: 64, height: 64, borderRadius: '20px', background: 'linear-gradient(135deg, #64d2ff 0%, #34c759 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, boxShadow: '0 8px 32px rgba(6,182,212,0.3)' }}>
+              <Package size={32} color="white" />
+            </Box>
+            <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', mb: 0.5 }}>
+              {t.qrDialog.title}
+            </Typography>
+            <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              {t.qrDialog.instruction}
+            </Typography>
+          </Box>
+
+          <Box sx={{ p: 4, borderRadius: '24px', bgcolor: '#fff', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', mb: 3 }}>
+            <QRCodeSVG
+              value={`ORDER:${qrOrderRef || ''}`}
+              size={Math.min(280, typeof window !== 'undefined' ? window.innerWidth - 100 : 280)}
+              level="H"
+              includeMargin={false}
+            />
+          </Box>
+
+          <Box sx={{ px: 3, py: 1.5, borderRadius: '16px', bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)', mb: 4 }}>
+            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', mb: 0.5 }}>
+              {t.qrDialog.orderNumber}
+            </Typography>
+            <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--secondary)', fontFamily: 'monospace', textAlign: 'center', letterSpacing: '0.05em' }}>
+              {qrOrderRef}
+            </Typography>
+          </Box>
+
+          {(() => {
+            const targetOrder = orders.find((order) => order.ref === qrOrderRef);
+            if (!targetOrder) return null;
+            const items = targetOrder.items || targetOrder.cart || [];
+            const productIds = items.map((item: any) => item.productId || (item as any).id).filter(Boolean);
+            const pickupProducts = config?.products?.filter((product) => product.pickup?.enabled && productIds.includes(product.id)) || [];
+            if (pickupProducts.length === 0) return null;
+            const locations = [...new Set(pickupProducts.map((product) => product.pickup?.location).filter(Boolean))];
+            const firstPickup = pickupProducts[0]?.pickup;
+            return (
+              <Box sx={{ maxWidth: 360, width: '100%', p: 2.5, borderRadius: '16px', bgcolor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <MapPin size={18} style={{ color: 'var(--success)' }} />
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)' }}>{t.qrDialog.pickupLocation}</Typography>
+                </Box>
+                {locations.map((location, index) => (
+                  <Typography key={index} sx={{ fontSize: '1rem', color: 'var(--foreground)', fontWeight: 600, mb: 0.5 }}>{location}</Typography>
+                ))}
+                {firstPickup && (firstPickup.startDate || firstPickup.endDate) && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+                    <Clock size={14} style={{ color: 'var(--text-muted)' }} />
+                    <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {firstPickup.startDate && new Date(firstPickup.startDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {firstPickup.startDate && firstPickup.endDate && ' - '}
+                      {firstPickup.endDate && new Date(firstPickup.endDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </Typography>
+                  </Box>
+                )}
+                {firstPickup?.notes && <Typography sx={{ fontSize: '0.8rem', color: 'var(--warning)', mt: 1 }}>{firstPickup.notes}</Typography>}
+              </Box>
+            );
+          })()}
+
+          <Button onClick={() => setQrOrderRef(null)} sx={{ mt: 4, px: 4, py: 1.5, borderRadius: '12px', bgcolor: 'var(--glass-bg)', color: 'var(--foreground)', fontSize: '1rem', fontWeight: 600, textTransform: 'none', '&:hover': { bgcolor: 'var(--glass-bg)' } }}>
+            {t.common.close}
+          </Button>
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(confirmCancelRef)}
+        onClose={() => setConfirmCancelRef(null)}
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--surface)',
+            color: 'var(--foreground)',
+            border: '1px solid var(--glass-border)',
+            borderRadius: '16px',
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>{t.orderHistory.confirmCancelTitle}</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'var(--foreground)', mb: 1 }}>
+            {t.orderHistory.confirmCancelMessage} #{confirmCancelRef} {t.orderHistory.confirmCancelAsk}
+          </Typography>
+          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            {t.orderHistory.cancelWarning}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button onClick={() => setConfirmCancelRef(null)} sx={{ color: 'var(--text-muted)' }}>
+            {t.orderHistory.dontCancel}
+          </Button>
+          <Button onClick={() => { void confirmCancellation(); }} variant="contained" color="error">
+            {t.orderHistory.confirmCancel}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

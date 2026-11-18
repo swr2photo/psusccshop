@@ -3,44 +3,33 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import {
   Box,
   Container,
   Typography,
   Paper,
   Button,
-  Chip,
   Divider,
   CircularProgress,
-  Card,
-  CardContent,
   Alert,
 } from '@mui/material';
 import {
   ArrowLeft,
-  CheckCircle2,
-  Clock,
-  Package,
   MapPin,
   QrCode,
   FileText,
-  MessageCircle,
   HelpCircle,
-  Truck,
-  Building,
 } from 'lucide-react';
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import OrderFlowTimeline from '@/components/OrderFlowTimeline';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiFetch } from '@/lib/api-client';
-
-const STATUS_STEPS = ['PENDING', 'PAID', 'READY', 'COMPLETED'];
+import { isOrderPaidForReceipt, normalizeStatus, PAYABLE_STATUSES } from '@/lib/shop-constants';
 
 export default function StandaloneOrderDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { lang } = useTranslation();
   const ref = String(params?.ref || '');
 
@@ -90,8 +79,8 @@ export default function StandaloneOrderDetailPage() {
       <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background, #f8fafc)', pb: 10 }}>
         <StorefrontNavbar />
         <Container maxWidth="md" sx={{ pt: 10, textAlign: 'center' }}>
-          <CircularProgress size={40} sx={{ color: '#1e3a5f' }} />
-          <Typography sx={{ mt: 2, color: '#64748b' }}>กำลังโหลดข้อมูลคำสั่งซื้อ #{ref}...</Typography>
+          <CircularProgress size={40} sx={{ color: 'var(--primary)' }} />
+          <Typography sx={{ mt: 2, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูลคำสั่งซื้อ #{ref}...</Typography>
         </Container>
         <MobileBottomNav />
       </Box>
@@ -106,7 +95,7 @@ export default function StandaloneOrderDetailPage() {
           <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
             {errorMsg || 'ไม่พบข้อมูลคำสั่งซื้อนี้'}
           </Alert>
-          <Button component={Link} href="/orders" startIcon={<ArrowLeft size={18} />} variant="contained" sx={{ bgcolor: '#1e3a5f', borderRadius: 2.5 }}>
+          <Button component={Link} href="/orders" startIcon={<ArrowLeft size={18} />} variant="contained" sx={{ bgcolor: 'var(--primary)', borderRadius: 2.5 }}>
             กลับไปยังประวัติคำสั่งซื้อ
           </Button>
         </Container>
@@ -115,8 +104,9 @@ export default function StandaloneOrderDetailPage() {
     );
   }
 
-  const currentStatus = order.status?.toUpperCase() || 'PENDING';
-  const isPaid = currentStatus === 'PAID' || currentStatus === 'READY' || currentStatus === 'COMPLETED' || order.paymentVerified;
+  const currentStatus = normalizeStatus(order.status || 'PENDING');
+  const isPaid = isOrderPaidForReceipt(order);
+  const canPay = PAYABLE_STATUSES.includes(currentStatus);
   const isCancelled = currentStatus === 'CANCELLED';
   const isExpired = currentStatus === 'EXPIRED';
 
@@ -129,25 +119,25 @@ export default function StandaloneOrderDetailPage() {
           component={Link}
           href="/orders"
           startIcon={<ArrowLeft size={18} />}
-          sx={{ textTransform: 'none', fontWeight: 600, color: 'var(--navy, #1e3a5f)', mb: 2 }}
+          sx={{ textTransform: 'none', fontWeight: 600, color: 'var(--payment-accent)', mb: 2 }}
         >
           {lang === 'en' ? 'Back to Orders' : 'ย้อนกลับไปยังคำสั่งซื้อทั้งหมด'}
         </Button>
 
         {/* Order Header Card */}
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff', mb: 3 }}>
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid var(--glass-border)', bgcolor: 'var(--surface)', mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
             <Box>
-              <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--navy, #1e3a5f)' }}>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--payment-accent)' }}>
                 คำสั่งซื้อ #{order.ref}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+              <Typography variant="body2" sx={{ color: 'var(--text-muted)', mt: 0.5 }}>
                 วันที่สั่งซื้อ: {new Date(order.createdAt || order.created_at || Date.now()).toLocaleString('th-TH')}
               </Typography>
             </Box>
 
             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-              {!isPaid && !isCancelled && !isExpired && (
+              {canPay && !isCancelled && !isExpired && (
                 <Button
                   component={Link}
                   href={`/payment/${encodeURIComponent(order.ref)}`}
@@ -164,7 +154,7 @@ export default function StandaloneOrderDetailPage() {
                   href={`/receipt/${encodeURIComponent(order.ref)}`}
                   variant="contained"
                   startIcon={<FileText size={18} />}
-                  sx={{ bgcolor: '#1e3a5f', '&:hover': { bgcolor: '#162d4a' }, borderRadius: 2.5, px: 3, fontWeight: 700 }}
+                  sx={{ bgcolor: 'var(--primary)', borderRadius: 2.5, px: 3, fontWeight: 700 }}
                 >
                   ใบเสร็จ E-Receipt
                 </Button>
@@ -180,36 +170,36 @@ export default function StandaloneOrderDetailPage() {
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 360px' }, gap: 3 }}>
           {/* Items Breakdown */}
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)', mb: 2 }}>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid var(--glass-border)', bgcolor: 'var(--surface)' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--payment-accent)', mb: 2 }}>
               รายการสินค้าที่สั่งซื้อ
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {(order.cart || order.items || []).map((item: any, i: number) => (
-                <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, borderBottom: '1px solid #f1f5f9' }}>
+                <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1.5, borderBottom: '1px solid var(--glass-border)' }}>
                   <Box>
                     <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>{item.name || item.productName}</Typography>
-                    <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                       {item.size ? `ไซส์ ${item.size} | ` : ''} จำนวน: {item.qty || item.quantity || 1}
                       {item.sleeve ? ` | แขน${item.sleeve === 'LONG' ? 'ยาว' : 'สั้น'}` : ''}
                     </Typography>
                     {(item.customName || item.customNumber) && (
-                      <Typography sx={{ fontSize: '0.75rem', color: '#1e3a5f' }}>
+                      <Typography sx={{ fontSize: '0.75rem', color: 'var(--payment-accent)' }}>
                         สกรีน: {item.customName ? `ชื่อ ${item.customName}` : ''} {item.customNumber ? `เบอร์ ${item.customNumber}` : ''}
                       </Typography>
                     )}
                   </Box>
-                  <Typography sx={{ fontWeight: 700, color: '#1e3a5f' }}>
+                  <Typography sx={{ fontWeight: 700, color: 'var(--payment-accent)' }}>
                     ฿{(Number(item.total) || (Number(item.price) * Number(item.qty || 1))).toLocaleString()}
                   </Typography>
                 </Box>
               ))}
             </Box>
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 3, mt: 2, borderTop: '2px solid #e2e8f0' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 3, mt: 2, borderTop: '2px solid var(--glass-border)' }}>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>ราคารวมทั้งหมด</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#1e3a5f' }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: 'var(--payment-accent)' }}>
                 ฿{Number(order.totalAmount || order.amount || 0).toLocaleString()}
               </Typography>
             </Box>
@@ -217,8 +207,8 @@ export default function StandaloneOrderDetailPage() {
 
           {/* Customer & Location Sidebar */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)', mb: 2 }}>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid var(--glass-border)', bgcolor: 'var(--surface)' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--payment-accent)', mb: 2 }}>
                 ข้อมูลผู้สั่งซื้อ & สถานที่รับ
               </Typography>
 
@@ -229,7 +219,7 @@ export default function StandaloneOrderDetailPage() {
 
               <Divider sx={{ my: 2 }} />
 
-              <Box sx={{ display: 'flex', gap: 1, color: '#1e3a5f' }}>
+              <Box sx={{ display: 'flex', gap: 1, color: 'var(--payment-accent)' }}>
                 <MapPin size={18} />
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
                   รับ ณ ห้องชุมนุมคอมพิวเตอร์ (SCC Computer Club) ชั้น 2 อาคารศูนย์คอมพิวเตอร์
@@ -237,10 +227,10 @@ export default function StandaloneOrderDetailPage() {
               </Box>
             </Paper>
 
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff', textAlign: 'center' }}>
-              <HelpCircle size={32} color="#1e3a5f" style={{ marginBottom: 8 }} />
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid var(--glass-border)', bgcolor: 'var(--surface)', textAlign: 'center' }}>
+              <HelpCircle size={32} color="var(--payment-accent)" style={{ marginBottom: 8 }} />
               <Typography sx={{ fontWeight: 700, mb: 1 }}>ต้องการความช่วยเหลือ?</Typography>
-              <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 2 }}>
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 2 }}>
                 สามารถสอบถามเกี่ยวกับคำสั่งซื้อ หรือติดต่อทีมงานได้ตลอดเวลา
               </Typography>
               <Button component={Link} href="/support" variant="outlined" fullWidth sx={{ borderRadius: 2, textTransform: 'none' }}>

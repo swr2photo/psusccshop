@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdminWithPermission } from '@/lib/auth';
+import { resolveAdminSession } from '@/lib/admin-context';
 import type { ShopConfig } from '@/lib/config';
 import type { LiveStreamData } from '@/lib/live-stream';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
@@ -57,8 +58,13 @@ export async function GET() {
 // POST — Admin only: Update live stream settings
 export async function POST(request: Request) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireAdminWithPermission('canManageLiveStream', request);
     if (auth instanceof NextResponse) return auth;
+
+    const adminSession = await resolveAdminSession(auth.email);
+    if (adminSession.userRole === 'shopAdmin') {
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const body = await secureJsonRequest(request);
     const { liveStream } = body;

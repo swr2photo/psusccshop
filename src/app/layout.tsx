@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import * as Sentry from "@sentry/nextjs";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, IBM_Plex_Sans_Thai } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import ThemeRegistry from "../components/ThemeRegistry";
@@ -13,6 +13,8 @@ const GOOGLE_SITE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION?.trim() ||
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// Storefront display/body face — Thai + Latin, used by the home page sections
+const plexThai = IBM_Plex_Sans_Thai({ variable: "--font-plex-thai", subsets: ["thai", "latin"], weight: ["400", "500", "600", "700"], display: "swap" });
 
 // SEO & Open Graph Metadata
 const siteMetadata = {
@@ -250,7 +252,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased relative min-h-screen overflow-x-hidden`} suppressHydrationWarning={true}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${plexThai.variable} antialiased relative min-h-screen overflow-x-hidden`} suppressHydrationWarning={true}>
         {/* Skip to main content link for accessibility */}
         <a 
           href="#main-content" 

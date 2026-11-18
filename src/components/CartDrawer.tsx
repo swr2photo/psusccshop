@@ -29,7 +29,7 @@ import {
   Truck,
   X,
 } from 'lucide-react';
-import OptimizedImage from '@/components/OptimizedImage';
+import ProductImage from '@/components/storefront/ProductImage';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import {
@@ -42,6 +42,15 @@ import { ShopConfig, Product, SIZES } from '@/lib/config';
 import { ShippingConfig } from '@/lib/shipping';
 import { evaluateReorderItem, type ReorderBlockReason } from '@/lib/reorder-availability';
 import { apiFetch } from '@/lib/api-client';
+import { formatFriendlyError } from '@/utils/error';
+
+type CartItemWithLegacyVariant = CartItem & {
+  selectedVariant?: { id?: string };
+};
+
+function getCartItemVariantId(item: CartItem): string | undefined {
+  return item.options?.variantId || (item as CartItemWithLegacyVariant).selectedVariant?.id;
+}
 
 export type CartPromoResult = {
   code: string;
@@ -241,7 +250,7 @@ export default function CartDrawer(props: CartDrawerProps) {
           setPromoError('');
         } else {
           setPromoResult(null);
-          setPromoError(data.error || t.checkout.invalidCode);
+          setPromoError(typeof data.error === 'string' ? formatFriendlyError(data.error) : t.checkout.invalidCode);
         }
       } catch {
         // Keep existing promo; checkout will re-validate
@@ -274,7 +283,7 @@ export default function CartDrawer(props: CartDrawerProps) {
         setPromoError('');
       } else {
         setPromoResult(null);
-        setPromoError(data.error || t.checkout.invalidCode);
+        setPromoError(typeof data.error === 'string' ? formatFriendlyError(data.error) : t.checkout.invalidCode);
       }
     } catch {
       setPromoError(t.checkout.cannotVerifyCode);
@@ -508,14 +517,14 @@ export default function CartDrawer(props: CartDrawerProps) {
               {cart.map((item) => {
                 const product = resolveProduct(item);
                 const issue = lineIssues.get(item.id);
-                const variantId = item.options?.variantId || (item as any).selectedVariant?.id;
+                const variantId = getCartItemVariantId(item);
                 const itemStockLimit = product ? getAvailableStock(product, variantId) : null;
                 
                 let maxAllowedForThisLine = itemStockLimit;
                 if (itemStockLimit !== null) {
                   const qtyInOtherLines = cart
-                    .filter(c => c.id !== item.id && c.productId === item.productId && (c.options?.variantId === variantId || (c as any).selectedVariant?.id === variantId))
-                    .reduce((sum, c) => sum + (c.quantity || (c as any).qty || 0), 0);
+                    .filter(c => c.id !== item.id && c.productId === item.productId && getCartItemVariantId(c) === variantId)
+                    .reduce((sum, c) => sum + c.quantity, 0);
                   maxAllowedForThisLine = Math.max(0, itemStockLimit - qtyInOtherLines);
                 }
                 const atStockLimit = maxAllowedForThisLine !== null && item.quantity >= maxAllowedForThisLine;
@@ -529,26 +538,25 @@ export default function CartDrawer(props: CartDrawerProps) {
                     }}
                   >
                     <Box sx={{ display: 'flex', gap: 2 }}>
-                      {product?.images?.[0] && (
-                        <Box sx={{
-                          width: 88,
-                          height: 88,
-                          borderRadius: '2px',
-                          overflow: 'hidden',
-                          flexShrink: 0,
-                          bgcolor: 'var(--surface)',
-                          opacity: issue ? 0.65 : 1,
-                        }}>
-                          <OptimizedImage
-                            src={product.images[0]}
-                            alt={item.productName}
-                            width={88}
-                            height={88}
-                            objectFit="cover"
-                            placeholder="skeleton"
-                          />
-                        </Box>
-                      )}
+                      <Box sx={{
+                        width: 88,
+                        height: 88,
+                        borderRadius: '2px',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                        bgcolor: 'var(--surface)',
+                        opacity: issue ? 0.65 : 1,
+                      }}>
+                        <ProductImage
+                          src={product?.coverImage}
+                          fallbackSrcs={product?.images}
+                          alt={item.productName}
+                          width={88}
+                          height={88}
+                          objectFit="cover"
+                          placeholder="skeleton"
+                        />
+                      </Box>
 
                       <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 0.5 }}>

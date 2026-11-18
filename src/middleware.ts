@@ -9,17 +9,30 @@ import { proxyToBackend, shouldProxyApiRoute } from '@/lib/backend-proxy';
 const allowedOrigins = [
   'https://sccshop.psuscc.club',
   'https://www.sccshop.psuscc.club',
-  'https://sccshop.psuscc.club',
-  'https://www.sccshop.psuscc.club',
 ];
 
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return true;
   if (allowedOrigins.includes(origin)) return true;
-  if (origin.endsWith('.psuscc.club') || origin.endsWith('.psuscc.club')) return true;
-  if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
-  if (origin.endsWith('.app.github.dev')) return true;
+  if (origin.endsWith('.psuscc.club')) return true;
+  if (process.env.NODE_ENV !== 'production') {
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
+    if (origin.endsWith('.app.github.dev')) return true;
+  }
   return false;
+}
+
+// L1 short-lived in-memory cache for shop open state to avoid Redis round-trip on every order POST
+let cachedOrderOpenState: { value: boolean | null; expiresAt: number } | null = null;
+const ORDER_OPEN_L1_TTL_MS = 5_000;
+
+function timingSafeStringEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 const securityHeaders = {
@@ -195,16 +208,18 @@ function isUniversityAccessAllowed(ip: string, pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  const loadTestSecret = request.headers.get('x-load-test-secret');
-  if (loadTestSecret && loadTestSecret === process.env.LOAD_TEST_SECRET) {
-    // ข้ามการตรวจเช็ก Rate Limit
-    return NextResponse.next();
-  }
-
   // Bypass middleware for Sentry telemetry tunnel
   if (pathname === '/monitoring') {
     return NextResponse.next();
   }
+
+  const configuredLoadTestSecret = process.env.LOAD_TEST_SECRET?.trim();
+  const loadTestSecret = request.headers.get('x-load-test-secret')?.trim();
+  const isLoadTest = Boolean(
+    configuredLoadTestSecret &&
+    loadTestSecret &&
+    timingSafeStringEqual(loadTestSecret, configuredLoadTestSecret)
+  );
 
   const origin = request.headers.get('origin');
   const method = request.method;
@@ -231,28 +246,35 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/api/orders') && method === 'POST') {
     try {
-      const redis = getRedisClient();
-      if (redis) {
-        const isOrderOpen = await redis.get<boolean>('is_order_open');
-        if (isOrderOpen === false) {
-          return NextResponse.json(
-            {
-              success: false,
-              status: 'error',
-              message: 'ขออภัย ขณะนี้ระบบปิดรับคำสั่งซื้อแล้ว',
-            },
-            {
-              status: 403,
-              headers: {
-                'Content-Type': 'application/json; charset=utf-8',
-                ...securityHeaders,
-              },
-            }
-          );
-        }
+      const now = Date.now();
+      let isOrderOpen: boolean | null = null;
+      if (cachedOrderOpenState && cachedOrderOpenState.expiresAt > now) {
+        isOrderOpen = cachedOrderOpenState.value;
       } else {
-        // Redis is an optional fast-path cache; /api/orders validates isOpen from DB
-        console.warn('[Middleware] Redis unavailable, deferring shop-open check to /api/orders');
+        const redis = getRedisClient();
+        if (redis) {
+          isOrderOpen = await redis.get<boolean>('is_order_open');
+          cachedOrderOpenState = { value: isOrderOpen ?? null, expiresAt: now + ORDER_OPEN_L1_TTL_MS };
+        } else {
+          // Redis is an optional fast-path cache; /api/orders validates isOpen from DB
+          console.warn('[Middleware] Redis unavailable, deferring shop-open check to /api/orders');
+        }
+      }
+      if (isOrderOpen === false) {
+        return NextResponse.json(
+          {
+            success: false,
+            status: 'error',
+            message: 'ขออภัย ขณะนี้ระบบปิดรับคำสั่งซื้อแล้ว',
+          },
+          {
+            status: 403,
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              ...securityHeaders,
+            },
+          }
+        );
       }
     } catch (error) {
       console.warn('[Middleware] Redis lookup failed, deferring shop-open check to /api/orders:', error);
@@ -303,7 +325,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const isBotProtected = BOT_PROTECTED_ROUTES.some(route => pathname.startsWith(route));
-  if (isBotProtected && isSuspiciousUserAgent(userAgent)) {
+  if (!isLoadTest && isBotProtected && isSuspiciousUserAgent(userAgent)) {
     console.warn(`[Security] Blocked suspicious bot: ${ip} - ${userAgent?.slice(0, 100)}`);
     return new NextResponse(
       JSON.stringify({ status: 'error', message: 'Access denied' }),
@@ -337,7 +359,9 @@ export async function middleware(request: NextRequest) {
 
   const windowSeconds = 60;
 
-  const rlResult = checkMiddlewareRateLimit(`${ip}:${rateLimitKey}`, rateLimit, windowSeconds);
+  const rlResult = isLoadTest
+    ? { allowed: true, limit: rateLimit, remaining: rateLimit, resetTime: Date.now() + windowSeconds * 1000 }
+    : checkMiddlewareRateLimit(`${ip}:${rateLimitKey}`, rateLimit, windowSeconds);
 
   if (!rlResult.allowed) {
     console.warn(`[Security] Rate limit exceeded: ${ip} on ${pathname} (${rateLimitKey})`);

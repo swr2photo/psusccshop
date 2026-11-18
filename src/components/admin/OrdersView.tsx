@@ -309,15 +309,15 @@ function OrderRow<O extends OrdersViewOrder>({
             className={cn(
               'inline-flex max-w-[160px] items-center gap-1 truncate rounded-md px-2 py-0.5 text-[0.7rem] font-medium',
               isPickup
-                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                : 'bg-sky-500/10 text-sky-700 dark:text-sky-400',
+                ? 'bg-success/10 text-success dark:text-success'
+                : 'bg-primary/10 text-primary dark:text-primary',
             )}
           >
             {isPickup ? <Store className="size-3 shrink-0" /> : <Truck className="size-3 shrink-0" />}
             <span className="truncate">{shipLabel}</span>
           </span>
           {order.pickup?.pickedUp ? (
-            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[0.7rem] font-medium text-emerald-700 dark:text-emerald-400">
+            <span className="inline-flex items-center gap-1 rounded-md bg-success/10 px-2 py-0.5 text-[0.7rem] font-medium text-success dark:text-success">
               <PackageCheck className="size-3" /> รับแล้ว
             </span>
           ) : null}
@@ -328,7 +328,7 @@ function OrderRow<O extends OrdersViewOrder>({
                 e.stopPropagation();
                 props.onViewSlip(order);
               }}
-              className="inline-flex !min-h-0 !min-w-0 items-center gap-1 rounded-md border border-emerald-500/30 px-2 py-0.5 text-[0.7rem] font-semibold text-emerald-700 transition-colors hover:bg-emerald-500/10 dark:text-emerald-400"
+              className="inline-flex !min-h-0 !min-w-0 items-center gap-1 rounded-md border border-success/30 px-2 py-0.5 text-[0.7rem] font-semibold text-success transition-colors hover:bg-success/10 dark:text-success"
             >
               <ImageIcon className="size-3" /> ดูสลิป
             </button>

@@ -44,6 +44,8 @@ import { PaymentConfig, PaymentOption } from '@/lib/payment';
 import TurnstileWidget from './TurnstileWidget';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useNotification } from '@/components/NotificationContext';
+import { usePageShipping, usePagePaymentConfig } from '@/hooks/usePageData';
+import { formatFriendlyError } from '@/utils/error';
 
 // ==================== TYPES ====================
 
@@ -139,6 +141,8 @@ export default function CheckoutDialog({
   shopId,
   initialPromo = null,
 }: CheckoutDialogProps) {
+  const { shippingConfig: sharedShippingConfig, isLoading: shippingConfigLoading } = usePageShipping(open);
+  const { paymentConfig: sharedPaymentConfig, isLoading: paymentConfigLoading } = usePagePaymentConfig(open);
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
@@ -287,42 +291,38 @@ export default function CheckoutDialog({
   }, [open, initialPromo]);
 
   useEffect(() => {
-    if (open) {
-      fetchConfigs();
+    setLoadingConfig(open && (shippingConfigLoading || paymentConfigLoading));
+  }, [open, shippingConfigLoading, paymentConfigLoading]);
+
+  useEffect(() => {
+    if (!open || !sharedShippingConfig) return;
+
+    const config = sharedShippingConfig;
+    setShippingConfig(config);
+    const enabledOptions = config.options?.filter((option: ShippingOption) => option.enabled) || [];
+    if (enabledOptions.length > 0) {
+      setSelectedShipping((current) => (
+        enabledOptions.some((option) => option.id === current)
+          ? current
+          : (enabledOptions.find((option) => option.id === config.defaultOptionId) || enabledOptions[0]).id
+      ));
     }
-  }, [open]);
+  }, [open, sharedShippingConfig]);
 
-  const fetchConfigs = async () => {
-    setLoadingConfig(true);
-    try {
-      const [shippingRes, paymentRes] = await Promise.all([
-        apiFetch('/api/shipping/options').then(r => r.json()),
-        apiFetch('/api/payment/config').then(r => r.json()),
-      ]);
+  useEffect(() => {
+    if (!open || !sharedPaymentConfig) return;
 
-      if (shippingRes.success && shippingRes.data) {
-        setShippingConfig(shippingRes.data);
-        const enabledOptions = shippingRes.data.options?.filter((o: ShippingOption) => o.enabled) || [];
-        if (enabledOptions.length > 0) {
-          const defaultOption = enabledOptions.find((o: ShippingOption) => o.id === shippingRes.data.defaultOptionId) || enabledOptions[0];
-          setSelectedShipping(defaultOption.id);
-        }
-      }
-
-      if (paymentRes.success && paymentRes.data) {
-        setPaymentConfig(paymentRes.data);
-        const enabledOptions = paymentRes.data.options?.filter((o: PaymentOption) => o.enabled) || [];
-        if (enabledOptions.length > 0) {
-          const defaultOption = enabledOptions.find((o: PaymentOption) => o.id === paymentRes.data.defaultMethodId) || enabledOptions[0];
-          setSelectedPayment(defaultOption.id);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch checkout config:', error);
-    } finally {
-      setLoadingConfig(false);
+    const config = sharedPaymentConfig;
+    setPaymentConfig(config);
+    const enabledOptions = config.options?.filter((option: PaymentOption) => option.enabled) || [];
+    if (enabledOptions.length > 0) {
+      setSelectedPayment((current) => (
+        enabledOptions.some((option) => option.id === current)
+          ? current
+          : (enabledOptions.find((option) => option.id === config.defaultMethodId) || enabledOptions[0]).id
+      ));
     }
-  };
+  }, [open, sharedPaymentConfig]);
 
   const subtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -385,7 +385,7 @@ export default function CheckoutDialog({
         setPromoResult(data);
         setPromoError('');
       } else {
-        setPromoError(data.error || t.checkout.invalidCode);
+        setPromoError(typeof data.error === 'string' ? formatFriendlyError(data.error) : t.checkout.invalidCode);
         setPromoResult(null);
       }
     } catch {

@@ -78,7 +78,7 @@ function LivePreview({ settings }: { settings: SupportChatSettings }) {
       </p>
       <div className="overflow-hidden rounded-lg bg-white ring-1 ring-slate-200 dark:bg-[#111827] dark:ring-white/5">
         <div className="flex items-center gap-2.5 border-b border-slate-200 px-3 py-2.5 dark:border-white/5">
-          <div className="flex size-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-sky-600/30 dark:text-sky-300">
+          <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary dark:bg-primary/30 dark:text-primary">
             {(settings.admin_display_name || 'A').slice(0, 1)}
           </div>
           <div className="min-w-0">
@@ -87,7 +87,7 @@ function LivePreview({ settings }: { settings: SupportChatSettings }) {
           </div>
         </div>
         <div className="space-y-2.5 bg-slate-50/80 px-3 py-3.5 dark:bg-transparent">
-          <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-blue-600 px-3 py-2 text-sm text-white">
+          <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3 py-2 text-sm text-white">
             สวัสดีค่ะ อยากสอบถามออเดอร์
           </div>
           {settings.auto_reply_enabled && reply?.trim() && (
@@ -472,7 +472,7 @@ export function ChatSettingsDialog({
                           className={cn(
                             'size-10 rounded-lg text-sm font-medium transition',
                             on
-                              ? 'bg-blue-600 text-white'
+                              ? 'bg-primary text-white'
                               : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-muted dark:text-muted-foreground dark:hover:bg-muted/80',
                             !settings.working_hours_enabled && 'opacity-50'
                           )}
@@ -682,7 +682,7 @@ export function ChatSettingsDialog({
           <Button
             onClick={() => void onSave()}
             disabled={saving}
-            className="h-10 bg-blue-600 px-5 text-sm hover:bg-blue-700"
+            className="h-10 bg-primary px-5 text-sm hover:bg-primary/90"
           >
             {saving ? 'กำลังบันทึก...' : 'บันทึก'}
           </Button>

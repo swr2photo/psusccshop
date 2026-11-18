@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api-client';
 
 
 import { useState, useEffect, useCallback } from 'react';
-import { Button, CircularProgress } from '@mui/material';
+import { Button, CircularProgress, type SxProps, type Theme } from '@mui/material';
 import { Fingerprint } from 'lucide-react';
 import { startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { signIn } from 'next-auth/react';
@@ -19,6 +19,8 @@ interface PasskeyLoginButtonProps {
   onSuccess?: () => void;
   fullWidth?: boolean;
   variant?: 'contained' | 'outlined' | 'text';
+  /** Extra style overrides merged on top of the defaults */
+  sx?: SxProps<Theme>;
 }
 
 export default function PasskeyLoginButton({
@@ -26,6 +28,7 @@ export default function PasskeyLoginButton({
   onSuccess,
   fullWidth = true,
   variant = 'outlined',
+  sx,
 }: PasskeyLoginButtonProps) {
   const { lang } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -114,7 +117,7 @@ export default function PasskeyLoginButton({
           <Fingerprint size={20} />
         )
       }
-      sx={{
+      sx={[{
         height: 48,
         borderRadius: '14px',
         textTransform: 'none',
@@ -130,7 +133,7 @@ export default function PasskeyLoginButton({
           border: variant === 'outlined' ? '1.5px solid #6366f1' : undefined,
           bgcolor: variant === 'outlined' ? 'rgba(99, 102, 241, 0.06)' : undefined,
         },
-      }}
+      }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}
     >
       {loading
         ? lang === 'en'

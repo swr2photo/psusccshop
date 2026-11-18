@@ -84,12 +84,39 @@ async function handleGasRequest(
   const allowed = await assertActionAllowed(action, authResult.email);
   if (allowed) return allowed;
 
+  const isAdmin = await isAdminEmailAsync(authResult.email);
+  const currentUserEmail = authResult.email.trim().toLowerCase();
+  const bodyObj = body && typeof body === 'object' && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
+    : {};
+
+  // Prevent IDOR: non-admin users may only access or mutate their own email scope
+  if (!isAdmin && PUBLIC_GAS_ACTIONS.has(action)) {
+    const queryEmail = request.nextUrl.searchParams.get('email')?.trim().toLowerCase();
+    const bodyEmail = typeof bodyObj.email === 'string' ? bodyObj.email.trim().toLowerCase() : undefined;
+    const bodyCustomerEmail = typeof bodyObj.customerEmail === 'string' ? bodyObj.customerEmail.trim().toLowerCase() : undefined;
+    if (
+      (queryEmail && queryEmail !== currentUserEmail) ||
+      (bodyEmail && bodyEmail !== currentUserEmail) ||
+      (bodyCustomerEmail && bodyCustomerEmail !== currentUserEmail)
+    ) {
+      return await secureJsonResponse(
+        { status: 'error', message: 'Forbidden' },
+        { status: 403 }
+      );
+    }
+  }
+
   const gasUrl = buildGasUrl(action);
   if (!gasUrl) {
     return await secureJsonResponse(
       { status: 'error', message: 'GAS_SCRIPT_URL is not configured' },
       { status: 503 }
     );
+  }
+
+  if (!isAdmin && PUBLIC_GAS_ACTIONS.has(action)) {
+    gasUrl.searchParams.set('email', currentUserEmail);
   }
 
   const controller = new AbortController();
@@ -100,7 +127,10 @@ async function handleGasRequest(
     const usePost = method === 'POST' || Boolean(GAS_AUTH_TOKEN);
     const postBody = usePost
       ? {
-          ...(body && typeof body === 'object' ? body : {}),
+          ...bodyObj,
+          ...(!isAdmin && PUBLIC_GAS_ACTIONS.has(action)
+            ? { email: currentUserEmail, customerEmail: currentUserEmail }
+            : {}),
           action,
           ...(GAS_AUTH_TOKEN ? { authorization: GAS_AUTH_TOKEN } : {}),
         }
@@ -176,7 +206,10 @@ export async function POST(request: NextRequest) {
 
 export async function OPTIONS(request: NextRequest) {
   const origin = request.headers.get('origin') || '';
-  const allowedOrigin = origin.endsWith('.psuscc.club') || origin.startsWith('http://localhost:') || origin.endsWith('.app.github.dev')
+  const isDevOrigin =
+    process.env.NODE_ENV !== 'production' &&
+    (origin.startsWith('http://localhost:') || origin.endsWith('.app.github.dev'));
+  const allowedOrigin = origin.endsWith('.psuscc.club') || isDevOrigin
     ? origin : 'https://sccshop.psuscc.club';
   return await secureJsonResponse(
     { status: 'ok' },

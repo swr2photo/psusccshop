@@ -9,7 +9,6 @@ import {
   Button,
   Checkbox,
   CircularProgress,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -58,7 +57,7 @@ import {
   type OrderHistory,
 } from '@/lib/shop-constants';
 import { ShopConfig, getProductName, type Product } from '@/lib/config';
-import { SHIPPING_PROVIDERS, getTrackingUrl, getTrack123Url, type ShippingProvider } from '@/lib/shipping';
+import { getTrackingUrl, getTrack123Url, type ShippingProvider } from '@/lib/shipping';
 import TrackingTimeline from './TrackingTimeline';
 import { useNotification } from './NotificationContext';
 import { CountdownBadge, isOrderExpired } from './OrderCountdown';
@@ -98,6 +97,8 @@ interface OrderHistoryDrawerProps {
   onRefundRequested?: (ref: string) => void;
   /** Close drawer and scroll/focus the storefront shop section */
   onBrowseShop?: () => void;
+  /** The drawer is already being shown from /orders, so do not link to itself. */
+  standalone?: boolean;
 }
 
 const historyFilters: HistoryFilter[] = [
@@ -310,11 +311,11 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     onShowQR,
     cancellingRef,
     isShopOpen,
-    realtimeConnected,
     config,
     onImageClick,
     onRefundRequested,
     onBrowseShop,
+    standalone = false,
   } = props;
 
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useNotification();
@@ -846,16 +847,18 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <IconButton
-              component={Link}
-              href="/orders"
-              onClick={onClose}
-              aria-label="Expand to full page"
-              title="ขยายเต็มหน้า (Expand to full page)"
-              sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--foreground)' } }}
-            >
-              <Maximize2 size={18} />
-            </IconButton>
+            {!standalone && (
+              <IconButton
+                component={Link}
+                href="/orders"
+                onClick={onClose}
+                aria-label="Expand to full page"
+                title="ขยายเต็มหน้า (Expand to full page)"
+                sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--foreground)' } }}
+              >
+                <Maximize2 size={18} />
+              </IconButton>
+            )}
             <IconButton onClick={onClose} sx={{ color: 'var(--text-muted)' }}>
               <X size={20} />
             </IconButton>
@@ -965,8 +968,12 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             </Typography>
             <Button
               onClick={() => {
-                onClose();
-                onBrowseShop?.();
+                if (standalone && onBrowseShop) {
+                  onBrowseShop();
+                } else {
+                  onClose();
+                  onBrowseShop?.();
+                }
               }}
               startIcon={<ShoppingBag size={16} />}
               sx={{

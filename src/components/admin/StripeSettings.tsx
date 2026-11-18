@@ -219,8 +219,8 @@ function StatusDot({ ok, label, tooltip }: { ok: boolean; label: string; tooltip
             className={cn(
               'size-2 rounded-full',
               ok
-                ? 'animate-pulse bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
-                : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]',
+                ? 'animate-pulse bg-success shadow-[0_0_8px_rgba(34,197,94,0.5)]'
+                : 'bg-destructive shadow-[0_0_8px_rgba(239,68,68,0.5)]',
             )}
           />
           <span className="text-[0.8rem] text-[var(--text-muted)]">{label}</span>
@@ -241,14 +241,14 @@ function EnvVarRow({ name, isSet, masked }: { name: string; isSet: boolean; mask
       className={cn(
         'flex items-center gap-3 rounded-lg px-3 py-2',
         isSet
-          ? 'border border-green-500/15 bg-green-500/[0.06]'
-          : 'border border-red-500/15 bg-red-500/[0.06]',
+          ? 'border border-success/15 bg-success/[0.06]'
+          : 'border border-destructive/15 bg-destructive/[0.06]',
       )}
     >
       <div
         className={cn(
           'flex size-5 shrink-0 items-center justify-center rounded-full',
-          isSet ? 'bg-green-500/15 text-green-500' : 'bg-red-500/15 text-red-500',
+          isSet ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive',
         )}
       >
         {isSet ? <CheckCircle size={12} /> : <Warning size={12} />}
@@ -307,7 +307,7 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
       className={cn(
         'text-[0.72rem] transition-all duration-200',
         copied
-          ? 'border-green-500 text-green-500'
+          ? 'border-success text-success'
           : 'border-[var(--glass-border)] text-[var(--text-muted)] hover:border-[#635BFF]',
       )}
     >
@@ -479,7 +479,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                   กำลังตรวจสอบ...
                 </Badge>
               ) : isConnected ? (
-                <Badge className="h-5 border-0 bg-green-500 text-[0.65rem] text-white">
+                <Badge className="h-5 border-0 bg-success text-[0.65rem] text-white">
                   เชื่อมต่อแล้ว
                 </Badge>
               ) : (
@@ -503,10 +503,10 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
             ) : (
               <>
                 {isConnected && status && (
-                  <div className="rounded-xl border border-green-500/15 bg-gradient-to-br from-green-500/[0.08] to-emerald-500/[0.04] p-4">
+                  <div className="rounded-xl border border-success/15 bg-gradient-to-br from-success/[0.08] to-success/[0.04] p-4">
                     <div className="mb-3 flex items-center gap-3">
                       <CheckCircle size={20} color="#22c55e" />
-                      <span className="text-[0.95rem] font-bold text-green-500">
+                      <span className="text-[0.95rem] font-bold text-success">
                         Stripe เชื่อมต่อสำเร็จ
                       </span>
                     </div>
@@ -546,12 +546,12 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                     </div>
 
                     {(status.balanceAvailable.length > 0 || status.balancePending.length > 0) && (
-                      <div className="mt-4 border-t border-green-500/15 pt-3">
+                      <div className="mt-4 border-t border-success/15 pt-3">
                         <p className="mb-2 text-[0.72rem] text-[var(--text-muted)]">ยอดเงิน</p>
                         <div className="flex gap-6">
                           {status.balanceAvailable.map((b, i) => (
                             <div key={`avl-${i}`}>
-                              <p className="text-[0.7rem] text-green-500">พร้อมใช้</p>
+                              <p className="text-[0.7rem] text-success">พร้อมใช้</p>
                               <p className="text-base font-bold text-[var(--foreground)]">
                                 ฿{b.amount?.toLocaleString()}
                               </p>
@@ -559,7 +559,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                           ))}
                           {status.balancePending.map((b, i) => (
                             <div key={`pnd-${i}`}>
-                              <p className="text-[0.7rem] text-amber-500">รอดำเนินการ</p>
+                              <p className="text-[0.7rem] text-warning">รอดำเนินการ</p>
                               <p className="text-base font-bold text-[var(--foreground)]">
                                 ฿{b.amount?.toLocaleString()}
                               </p>
@@ -571,17 +571,17 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
 
                     {/* Payout Diagnostics Warning */}
                     {status.payoutBlockReasons && status.payoutBlockReasons.length > 0 && (
-                      <div className="mt-4 border-t border-amber-500/20 pt-3">
-                        <Alert className="border border-amber-500/30 bg-amber-500/[0.08] text-[var(--foreground)]">
-                          <Warning className="size-4 text-amber-500" />
+                      <div className="mt-4 border-t border-warning/20 pt-3">
+                        <Alert className="border border-warning/30 bg-warning/[0.08] text-[var(--foreground)]">
+                          <Warning className="size-4 text-warning" />
                           <div className="flex-1">
-                            <AlertTitle className="text-[0.88rem] font-bold text-amber-600 dark:text-amber-400">
+                            <AlertTitle className="text-[0.88rem] font-bold text-warning dark:text-warning">
                               ⚠️ วิเคราะห์สาเหตุที่เบิกเงินไม่ได้ (Payout Diagnostic Warnings):
                             </AlertTitle>
                             <AlertDescription className="mt-2 space-y-1 text-[0.8rem]">
                               {status.payoutBlockReasons.map((reason, idx) => (
                                 <p key={idx} className="flex items-start gap-1.5">
-                                  <span className="font-semibold text-amber-500">•</span>
+                                  <span className="font-semibold text-warning">•</span>
                                   <span>{reason}</span>
                                 </p>
                               ))}
@@ -597,7 +597,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                                   setIssueDescription(status.payoutBlockReasons?.join('\n') || '');
                                   setReportModalOpen(true);
                                 }}
-                                className="h-7 border-amber-500/40 bg-amber-500/10 text-[0.75rem] font-bold text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+                                className="h-7 border-warning/40 bg-warning/10 text-[0.75rem] font-bold text-warning hover:bg-warning/20 dark:text-warning"
                               >
                                 <LifeBuoy className="mr-1 size-3.5" />
                                 แจ้งปัญหาไปยัง Stripe Support
@@ -649,8 +649,8 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                 className={cn(
                   'h-5 text-[0.65rem] font-bold',
                   isTestMode
-                    ? 'border-0 bg-amber-500 text-white'
-                    : 'border-0 bg-green-500 text-white',
+                    ? 'border-0 bg-warning text-white'
+                    : 'border-0 bg-success text-white',
                 )}
               >
                 {isTestMode ? 'TEST MODE' : 'LIVE MODE'}
@@ -685,8 +685,8 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
               className={cn(
                 'flex items-center justify-between rounded-[10px] p-3',
                 isTestMode
-                  ? 'border border-amber-500/15 bg-amber-500/[0.06]'
-                  : 'border border-green-500/15 bg-green-500/[0.06]',
+                  ? 'border border-warning/15 bg-warning/[0.06]'
+                  : 'border border-success/15 bg-success/[0.06]',
               )}
             >
               <div>
@@ -741,7 +741,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                   className={cn(
                     'flex size-11 items-center justify-center rounded-xl transition-all duration-300',
                     stripeConfig.enablePromptPay
-                      ? 'bg-gradient-to-br from-blue-600 to-blue-500'
+                      ? 'bg-primary'
                       : 'bg-[var(--surface-2)]',
                   )}
                 >
@@ -766,13 +766,13 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
               </div>
               {stripeConfig.enablePromptPay && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge className="border-0 bg-green-500/10 text-[0.72rem] text-green-500">
+                  <Badge className="border-0 bg-success/10 text-[0.72rem] text-success">
                     ค่าธรรมเนียม: ฟรี
                   </Badge>
                   <Badge className="border-0 bg-[#635BFF]/15 text-[0.72rem] text-[#635BFF]">
                     ยืนยันอัตโนมัติ
                   </Badge>
-                  <Badge className="border-0 bg-cyan-500/10 text-[0.72rem] text-cyan-500">
+                  <Badge className="border-0 bg-primary/10 text-[0.72rem] text-primary">
                     Real-time
                   </Badge>
                 </div>
@@ -792,7 +792,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                   className={cn(
                     'flex size-11 items-center justify-center rounded-xl transition-all duration-300',
                     stripeConfig.enableCreditCard
-                      ? 'bg-gradient-to-br from-violet-500 to-purple-500'
+                      ? 'bg-primary'
                       : 'bg-[var(--surface-2)]',
                   )}
                 >
@@ -817,10 +817,10 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
               </div>
               {stripeConfig.enableCreditCard && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge className="border-0 bg-amber-500/10 text-[0.72rem] text-amber-500">
+                  <Badge className="border-0 bg-warning/10 text-[0.72rem] text-warning">
                     ค่าธรรมเนียม: 3.65%
                   </Badge>
-                  <Badge className="border-0 bg-green-500/10 text-[0.72rem] text-green-500">
+                  <Badge className="border-0 bg-success/10 text-[0.72rem] text-success">
                     3D Secure
                   </Badge>
                   <Badge className="border-0 bg-[#635BFF]/15 text-[0.72rem] text-[#635BFF]">
@@ -907,8 +907,8 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                 </p>
               </div>
 
-              <Alert className="rounded-[10px] border border-blue-600/15 bg-blue-600/[0.06]">
-                <Info className="size-4 text-blue-600" />
+              <Alert className="rounded-[10px] border border-primary/15 bg-primary/[0.06]">
+                <Info className="size-4 text-primary" />
                 <AlertDescription className="text-[0.8rem] text-[var(--foreground)]">
                   💡 เมื่อลูกค้าชำระเงินผ่าน PromptPay QR Code ระบบจะยืนยันการชำระเงินอัตโนมัติทันที
                   ไม่ต้องอัปโหลดสลิป และไม่มีค่าธรรมเนียมเพิ่มเติม
@@ -925,7 +925,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
             accentColor="#06b6d4"
             badge={
               status?.recentWebhookEvents ? (
-                <Badge className="h-5 border-0 bg-cyan-500 text-[0.65rem] text-white">
+                <Badge className="h-5 border-0 bg-primary text-[0.65rem] text-white">
                   {status.recentWebhookEvents >= 100 ? '100+' : status.recentWebhookEvents} events (24h)
                 </Badge>
               ) : null
@@ -962,8 +962,8 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
               </div>
             </div>
 
-            <Alert className="rounded-[10px] border border-amber-500/15 bg-amber-500/[0.06]">
-              <Warning className="size-4 text-amber-500" />
+            <Alert className="rounded-[10px] border border-warning/15 bg-warning/[0.06]">
+              <Warning className="size-4 text-warning" />
               <AlertDescription className="text-[0.78rem] text-[var(--foreground)]">
                 ⚠️ ต้องเพิ่ม events ข้างต้นทั้ง 4 รายการใน Stripe Dashboard → Webhooks เพื่อให้ระบบทำงานได้สมบูรณ์
               </AlertDescription>
@@ -1098,7 +1098,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
             accentColor="#ef4444"
             defaultExpanded={true}
           >
-            <div className="flex flex-col gap-3 rounded-xl border border-red-500/20 bg-gradient-to-br from-red-500/[0.04] to-pink-500/[0.02] p-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-destructive/20 bg-gradient-to-br from-destructive/[0.04] to-primary/[0.02] p-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-[0.95rem] font-bold text-[var(--foreground)]">
@@ -1111,7 +1111,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                 <Button
                   type="button"
                   onClick={() => setReportModalOpen(true)}
-                  className="shrink-0 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 font-bold text-white shadow-md hover:from-red-600 hover:to-rose-700"
+                  className="shrink-0 rounded-xl bg-destructive font-bold text-white shadow-md"
                 >
                   <LifeBuoy className="mr-1.5 size-4" />
                   สร้างรายงานแจ้งปัญหา Stripe
@@ -1126,7 +1126,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-                <LifeBuoy className="text-red-500" />
+                <LifeBuoy className="text-destructive" />
                 แจ้งปัญหาการใช้งาน Stripe / Payout Trouble Ticket
               </DialogTitle>
               <DialogDescription>
@@ -1136,7 +1136,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
 
             {reportResult ? (
               <div className="space-y-4 py-2">
-                <Alert className="border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300">
+                <Alert className="border-success/30 bg-success/10 text-success dark:text-success">
                   <CheckCircle className="size-4" />
                   <AlertDescription className="font-semibold">
                     {reportResult.message || 'บันทึกรายงานปัญหาสำเร็จ!'}
@@ -1251,7 +1251,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                   <Button
                     type="submit"
                     disabled={submittingReport}
-                    className="bg-red-600 font-bold text-white hover:bg-red-700"
+                    className="bg-destructive font-bold text-white hover:bg-destructive/90"
                   >
                     {submittingReport ? (
                       <>

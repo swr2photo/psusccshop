@@ -26,6 +26,8 @@ interface PaymentModalProps {
   orderRef: string;
   onClose: () => void;
   onSuccess: () => void;
+  /** The modal is already being shown from /payment/[ref], so do not link to itself. */
+  standalone?: boolean;
 }
 
 interface CartItem {
@@ -41,7 +43,7 @@ interface CartItem {
 }
 
 const usePaymentToast = () => {
-  const addToast = (
+  const addToast = useCallback((
     type: 'success' | 'error' | 'info' | 'warning',
     title: string,
     message?: string,
@@ -52,15 +54,29 @@ const usePaymentToast = () => {
       description: message,
       timeout: type === 'error' ? 5000 : 3500,
       priority: type === 'error' ? 'high' : 'low',
-    });
+    }), []);
 
   return { addToast };
 };
 
-const PAID_STATUSES = ['PAID', 'COMPLETED', 'SHIPPED', 'READY', 'VERIFYING'];
+// Keep direct /payment/:ref links safe for every state that already has a
+// payment signal; only genuinely unpaid states should render the upload form.
+const PAID_STATUSES = [
+  'PAID',
+  'PROCESSING',
+  'READY',
+  'SHIPPED',
+  'COMPLETED',
+  'RECEIVED',
+  'REFUNDED',
+  'REFUND_REQUESTED',
+  'VERIFYING',
+  'WAITING_SLIP',
+];
 
-const NAVY = '#1e3a5f';
-const NAVY_SOFT = 'rgba(30, 58, 95, 0.08)';
+const NAVY = 'var(--payment-accent)';
+const NAVY_SOFT = 'var(--payment-accent-soft)';
+const DOCUMENT_NAVY = '#1e3a5f';
 const EMERALD = '#059669';
 const EMERALD_SOFT = 'rgba(5, 150, 105, 0.12)';
 const AMBER = '#d97706';
@@ -86,7 +102,7 @@ function itemSpec(item: CartItem, t: { sizeLabel: string; numberLabel: string; l
   return parts.join(' · ') || '—';
 }
 
-export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentModalProps): JSX.Element {
+export default function PaymentModal({ orderRef, onClose, onSuccess, standalone = false }: PaymentModalProps): JSX.Element {
   const { addToast } = usePaymentToast();
   const { t, lang } = useTranslation();
   const isMobile = useMediaQuery('(max-width: 640px)');
@@ -200,6 +216,41 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     }
   }, [isSwipeDragging, swipeDragOffset, onClose]);
 
+  const fetchPaymentInfo = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res: Response = await apiFetch(`/api/payment-info?ref=${encodeURIComponent(orderRef)}`);
+      const data: any = await res.json();
+
+      if (data.status === 'success') {
+        const info = data.data || data;
+        setQrPayload(info.qrPayload || null);
+        setAmount(Number(info.finalAmount ?? info.amount ?? 0));
+        setBaseAmount(Number(info.baseAmount ?? info.amount ?? 0));
+        setDiscount(Number(info.discount ?? 0));
+        setCartItems(info.cart || []);
+        setOrderStatus(String(info.status || 'PENDING').trim().toUpperCase());
+        setOrderDate(info.orderDate || info.date || info.createdAt || null);
+        setPaymentEnabled(info.paymentEnabled !== false);
+        setPaymentDisabledMessage(info.paymentDisabledMessage || null);
+        setAccountHolderName(info.accountName || '');
+        setPromptPayId(info.promptPayId || '');
+        setBankName(info.bankName || '');
+        setAccountNumber(info.accountNumber || '');
+        setTaxId(info.taxId || '');
+        const stripeOk = info.stripePromptPayEnabled === true;
+        setStripeEnabled(stripeOk);
+        if (stripeOk) setPayMethod('stripe');
+      } else {
+        addToast('error', t.common.error, data.message || t.payment.noPaymentInfo);
+      }
+    } catch {
+      addToast('error', t.payment.connectionError, t.payment.tryAgain);
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast, orderRef, t.common.error, t.payment.connectionError, t.payment.noPaymentInfo, t.payment.tryAgain]);
+
   // ── Queue status polling with rich metadata ──────────
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
@@ -248,7 +299,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
          } else {
             parseQueueResponse(data);
          }
-      } catch (e) {
+      } catch {
          // ignore
       }
     };
@@ -268,7 +319,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
            progressRaf = requestAnimationFrame(updateProgress);
            pollInterval = setInterval(checkStatus, 1500);
         }
-      } catch (e) {
+      } catch {
         fetchPaymentInfo(); // Fallback
       }
     };
@@ -279,42 +330,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
        if (pollInterval) clearInterval(pollInterval);
        if (progressRaf) cancelAnimationFrame(progressRaf);
     };
-  }, [orderRef]);
-
-  const fetchPaymentInfo = async () => {
-    setLoading(true);
-    try {
-      const res: Response = await apiFetch(`/api/payment-info?ref=${encodeURIComponent(orderRef)}`);
-      const data: any = await res.json();
-
-      if (data.status === 'success') {
-        const info = data.data || data;
-        setQrPayload(info.qrPayload || null);
-        setAmount(Number(info.finalAmount ?? info.amount ?? 0));
-        setBaseAmount(Number(info.baseAmount ?? info.amount ?? 0));
-        setDiscount(Number(info.discount ?? 0));
-        setCartItems(info.cart || []);
-        setOrderStatus(info.status || 'PENDING');
-        setOrderDate(info.orderDate || info.date || info.createdAt || null);
-        setPaymentEnabled(info.paymentEnabled !== false);
-        setPaymentDisabledMessage(info.paymentDisabledMessage || null);
-        setAccountHolderName(info.accountName || '');
-        setPromptPayId(info.promptPayId || '');
-        setBankName(info.bankName || '');
-        setAccountNumber(info.accountNumber || '');
-        setTaxId(info.taxId || '');
-        const stripeOk = info.stripePromptPayEnabled === true;
-        setStripeEnabled(stripeOk);
-        if (stripeOk) setPayMethod('stripe');
-      } else {
-        addToast('error', t.common.error, data.message || t.payment.noPaymentInfo);
-      }
-    } catch {
-      addToast('error', t.payment.connectionError, t.payment.tryAgain);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [fetchPaymentInfo, orderRef]);
 
   const handleStripeSuccess = () => {
     addToast('success', t.payment.paymentSuccessToast, t.payment.paymentDetected);
@@ -454,7 +470,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           return;
         }
 
-        ctx.fillStyle = NAVY;
+        ctx.fillStyle = DOCUMENT_NAVY;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         ctx.fillStyle = '#ffffff';
@@ -742,22 +758,24 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 <Printer size={16} />
               </IconButton>
             )}
-            <IconButton
-              component={Link}
-              href={`/payment/${encodeURIComponent(orderRef)}`}
-              onClick={onClose}
-              size="small"
-              aria-label="Expand to full page"
-              title="ขยายเต็มหน้า (Expand to full page)"
-              sx={{
-                bgcolor: 'var(--glass-bg)',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--glass-border)',
-                '&:hover': { bgcolor: 'var(--glass-bg)', color: 'var(--foreground)' },
-              }}
-            >
-              <Maximize2 size={16} />
-            </IconButton>
+            {!standalone && (
+              <IconButton
+                component={Link}
+                href={`/payment/${encodeURIComponent(orderRef)}`}
+                onClick={onClose}
+                size="small"
+                aria-label="Expand to full page"
+                title="ขยายเต็มหน้า (Expand to full page)"
+                sx={{
+                  bgcolor: 'var(--glass-bg)',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--glass-border)',
+                  '&:hover': { bgcolor: 'var(--glass-bg)', color: 'var(--foreground)' },
+                }}
+              >
+                <Maximize2 size={16} />
+              </IconButton>
+            )}
             <IconButton
               onClick={onClose}
               size="small"
@@ -1431,7 +1449,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                               level="M"
                               includeMargin={false}
                               bgColor="#ffffff"
-                              fgColor={NAVY}
+                              fgColor={DOCUMENT_NAVY}
                               imageSettings={{
                                 src: '/trust/promptpay.svg',
                                 height: 24,

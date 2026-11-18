@@ -118,7 +118,7 @@ const PERM_LABELS: Record<string, string> = {
 };
 
 const gradientBtnClass =
-  'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white hover:opacity-90';
+  'rounded-[10px] bg-primary font-bold text-white hover:opacity-90';
 
 export default function ShopManagement({ showToast, isSuperAdmin }: ShopManagementProps) {
   const [shops, setShops] = useState<Shop[]>([]);
@@ -381,14 +381,14 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
         <p className="text-[0.9rem] font-semibold text-[var(--foreground)]">{title}</p>
         <p className="mt-0.5 text-[0.75rem] text-[var(--muted-foreground)]">{description}</p>
       </div>
-      <Switch checked={checked} onCheckedChange={onChange} className="shrink-0 data-[state=checked]:bg-emerald-500" />
+      <Switch checked={checked} onCheckedChange={onChange} className="shrink-0 data-[state=checked]:bg-success" />
     </div>
   );
 
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <Loader2 className="size-8 animate-spin text-violet-500" />
+        <Loader2 className="size-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -418,7 +418,7 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
           <Store className="mx-auto size-12 text-[var(--muted-foreground)]" />
           <p className="mt-2 text-[var(--muted-foreground)]">ยังไม่มีร้านค้า</p>
           {isSuperAdmin && (
-            <Button variant="outline" className="mt-2 rounded-[10px] border-violet-500 text-violet-500" onClick={() => setCreateOpen(true)}>
+            <Button variant="outline" className="mt-2 rounded-[10px] border-primary text-primary" onClick={() => setCreateOpen(true)}>
               <Plus className="size-[18px]" />
               สร้างร้านค้าแรก
             </Button>
@@ -436,7 +436,7 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
                 >
                   <Avatar className="size-12">
                     <AvatarImage src={shop.logoUrl} />
-                    <AvatarFallback className="bg-violet-500/20 text-[1.3rem]">{shop.name[0]}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/20 text-[1.3rem]">{shop.name[0]}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1">
@@ -462,18 +462,18 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
                 {isExpanded && (
                   <div className="flex flex-col gap-1.5 px-2.5 pb-2.5">
                     <div className="flex flex-wrap gap-1">
-                      <Button variant="ghost" size="sm" className="text-[0.8rem] text-blue-400" onClick={async () => {
+                      <Button variant="ghost" size="sm" className="text-[0.8rem] text-primary" onClick={async () => {
                         const detail = await fetchShopDetail(shop.id);
                         if (detail) setEditingShop(normalizeShopDetail(detail));
                       }}>
                         <Edit className="size-[14px]" />
                         แก้ไขร้าน
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-[0.8rem] text-violet-400" onClick={() => fetchShopAdmins(shop.id)}>
+                      <Button variant="ghost" size="sm" className="text-[0.8rem] text-primary" onClick={() => fetchShopAdmins(shop.id)}>
                         <Users className="size-[14px]" />
                         จัดการแอดมิน
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-[0.8rem] text-emerald-400" onClick={() => window.open(`/shop/${shop.slug}`, '_blank')}>
+                      <Button variant="ghost" size="sm" className="text-[0.8rem] text-success" onClick={() => window.open(`/shop/${shop.slug}`, '_blank')}>
                         <ExternalLink className="size-[14px]" />
                         ดูหน้าร้าน
                       </Button>
@@ -486,8 +486,8 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
                     </div>
 
                     {adminsShopId === shop.id && (
-                      <div className="mt-1 rounded-xl border border-violet-500/15 bg-[var(--card)] p-2">
-                        <p className="mb-1.5 flex items-center gap-1 text-[0.9rem] font-bold text-violet-400">
+                      <div className="mt-1 rounded-xl border border-primary/15 bg-[var(--card)] p-2">
+                        <p className="mb-1.5 flex items-center gap-1 text-[0.9rem] font-bold text-primary">
                           <Users className="size-4" /> แอดมินร้าน ({shopAdmins.length})
                         </p>
 
@@ -531,7 +531,7 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
                                   className={cn(
                                     'h-[22px] cursor-pointer text-[0.65rem] hover:opacity-80',
                                     admin.permissions[key]
-                                      ? 'border-emerald-500/30 bg-emerald-500/15 text-[var(--success)]'
+                                      ? 'border-success/30 bg-success/15 text-[var(--success)]'
                                       : 'border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)]'
                                   )}
                                   onClick={() => handleTogglePermission(shop.id, admin.email, admin.permissions, key)}
@@ -596,7 +596,7 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
               <Label>คำอธิบาย (อังกฤษ)</Label>
               <Textarea rows={2} value={newShop.descriptionEn} onChange={(e) => setNewShop(prev => ({ ...prev, descriptionEn: e.target.value }))} />
             </div>
-            <div className="rounded-[10px] border border-[var(--border)] bg-indigo-500/8 p-1.5">
+            <div className="rounded-[10px] border border-[var(--border)] bg-primary/8 p-1.5">
               <p className="text-[0.78rem] leading-snug text-[var(--muted-foreground)]">
                 การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
               </p>
@@ -622,7 +622,7 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
                 </DialogTitle>
               </DialogHeader>
               <div className="flex flex-col gap-2 pt-1">
-                <p className="flex items-center gap-1 text-[0.9rem] font-bold text-blue-600">
+                <p className="flex items-center gap-1 text-[0.9rem] font-bold text-primary">
                   <Image className="size-4" /> รูปภาพร้านค้า
                 </p>
 
@@ -630,8 +630,8 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
                   <Label className="mb-0.75 text-[0.8rem]">รูปปกร้าน (แบนเนอร์)</Label>
                   <label
                     className={cn(
-                      'relative block h-40 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed bg-[var(--card)] transition-colors hover:border-blue-600',
-                      editingShop.bannerUrl ? 'border-blue-600' : 'border-[var(--border)]',
+                      'relative block h-40 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed bg-[var(--card)] transition-colors hover:border-primary',
+                      editingShop.bannerUrl ? 'border-primary' : 'border-[var(--border)]',
                       uploadingImage === 'banner' && 'cursor-wait'
                     )}
                     style={editingShop.bannerUrl ? { backgroundImage: `url(${editingShop.bannerUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
@@ -669,7 +669,7 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
                 <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-1.5">
                   <Avatar className="size-16 border-2 border-[var(--border)]">
                     <AvatarImage src={editingShop.logoUrl} />
-                    <AvatarFallback className="text-xl font-bold text-blue-600">{editingShop.name[0]}</AvatarFallback>
+                    <AvatarFallback className="text-xl font-bold text-primary">{editingShop.name[0]}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <Label className="mb-0.5 text-[0.8rem]">โลโก้ร้าน</Label>
@@ -698,7 +698,7 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
                 <div><Label>คำอธิบาย (ไทย)</Label><Textarea rows={2} value={editingShop.description || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, description: e.target.value } : null)} /></div>
                 <div><Label>คำอธิบาย (อังกฤษ)</Label><Textarea rows={2} value={editingShop.descriptionEn || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, descriptionEn: e.target.value } : null)} /></div>
 
-                <p className="mt-0.5 flex items-center gap-1 text-[0.9rem] font-bold text-blue-600">สถานะร้าน</p>
+                <p className="mt-0.5 flex items-center gap-1 text-[0.9rem] font-bold text-primary">สถานะร้าน</p>
                 <SettingToggle title="แสดงร้านบนเว็บ" description="ปิด = ซ่อนร้านจากหน้าร้านหลักและ /shop/slug" checked={editingShop.isActive} onChange={(checked) => setEditingShop(prev => prev ? { ...prev, isActive: checked } : null)} />
                 <SettingToggle title="เปิดรับออเดอร์" description="ปิด = ลูกค้ายังดูสินค้าได้ แต่สั่งซื้อไม่ได้" checked={editingShop.settings.isOpen} onChange={(checked) => setEditingShop(prev => prev ? { ...prev, settings: { ...prev.settings, isOpen: checked } } : null)} />
                 {!editingShop.settings.isOpen && (
@@ -708,17 +708,17 @@ export default function ShopManagement({ showToast, isSuperAdmin }: ShopManageme
                   </div>
                 )}
 
-                <p className="mt-1 flex items-center gap-1 text-[0.9rem] font-bold text-blue-600"><Users className="size-4" /> ข้อมูลติดต่อ</p>
+                <p className="mt-1 flex items-center gap-1 text-[0.9rem] font-bold text-primary"><Users className="size-4" /> ข้อมูลติดต่อ</p>
                 <div><Label>อีเมลติดต่อ</Label><Input value={editingShop.contactEmail || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, contactEmail: e.target.value } : null)} /></div>
                 <div><Label>เบอร์โทรติดต่อ</Label><Input value={editingShop.contactPhone || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, contactPhone: e.target.value } : null)} /></div>
 
-                <p className="mt-1 flex items-center gap-1 text-[0.9rem] font-bold text-blue-600"><Store className="size-4" /> การแสดงผล</p>
+                <p className="mt-1 flex items-center gap-1 text-[0.9rem] font-bold text-primary"><Store className="size-4" /> การแสดงผล</p>
                 <div>
                   <Label>ลำดับการแสดง (น้อย = ขึ้นก่อน)</Label>
                   <Input type="number" value={editingShop.sortOrder} onChange={(e) => setEditingShop(prev => prev ? { ...prev, sortOrder: Number(e.target.value) || 0 } : null)} />
                   <p className="mt-1 text-xs text-[var(--muted-foreground)]">ใช้เรียงร้านย่อยบนหน้าร้านหลัก</p>
                 </div>
-                <div className="rounded-[10px] border border-[var(--border)] bg-indigo-500/8 p-1.5">
+                <div className="rounded-[10px] border border-[var(--border)] bg-primary/8 p-1.5">
                   <p className="text-[0.78rem] leading-snug text-[var(--muted-foreground)]">
                     การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
                   </p>

@@ -66,7 +66,7 @@ function getRpConfig(requestUrl?: string) {
       origin = u.origin;
     } catch {}
   } else {
-    const url = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    const url = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
     try {
       const u = new URL(url);
       hostname = u.hostname;
@@ -78,7 +78,6 @@ function getRpConfig(requestUrl?: string) {
   const allowedHostnames = [
     'localhost',
     '127.0.0.1',
-    'sccshop.psuscc.club',
     'sccshop.psuscc.club',
   ];
   
@@ -98,12 +97,11 @@ function getRpConfig(requestUrl?: string) {
 
   const isAllowed =
     allowedHostnames.includes(hostname) ||
-    hostname.endsWith('.psuscc.club') ||
     hostname.endsWith('.psuscc.club');
   if (!isAllowed) {
-    // Fallback to NEXTAUTH_URL configuration
+    // Fallback to configured site URL
     try {
-      const u = new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000');
+      const u = new URL(process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000');
       hostname = u.hostname;
       origin = u.origin;
     } catch {}
@@ -388,22 +386,13 @@ export async function verifyPasskeyAuthentication(
   requestUrl?: string,
 ): Promise<{ verified: boolean; userEmail: string | null; error?: string }> {
   const { rpID, origin } = getRpConfig(requestUrl);
-  console.log('[Passkey] verifyPasskeyAuthentication debug:', {
-    rpID,
-    origin,
-    challengeId,
-    credentialId: response.id,
-  });
-
   const expectedChallenge = await getAndDeleteChallenge(challengeId, 'authentication');
-  console.log('[Passkey] expectedChallenge:', expectedChallenge);
 
   const credentialId = response.id;
   const storedCred = await getCredentialById(credentialId);
-  console.log('[Passkey] storedCred:', storedCred);
 
   if (!storedCred) {
-    console.error('[Passkey] Credential not found in database for ID:', credentialId);
+    console.warn('[Passkey] Credential not found in database');
     return { verified: false, userEmail: null, error: 'credential_not_found' };
   }
 
@@ -421,8 +410,6 @@ export async function verifyPasskeyAuthentication(
         transports: storedCred.transports,
       },
     });
-
-    console.log('[Passkey] verifyAuthenticationResponse result:', verification);
 
     if (verification.verified) {
       await updateCredentialCounter(

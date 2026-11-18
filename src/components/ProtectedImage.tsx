@@ -539,7 +539,7 @@ export default function ProtectedImage({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/favicon.png"
+            src="/logo.png"
             alt="SCC Shop"
             style={{
               width: 40,

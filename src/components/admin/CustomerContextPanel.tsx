@@ -137,34 +137,34 @@ function computeInsights(orders: any[]) {
     badges.push({
       key: 'new',
       label: 'ลูกค้าใหม่',
-      className: 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+      className: 'bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary',
     });
   } else if (total === 1 && completed.length === 1) {
     badges.push({
       key: 'first',
       label: 'สั่งซื้อครั้งแรก',
-      className: 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+      className: 'bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary',
     });
   }
   if (spent >= 5000 || completed.length >= 5) {
     badges.push({
       key: 'vip',
       label: 'VIP Customer',
-      className: 'bg-amber-50 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
+      className: 'bg-warning/10 text-warning dark:bg-warning/15 dark:text-warning',
     });
   }
   if (cancelled.length >= 3) {
     badges.push({
       key: 'cancel-heavy',
       label: `ยกเลิก ${cancelled.length} ครั้ง`,
-      className: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300',
+      className: 'bg-destructive/10 text-destructive dark:bg-destructive/15 dark:text-destructive',
     });
   }
   if (completed.length > 0) {
     badges.push({
       key: 'done',
       label: `ซื้อสำเร็จ ${completed.length} รายการ`,
-      className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+      className: 'bg-success/10 text-success dark:bg-success/15 dark:text-success',
     });
   }
 
@@ -284,7 +284,7 @@ export function CustomerContextPanel({
         <div className="mt-2 flex items-start gap-2.5">
           <Avatar className="size-10 shrink-0">
             {customerAvatar ? <AvatarImage src={customerAvatar} alt={customerName} /> : null}
-            <AvatarFallback className="bg-blue-100 text-sm font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+            <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary dark:bg-primary/20 dark:text-primary">
               {(customerName || '?').slice(0, 1)}
             </AvatarFallback>
           </Avatar>
@@ -319,38 +319,34 @@ export function CustomerContextPanel({
       {/* Case status */}
       <div className="space-y-2 border-b border-slate-200 px-3 py-3 dark:border-white/5">
         <p className="text-[0.65rem] font-medium text-muted-foreground">สถานะเคส</p>
-        <div className="flex flex-wrap gap-1.5">
-          <Badge
-            className={cn(
-              'cursor-default text-[0.65rem]',
-              chatStatus === 'pending'
-                ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
-                : 'bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-muted-foreground'
-            )}
-          >
-            รอรับ
-          </Badge>
-          <Badge
-            className={cn(
-              'cursor-default text-[0.65rem]',
-              chatStatus === 'active'
-                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-                : 'bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-muted-foreground'
-            )}
-          >
-            กำลังดำเนินการ
-          </Badge>
-          <Badge
-            className={cn(
-              'cursor-default text-[0.65rem]',
-              chatStatus === 'closed'
-                ? 'bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300'
-                : 'bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-muted-foreground'
-            )}
-          >
-            ปิดเคส
-          </Badge>
-        </div>
+        {/* Read-only progress: pending → active → closed */}
+        <ol className="flex items-center gap-1" aria-label="ความคืบหน้าของเคส">
+          {(['pending', 'active', 'closed'] as const).map((step, i, all) => {
+            const order = { pending: 0, active: 1, closed: 2 } as Record<string, number>;
+            const current = order[chatStatus] ?? 0;
+            const done = i < current;
+            const isCurrent = i === current;
+            const label = step === 'pending' ? 'รอรับ' : step === 'active' ? 'กำลังดูแล' : 'ปิดแล้ว';
+            return (
+              <li key={step} className="flex min-w-0 flex-1 items-center gap-1" aria-current={isCurrent ? 'step' : undefined}>
+                <span
+                  className={cn(
+                    'flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md px-1.5 py-1 text-[0.68rem] font-semibold',
+                    isCurrent && step === 'pending' && 'bg-warning/15 text-warning',
+                    isCurrent && step === 'active' && 'bg-success/15 text-success',
+                    isCurrent && step === 'closed' && 'bg-muted text-foreground',
+                    done && 'text-muted-foreground',
+                    !isCurrent && !done && 'text-muted-foreground/60',
+                  )}
+                >
+                  {done ? <span aria-hidden>✓</span> : isCurrent ? <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden /> : null}
+                  <span className="truncate">{label}</span>
+                </span>
+                {i < all.length - 1 && <span className={cn('h-px w-2 shrink-0', i < current ? 'bg-muted-foreground/50' : 'bg-border')} aria-hidden />}
+              </li>
+            );
+          })}
+        </ol>
         <p className="text-[0.7rem] text-muted-foreground">
           ผู้ดูแล:{' '}
           <span className="font-medium text-foreground">
@@ -359,7 +355,7 @@ export function CustomerContextPanel({
         </p>
         <div className="flex flex-wrap gap-1.5 pt-1">
           {chatStatus === 'pending' && (
-            <Button size="sm" className="h-8 bg-emerald-600 text-xs hover:bg-emerald-700" onClick={onAccept}>
+            <Button size="sm" className="h-8 bg-success text-xs hover:bg-success/90" onClick={onAccept}>
               + รับเคสนี้
             </Button>
           )}
@@ -367,25 +363,25 @@ export function CustomerContextPanel({
             <Button
               size="sm"
               variant="outline"
-              className="h-8 border-blue-200 text-xs text-blue-700 hover:bg-blue-50 dark:border-blue-500/30 dark:text-blue-300"
+              className="h-8 border-primary/35 text-xs text-primary hover:bg-primary/10 dark:border-primary/30 dark:text-primary"
               onClick={onTakeOver}
             >
               โอนเคสมาให้ฉัน
             </Button>
           )}
           {chatStatus === 'active' && !assigneeEmail && (
-            <Button size="sm" className="h-8 bg-emerald-600 text-xs hover:bg-emerald-700" onClick={onTakeOver}>
+            <Button size="sm" className="h-8 bg-success text-xs hover:bg-success/90" onClick={onTakeOver}>
               + รับเคสนี้
             </Button>
           )}
           {chatStatus === 'active' && assigneeEmail === myEmail && (
             <Button
               size="sm"
-              variant="ghost"
-              className="h-8 text-xs ring-1 ring-slate-200 dark:ring-white/10"
+              variant="outline"
+              className="h-8 border-destructive/30 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={onCloseCase}
             >
-              ปิดเคส
+              ปิดเคสนี้ (Alt+C)
             </Button>
           )}
         </div>
@@ -411,7 +407,7 @@ export function CustomerContextPanel({
             </Select>
             <Button
               size="sm"
-              className="h-8 w-full bg-blue-600 text-xs hover:bg-blue-700"
+              className="h-8 w-full bg-primary text-xs hover:bg-primary/90"
               disabled={!transferToEmail || transferring}
               onClick={onTransfer}
             >
@@ -461,7 +457,7 @@ export function CustomerContextPanel({
                 className={cn(
                   'shrink-0 rounded-full px-2.5 py-1 text-[0.65rem] font-medium transition',
                   orderFilter === id
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-primary text-white'
                     : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 dark:bg-white/5 dark:text-muted-foreground dark:ring-white/10'
                 )}
               >
@@ -499,12 +495,12 @@ export function CustomerContextPanel({
                     }}
                     className={cn(
                       'rounded-xl bg-white p-2.5 ring-1 ring-slate-200 transition dark:bg-[#111827] dark:ring-white/10',
-                      focused && 'ring-2 ring-blue-500 shadow-[0_0_0_3px_rgba(37,99,235,0.2)]'
+                      focused && 'ring-2 ring-primary shadow-[0_0_0_3px_rgba(37,99,235,0.2)]'
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate font-mono text-[0.75rem] font-semibold text-emerald-700 dark:text-emerald-400">
+                        <p className="truncate font-mono text-[0.75rem] font-semibold text-success dark:text-success">
                           #{ref}
                         </p>
                         <p className="text-[0.65rem] text-muted-foreground">
@@ -557,7 +553,7 @@ export function CustomerContextPanel({
                           <Copy className="size-3.5" />
                         </Button>
                         {copiedTrack === tracking && (
-                          <span className="text-[0.6rem] text-emerald-600">คัดลอกแล้ว</span>
+                          <span className="text-[0.6rem] text-success">คัดลอกแล้ว</span>
                         )}
                       </div>
                     ) : null}
@@ -600,7 +596,7 @@ export function CustomerContextPanel({
                       <Button
                         type="button"
                         size="sm"
-                        className="h-7 gap-1 bg-emerald-600 px-2 text-[0.65rem] hover:bg-emerald-700"
+                        className="h-7 gap-1 bg-success px-2 text-[0.65rem] hover:bg-success/90"
                         disabled={!canSendToChat}
                         onClick={() => onSendOrderSummary(order)}
                       >
@@ -678,7 +674,7 @@ export function ChatTextWithOrderLinks({
         <button
           key={`ord-${i++}-${match.index}`}
           type="button"
-          className="font-mono font-semibold text-blue-700 underline decoration-blue-400/60 underline-offset-2 hover:text-blue-800 dark:text-sky-300 dark:hover:text-sky-200"
+          className="font-mono font-semibold text-primary underline decoration-primary/60 underline-offset-2 hover:text-primary dark:text-primary dark:hover:text-primary"
           onClick={(e) => {
             e.stopPropagation();
             onOrderClick(ref);

@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 
 async function handlePaymentIntentSucceeded(paymentIntent: any) {
   const intentId = paymentIntent.id;
-  const orderId = paymentIntent.metadata?.orderId;
+  const orderId = paymentIntent.metadata?.orderId || paymentIntent.metadata?.orderRef;
 
   if (!orderId) {
     console.error('[Webhook] Missing orderId in PaymentIntent metadata');
@@ -147,7 +147,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
 
 async function handlePaymentIntentFailed(paymentIntent: any) {
   const intentId = paymentIntent.id;
-  const orderId = paymentIntent.metadata?.orderId;
+  const orderId = paymentIntent.metadata?.orderId || paymentIntent.metadata?.orderRef;
 
   if (!orderId) return;
 
@@ -178,7 +178,7 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
 
 async function handlePaymentIntentCanceled(paymentIntent: any) {
   const intentId = paymentIntent.id;
-  const orderId = paymentIntent.metadata?.orderId;
+  const orderId = paymentIntent.metadata?.orderId || paymentIntent.metadata?.orderRef;
 
   if (!orderId) return;
 

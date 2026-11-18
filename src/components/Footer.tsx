@@ -116,7 +116,7 @@ function LinkList({ items }: { items: Array<{ href: string; label: string }> }) 
  * brand strip, uppercase columns, hairline dividers, solid links.
  */
 export default function Footer() {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const [showBuildInfo, setShowBuildInfo] = useState(false);
 
   const formatBuildTime = (iso: string) => {
@@ -145,6 +145,7 @@ export default function Footer() {
     { href: '/#shop-section', label: t.footer.apparel },
     { href: '/#shop-section', label: t.footer.merchandise },
     { href: '/#events-section', label: t.footer.eventsCamps },
+    { href: '/forms', label: lang === 'en' ? 'Surveys & votes' : 'แบบสำรวจ & โหวต' },
   ];
 
   const helpLinks = [

@@ -23,7 +23,7 @@ type PromoCode = NonNullable<ShopConfig['promoCodes']>[number];
 
 export interface PromoCodesViewProps {
   config: ShopConfig;
-  saveConfig: (newConfig: ShopConfig) => Promise<void>;
+  saveConfig: (newConfig: ShopConfig) => Promise<unknown>;
   showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
   userEmail: string | null | undefined;
 }
@@ -50,7 +50,7 @@ function localDatetimeToIso(localStr?: string): string {
 }
 
 const gradientBtnClass =
-  'rounded-xl bg-gradient-to-br from-emerald-500 to-green-400 font-bold text-white hover:opacity-90';
+  'rounded-xl bg-success font-bold text-white hover:opacity-90';
 
 const inputClass = 'rounded-xl bg-[var(--surface)]';
 
@@ -167,11 +167,11 @@ export const PromoCodesView = React.memo(function PromoCodesView({
                   <Switch
                     checked={code.enabled}
                     onCheckedChange={() => toggleEnabled(code.id)}
-                    className="shrink-0 data-[state=checked]:bg-emerald-500"
+                    className="shrink-0 data-[state=checked]:bg-success"
                   />
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-base font-extrabold tracking-wider text-emerald-500">
+                      <span className="font-mono text-base font-extrabold tracking-wider text-success">
                         {code.code}
                       </span>
                       {isExpired && (
@@ -203,7 +203,7 @@ export const PromoCodesView = React.memo(function PromoCodesView({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 gap-1 border-blue-500/30 bg-blue-500/10 px-2.5 text-xs text-blue-400 hover:bg-blue-500/20"
+                      className="h-8 gap-1 border-primary/30 bg-primary/10 px-2.5 text-xs text-primary hover:bg-primary/20"
                       onClick={() => setEditingCode(code)}
                     >
                       <Edit className="size-3.5" />
@@ -212,7 +212,7 @@ export const PromoCodesView = React.memo(function PromoCodesView({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 gap-1 border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                      className="h-8 gap-1 border-destructive/30 bg-destructive/10 px-2.5 text-xs text-destructive hover:bg-destructive/20 hover:text-destructive"
                       onClick={() => handleDelete(code.id)}
                     >
                       <Trash2 className="size-3.5" />
@@ -287,7 +287,7 @@ export const PromoCodesView = React.memo(function PromoCodesView({
                         className={cn(
                           'rounded-lg font-bold',
                           editingCode.discountType === opt.value
-                            ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-500'
+                            ? 'border-success/40 bg-success/20 text-success'
                             : 'border-[var(--border)] bg-[var(--surface)] text-[var(--muted-foreground)]',
                         )}
                         onClick={() => setEditingCode({ ...editingCode, discountType: opt.value })}
@@ -390,7 +390,7 @@ export const PromoCodesView = React.memo(function PromoCodesView({
                     id="promo-enabled"
                     checked={editingCode.enabled}
                     onCheckedChange={(checked) => setEditingCode({ ...editingCode, enabled: checked })}
-                    className="data-[state=checked]:bg-emerald-500"
+                    className="data-[state=checked]:bg-success"
                   />
                   <Label htmlFor="promo-enabled" className="cursor-pointer">
                     เปิดใช้งาน

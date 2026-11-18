@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, type ReactNode } from 'react';
+import { useState, useMemo, useEffect, type ReactNode } from 'react';
 import {
   AppBar,
   Badge,
@@ -236,6 +236,21 @@ export default function StorefrontNavbar({
     if (pathname.startsWith('/shop')) return 'shop';
     return activeTab || 'home';
   }, [activeTab, pathname]);
+
+  // Warm up the main destinations once the browser is idle, so switching
+  // pages from the navbar / bottom nav feels instant (router.push never prefetches).
+  useEffect(() => {
+    const routes = ['/', '/shop', '/cart', '/orders', '/forms'];
+    const run = () => routes.forEach((r) => { if (r !== pathname) router.prefetch(r); });
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(run, { timeout: 4000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(run, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- prefetch once per page
+  }, [pathname]);
 
   // Auto-calculate cart count if not provided
   const effectiveCartCount = useMemo(() => {

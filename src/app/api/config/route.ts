@@ -4,6 +4,7 @@ import { withBackendProxy } from '@/lib/backend-proxy';
 import { getJson, putJson, syncShopOpenStatusToRedis } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
+import { resolveAdminSession } from '@/lib/admin-context';
 import { sanitizeConfigForPublic, sanitizeObjectUtf8 } from '@/lib/sanitize';
 import { saveAllAdminPermissionsToDB, getAllAdminPermissionsFromDB, deleteAdminPermissionsFromDB } from '@/lib/supabase';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
@@ -107,10 +108,18 @@ async function GETHandler() {
 }
 
 async function POSTHandler(req: NextRequest) {
-  // ตรวจสอบสิทธิ์ Admin - เฉพาะ admin เท่านั้นที่แก้ config ได้
+  // ตรวจสอบสิทธิ์ Admin - เฉพาะ global admin เท่านั้นที่แก้ config ร้านหลักได้
   const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) {
     return authResult;
+  }
+
+  const adminSession = await resolveAdminSession(authResult.email);
+  if (adminSession.userRole === 'shopAdmin') {
+    return await secureJsonResponse(
+      { status: 'error', message: 'แอดมินร้านย่อยไม่สามารถแก้ไขการตั้งค่าร้านหลักได้' },
+      { status: 403 }
+    );
   }
 
   try {
@@ -121,7 +130,19 @@ async function POSTHandler(req: NextRequest) {
     // ⚠️ Safety: prevent saving config with empty products if DB already has products
     // This prevents accidental data wipe from race conditions or stale client state
     const currentConfig = await getJson<ShopConfig>(CONFIG_KEY);
-    if (currentConfig && (currentConfig.products?.length ?? 0) > 0 && (!config.products || config.products.length === 0)) {
+    // An admin deleting the last product(s) on purpose names them in deletedProductIds.
+    // Allow the empty list only when those ids cover every product still stored.
+    const deletedIds = new Set(
+      Array.isArray(body?.deletedProductIds) ? body.deletedProductIds.map((id: unknown) => String(id)) : [],
+    );
+    const isIntentionalDeleteAll =
+      deletedIds.size > 0 && (currentConfig?.products || []).every((p) => deletedIds.has(String(p.id)));
+    if (
+      currentConfig &&
+      (currentConfig.products?.length ?? 0) > 0 &&
+      (!config.products || config.products.length === 0) &&
+      !isIntentionalDeleteAll
+    ) {
       console.error(`[config] BLOCKED: attempted to save 0 products when DB has ${currentConfig.products?.length}. User: ${authResult.email}`);
       return await secureJsonResponse(
         { status: 'error', message: 'ไม่สามารถบันทึกได้: กรุณาโหลดข้อมูลสินค้าก่อนบันทึก (ป้องกันข้อมูลหาย)' },

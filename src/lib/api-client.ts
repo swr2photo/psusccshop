@@ -482,9 +482,10 @@ export async function getAdminData(): Promise<APIResponse> {
 
 export async function saveShopConfig(
   config: any,
-  adminEmail: string
+  adminEmail: string,
+  options?: { deletedProductIds?: string[] },
 ): Promise<APIResponse> {
-  const body = { config, adminEmail };
+  const body = { config, adminEmail, ...(options?.deletedProductIds?.length ? { deletedProductIds: options.deletedProductIds } : {}) };
   let res = await fetchJson('/api/config', { method: 'POST', body });
   // Stale host-only cookie after Domain rollout — refresh once then retry
   if (res.status === 'error' && (res as any).error?.status === 401) {

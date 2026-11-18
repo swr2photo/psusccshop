@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdminWithPermission } from '@/lib/auth';
+import { resolveAdminSession } from '@/lib/admin-context';
 import { updateShopOpenStatus } from '@/lib/filebase';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
@@ -9,13 +10,21 @@ export const dynamic = 'force-dynamic';
  * POST /api/admin/toggle-shop
  * 
  * Secure endpoint to toggle shop open/closed status.
- * Requires admin authentication.
+ * Requires global admin authentication with canManageShop permission.
  */
 export async function POST(req: NextRequest) {
   // Verify administrator permissions
-  const authResult = await requireAdmin(req);
+  const authResult = await requireAdminWithPermission('canManageShop', req);
   if (authResult instanceof NextResponse) {
     return authResult;
+  }
+
+  const adminSession = await resolveAdminSession(authResult.email);
+  if (adminSession.userRole === 'shopAdmin') {
+    return await secureJsonResponse(
+      { status: 'error', message: 'แอดมินร้านย่อยไม่สามารถเปิด/ปิดร้านหลักได้' },
+      { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+    );
   }
 
   try {

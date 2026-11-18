@@ -26,6 +26,7 @@
     "deploy:cloudflare": "NODE_OPTIONS=--max-old-space-size=6144 opennextjs-cloudflare build && wrangler deploy",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit",
     "check:node-ready": "node scripts/check-node-migration-readiness.mjs",
     "migrate:images": "npx tsx scripts/migrate-image-urls.ts",
     "cron": "tsx scripts/cron-worker.ts",

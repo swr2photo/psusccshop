@@ -196,22 +196,22 @@ function AdminViewLoading() {
     </div>
   );
 }
-const lazyView = { ssr: false, loading: AdminViewLoading } as const;
-const SettingsView = dynamic(() => import('@/components/admin/SettingsView').then((m) => m.SettingsView), lazyView);
-const FlagshipSettings = dynamic(() => import('@/components/admin/FlagshipSettings'), lazyView);
-const SupportChatPanel = dynamic(() => import('@/components/admin/SupportChatPanel'), lazyView);
-const EmailManagement = dynamic(() => import('@/components/admin/EmailManagement'), lazyView);
-const UserLogsView = dynamic(() => import('@/components/admin/UserLogsView'), lazyView);
-const ShippingSettings = dynamic(() => import('@/components/admin/ShippingSettings'), lazyView);
-const PaymentSettings = dynamic(() => import('@/components/admin/PaymentSettings'), lazyView);
-const TrackingManagement = dynamic(() => import('@/components/admin/TrackingManagement'), lazyView);
-const RefundManagement = dynamic(() => import('@/components/admin/RefundManagement'), lazyView);
-const LiveStreamSettings = dynamic(() => import('@/components/admin/LiveStreamSettings'), lazyView);
-const ShopManagement = dynamic(() => import('@/components/admin/ShopManagement'), lazyView);
-const PromoCodesView = dynamic(() => import('@/components/admin/PromoCodesView').then((m) => m.PromoCodesView), lazyView);
-const EventsView = dynamic(() => import('@/components/admin/EventsView').then((m) => m.EventsView), lazyView);
-const AnnouncementsView = dynamic(() => import('@/components/admin/AnnouncementsView').then((m) => m.AnnouncementsView), lazyView);
-const ProductsView = dynamic(() => import('@/components/admin/ProductsView').then((m) => m.ProductsView), lazyView);
+const SettingsView = dynamic(() => import('@/components/admin/SettingsView').then((m) => m.SettingsView), { ssr: false, loading: AdminViewLoading });
+const FlagshipSettings = dynamic(() => import('@/components/admin/FlagshipSettings'), { ssr: false, loading: AdminViewLoading });
+const SupportChatPanel = dynamic(() => import('@/components/admin/SupportChatPanel'), { ssr: false, loading: AdminViewLoading });
+const EmailManagement = dynamic(() => import('@/components/admin/EmailManagement'), { ssr: false, loading: AdminViewLoading });
+const UserLogsView = dynamic(() => import('@/components/admin/UserLogsView'), { ssr: false, loading: AdminViewLoading });
+const ShippingSettings = dynamic(() => import('@/components/admin/ShippingSettings'), { ssr: false, loading: AdminViewLoading });
+const PaymentSettings = dynamic(() => import('@/components/admin/PaymentSettings'), { ssr: false, loading: AdminViewLoading });
+const TrackingManagement = dynamic(() => import('@/components/admin/TrackingManagement'), { ssr: false, loading: AdminViewLoading });
+const RefundManagement = dynamic(() => import('@/components/admin/RefundManagement'), { ssr: false, loading: AdminViewLoading });
+const LiveStreamSettings = dynamic(() => import('@/components/admin/LiveStreamSettings'), { ssr: false, loading: AdminViewLoading });
+const ShopManagement = dynamic(() => import('@/components/admin/ShopManagement'), { ssr: false, loading: AdminViewLoading });
+const PromoCodesView = dynamic(() => import('@/components/admin/PromoCodesView').then((m) => m.PromoCodesView), { ssr: false, loading: AdminViewLoading });
+const EventsView = dynamic(() => import('@/components/admin/EventsView').then((m) => m.EventsView), { ssr: false, loading: AdminViewLoading });
+const FormsView = dynamic(() => import('@/components/admin/FormsView').then((m) => m.FormsView), { ssr: false, loading: AdminViewLoading });
+const AnnouncementsView = dynamic(() => import('@/components/admin/AnnouncementsView').then((m) => m.AnnouncementsView), { ssr: false, loading: AdminViewLoading });
+const ProductsView = dynamic(() => import('@/components/admin/ProductsView').then((m) => m.ProductsView), { ssr: false, loading: AdminViewLoading });
 import { mapShopPermissionsToAdminPanel } from '@/lib/admin-permissions';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AdminShell, type AdminNavGroup } from '@/components/admin/AdminShell';
@@ -1336,12 +1336,21 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
   };
 
   // 💾 Save Config
-  const saveFullConfig = useCallback(async (newConfig: ShopConfig) => {
+  /**
+   * Save the whole config. Resolves true when the server accepted it.
+   * `deletedProductIds` marks an intentional delete so the server lets the
+   * last product(s) go (it otherwise refuses empty product lists as a wipe guard).
+   */
+  const saveFullConfig = useCallback(async (
+    newConfig: ShopConfig,
+    options?: { deletedProductIds?: string[] },
+  ): Promise<boolean> => {
     // ⚠️ Safeguard: prevent saving empty config that would wipe products
     // This can happen if save is triggered before real config loads from server
-    if ((!newConfig.products || newConfig.products.length === 0) && !serverUserRole) {
+    if ((!newConfig.products || newConfig.products.length === 0) && !serverUserRole && !options?.deletedProductIds?.length) {
       console.warn('[Admin] Blocked save: config has no products and server role not confirmed yet');
-      return;
+      showToast('warning', 'ยังโหลดข้อมูลสินค้าไม่เสร็จ ลองใหม่อีกครั้งในอีกสักครู่');
+      return false;
     }
     
     // Capture previous config for rollback in case of error
@@ -1414,22 +1423,26 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         addLog('SAVE_SHOP_CONFIG', `บันทึกการตั้งค่าร้านค้า (${myShops.find(s => s.id === selectedShopId)?.name || selectedShopId})`, { config: configWithUrls });
       } else {
         // Save to global config
-        const res = await saveShopConfig(configWithUrls, session?.user?.email || '');
+        const res = await saveShopConfig(configWithUrls, session?.user?.email || '', {
+          deletedProductIds: options?.deletedProductIds,
+        });
         if (res.status !== 'success') {
           throw new Error((res as any).message || 'บันทึกไม่สำเร็จ');
         }
         addLog('SAVE_CONFIG', 'บันทึกการตั้งค่า', { config: configWithUrls });
       }
+      return true;
     } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('❌ Save error:', error);
       showToast('error', error?.message || 'บันทึกไม่สำเร็จ');
       // Rollback to previous config on error
       setConfig(previousConfig);
       saveAdminCache({ config: previousConfig, orders, logs });
+      return false;
     } finally {
       setSaving(false);
     }
-  }, [orders, logs, showToast, session?.user?.email, addLog, config, isShopMode, selectedShopId, myShops]);
+  }, [orders, logs, showToast, session?.user?.email, addLog, config, isShopMode, selectedShopId, myShops, serverUserRole]);
 
   // Update Order Status
   const updateOrderStatus = async (ref: string, newStatus: string) => {
@@ -1960,7 +1973,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
   // ✅ No Permission View
   const NoPermissionView = ({ permission }: { permission: string }): JSX.Element => (
     <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[20px] bg-red-500/10">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[20px] bg-destructive/10">
         <Lock size={40} color="#ef4444" />
       </div>
       <p className="mb-1 text-xl font-bold text-[var(--foreground)]">ไม่มีสิทธิ์เข้าถึง</p>
@@ -2392,8 +2405,8 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                   '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.2)' },
                 }}
               >
-                <CheckCircleOutline size={16} color="#818cf8" />
-                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#818cf8' }}>
+                <CheckCircleOutline size={16} color="#0a84ff" />
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary)' }}>
                   วันนี้ {completedToday.length}
                 </Typography>
               </Box>
@@ -2552,7 +2565,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                       {/* Customer Info */}
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                          <Person size={14} color="#a78bfa" />
+                          <Person size={14} color="#0a84ff" />
                           <Typography sx={{ fontSize: '0.85rem', color: 'var(--foreground)' }}>
                             {order.name}
                           </Typography>
@@ -2568,7 +2581,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                       {/* Cart Summary */}
                       {order.cart && order.cart.length > 0 && (
                         <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                          <ShoppingBag size={14} color="#818cf8" />
+                          <ShoppingBag size={14} color="#0a84ff" />
                           <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             {order.cart.length} รายการ
                           </Typography>
@@ -2649,7 +2662,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
               {pickupFilter === 'ready' && <><LocalMall size={20} color="#10b981" /> ออเดอร์พร้อมรับ ({readyForPickup.length})</>}
-              {pickupFilter === 'today' && <><CheckCircleOutline size={20} color="#818cf8" /> รับแล้ววันนี้ ({completedToday.length})</>}
+              {pickupFilter === 'today' && <><CheckCircleOutline size={20} color="#0a84ff" /> รับแล้ววันนี้ ({completedToday.length})</>}
               {pickupFilter === 'all_completed' && <><Inventory size={20} color="#fbbf24" /> รับแล้วทั้งหมด ({completedPickups.length})</>}
             </Typography>
             
@@ -3158,7 +3171,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                 border: '1px solid var(--glass-border)',
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <Person size={18} color="#a78bfa" />
+                  <Person size={18} color="#0a84ff" />
                   <Typography sx={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--foreground)' }}>
                     {pickupSelectedOrder.name}
                   </Typography>
@@ -3223,7 +3236,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                                 fontSize: '0.7rem', 
                                 fontWeight: 600,
                                 bgcolor: 'rgba(99, 102, 241, 0.2)', 
-                                color: '#a5b4fc',
+                                color: 'var(--primary)',
                                 border: '1px solid rgba(99, 102, 241, 0.3)',
                               }} 
                             />
@@ -3267,7 +3280,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                             }}>
                               {item.options?.customName && (
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: item.options?.customNumber ? 0.5 : 0 }}>
-                                  <Typography sx={{ fontSize: '0.7rem', color: '#a78bfa', fontWeight: 600, minWidth: 60 }}>
+                                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600, minWidth: 60 }}>
                                     ชื่อติดเสื้อ:
                                   </Typography>
                                   <Typography sx={{ 
@@ -3287,7 +3300,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                               )}
                               {item.options?.customNumber && (
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Typography sx={{ fontSize: '0.7rem', color: '#a78bfa', fontWeight: 600, minWidth: 60 }}>
+                                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 600, minWidth: 60 }}>
                                     เลขเสื้อ:
                                   </Typography>
                                   <Typography sx={{ 
@@ -3861,7 +3874,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                     '&:active': { transform: 'scale(0.97)' },
                   }}
                 >
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: isActive ? '#a78bfa' : '#64748b' }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: isActive ? 'var(--primary)' : '#64748b' }}>
                     {filter.label}
                   </Typography>
                   <Box sx={{
@@ -3871,7 +3884,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                     bgcolor: 'var(--glass-bg)',
                     fontSize: '0.6rem',
                     fontWeight: 700,
-                    color: isActive ? '#a78bfa' : '#64748b',
+                    color: isActive ? 'var(--primary)' : '#64748b',
                     minWidth: 16,
                     textAlign: 'center',
                   }}>
@@ -4010,7 +4023,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
               style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(59,130,246,0.2) 100%)' }}
             >
               {/* Logo */}
-              <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 shadow-[0_20px_40px_rgba(139,92,246,0.3)]">
+              <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-3xl bg-primary shadow-[0_20px_40px_rgba(139,92,246,0.3)]">
                 <Store size={40} color="#fff" />
               </div>
               <h1 className="mb-1 text-[1.6rem] font-extrabold text-[var(--foreground)]">
@@ -4217,6 +4230,8 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
           description: en ? 'Live stream settings' : 'ตั้งค่าการไลฟ์สด', keywords: 'live stream ไลฟ์' },
         { icon: <Sparkles size={18} />, label: en ? 'Flagship page' : 'หน้าสินค้า Flagship', idx: 18, color: '#8b5cf6', show: Boolean(canManageProducts || canManageShop || isSuperAdminUser),
           description: en ? 'Featured product landing page' : 'หน้าแนะนำสินค้าเรือธง', keywords: 'flagship landing เรือธง' },
+        { icon: <ClipboardList size={18} />, label: en ? 'Surveys & votes' : 'แบบสำรวจ & โหวต', idx: 19, color: '#3b82f6', show: Boolean(canManageEvents),
+          description: en ? 'Forms for students to sign up, vote and give feedback' : 'ฟอร์มให้นักศึกษาลงชื่อ โหวต และแสดงความคิดเห็น', keywords: 'form forms survey vote poll แบบฟอร์ม แบบสำรวจ โหวต ลงชื่อ ความคิดเห็น' },
       ],
     },
     {
@@ -4438,6 +4453,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
           {activeTab === 12 && (canManageTracking ? <TrackingManagement showToast={showToast} selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
           {activeTab === 13 && (canManageRefunds ? <RefundManagement showToast={showToast} selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="จัดการคืนเงิน" />)}
           {activeTab === 17 && (isSuperAdminUser ? <ShopManagement showToast={showToast} isSuperAdmin={isSuperAdminUser} userEmail={session?.user?.email || ''} /> : <NoPermissionView permission="จัดการร้านค้าย่อย" />)}
+          {activeTab === 19 && (canManageEvents ? <FormsView showToast={showToast} /> : <NoPermissionView permission="จัดการแบบสำรวจ" />)}
           {activeTab === 18 && ((canManageProducts || canManageShop || isSuperAdminUser) ? <FlagshipSettings products={config?.products || []} currentConfig={config} onSaveSuccess={() => { showToast('success', 'บันทึกการตั้งค่า Flagship เรียบร้อยแล้ว'); fetchData({ silent: true }); }} /> : <NoPermissionView permission="ตั้งค่า Flagship" />)}
         </div>
       </AdminShell>
@@ -4468,7 +4484,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                   const parent = target.parentElement;
                   if (parent && !parent.querySelector('.slip-error-fallback')) {
                     const fallback = document.createElement('div');
-                    fallback.className = 'slip-error-fallback my-4 flex flex-col items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-6 text-center text-red-400';
+                    fallback.className = 'slip-error-fallback my-4 flex flex-col items-center justify-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-center text-destructive';
                     fallback.innerHTML = `
                       <svg class="size-8 opacity-80" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" y1="13.5" x2="16.5" y2="16.5"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m3 16 5-5c.9-.9 2.1-.9 3 0l.5.5"/></svg>
                       <p class="text-sm font-bold">โหลดรูปไม่สำเร็จ</p>
@@ -4492,8 +4508,8 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                 </p>
               )}
               {slipViewerData.slip.slipData && (
-                <div className="mt-4 rounded-xl bg-emerald-500/10 p-4 text-left">
-                  <p className="mb-2 flex items-center gap-1 font-semibold text-emerald-500"><ClipboardList size={16} /> ข้อมูลจากสลิป</p>
+                <div className="mt-4 rounded-xl bg-success/10 p-4 text-left">
+                  <p className="mb-2 flex items-center gap-1 font-semibold text-success"><ClipboardList size={16} /> ข้อมูลจากสลิป</p>
                   {slipViewerData.slip.slipData.amount && (
                     <p className="flex items-center gap-1 text-sm text-[var(--foreground)]"><Banknote size={14} /> จำนวนเงิน: ฿{Number(slipViewerData.slip.slipData.amount)?.toLocaleString()}</p>
                   )}
@@ -4555,7 +4571,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         <UiDialogContent className="border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-xl sm:max-w-md">
           <UiDialogHeader className="border-b border-[var(--glass-border)] pb-4">
             <UiDialogTitle className="flex items-center gap-2 text-base font-bold">
-              <Update color="#6366f1" />
+              <Update color="#0a84ff" />
               อัปเดตสถานะพร้อมกัน
             </UiDialogTitle>
           </UiDialogHeader>
@@ -4572,7 +4588,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                     size="small"
                     sx={{
                       bgcolor: 'rgba(99,102,241,0.15)',
-                      color: '#a5b4fc',
+                      color: 'var(--primary)',
                       fontFamily: 'monospace',
                     }}
                   />
@@ -4604,7 +4620,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                         },
                         '&.Mui-selected': {
                           bgcolor: 'rgba(99,102,241,0.25)',
-                          color: '#a5b4fc',
+                          color: 'var(--primary)',
                           fontWeight: 700,
                           '&:hover': {
                             bgcolor: 'rgba(99,102,241,0.35)',
@@ -4643,7 +4659,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
             <UiButton
               onClick={handleBatchUpdateStatus}
               disabled={batchUpdating || !batchNewStatus}
-              className="bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:from-violet-600 hover:to-indigo-600"
+              className="bg-primary text-white"
             >
               {batchUpdating ? (
                 <>

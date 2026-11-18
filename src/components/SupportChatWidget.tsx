@@ -36,7 +36,7 @@ import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-
 import { fetchChatSync, mergeChatMessages, mergeNewestWindow, fetchOlderChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
 import { formatStickerMessage } from '@/lib/chat-stickers';
 import { formatVoiceMessage, VOICE_DATA_URL_FALLBACK_MAX } from '@/lib/chat-voice';
-import { formatReplyPrefix, parseChatMessage } from '@/lib/chat-message';
+import { formatChatPreview, formatReplyPrefix, parseChatMessage } from '@/lib/chat-message';
 import { cn } from '@/lib/utils';
 import {
   chatBubbleContentStyle,
@@ -1407,43 +1407,76 @@ ${getStatusLabel(order.status)}
         >
           <Badge
             badgeContent={unreadCount}
-            overlap="circular"
+            color="error"
+            max={99}
             sx={{
               '& .MuiBadge-badge': {
-                right: 4,
-                top: 4,
+                fontSize: '0.75rem',
                 fontWeight: 700,
-                fontSize: '0.7rem',
                 minWidth: 20,
                 height: 20,
-                borderRadius: '50%',
+                borderRadius: 10,
+                padding: '0 6px',
                 bgcolor: 'var(--destructive, #ff3b30)',
                 color: '#fff',
-                border: '2px solid var(--background)',
+                border: '2px solid var(--surface)',
+                top: 4,
+                right: 4,
               },
             }}
           >
-            <IconButton
+            <Box
               onClick={handleOpenMenu}
+              role="button"
+              tabIndex={0}
               aria-label={t.supportChat.chatTitle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleOpenMenu(e as any);
+                }
+              }}
               sx={{
-                width: { xs: 56, sm: 60 },
-                height: { xs: 56, sm: 60 },
-                bgcolor: 'var(--primary)',
-                color: 'var(--primary-foreground)',
-                boxShadow: '0 8px 24px color-mix(in srgb, var(--primary) 35%, transparent)',
-                borderRadius: '50%',
-                border: '1px solid color-mix(in srgb, var(--primary) 70%, #000)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25,
+                bgcolor: 'var(--surface)',
+                border: '1px solid var(--border)',
+                px: 2.25,
+                py: 1.25,
+                borderRadius: '99px',
+                color: 'var(--foreground)',
+                boxShadow: (theme) =>
+                  theme.palette.mode === 'dark'
+                    ? '0 6px 20px rgba(0,0,0,0.45)'
+                    : '0 6px 18px rgba(0,0,0,0.1)',
+                cursor: 'pointer',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent',
+                fontFamily: 'inherit',
+                transition: 'transform 0.18s ease, box-shadow 0.18s ease',
                 '&:hover': {
-                  bgcolor: 'color-mix(in srgb, var(--primary) 88%, #000)',
-                  transform: 'scale(1.05)',
+                  boxShadow: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? '0 8px 24px rgba(0,0,0,0.55)'
+                      : '0 8px 22px rgba(0,0,0,0.14)',
                 },
-                '&:active': { transform: 'scale(0.96)' },
-                transition: 'transform 0.2s ease, background-color 0.2s ease',
+                '&:active': { transform: 'scale(0.97)' },
               }}
             >
-              <ChatIcon size={24} strokeWidth={2.2} />
-            </IconButton>
+              <ChatIcon size={18} strokeWidth={1.75} />
+              <Box
+                component="span"
+                sx={{
+                  fontSize: '0.82rem',
+                  fontWeight: 650,
+                  letterSpacing: '0.01em',
+                  lineHeight: 1,
+                }}
+              >
+                {t.nav.chat}
+              </Box>
+            </Box>
           </Badge>
         </Box>
       </Zoom>
@@ -2020,7 +2053,7 @@ ${getStatusLabel(order.status)}
                           {historyChat.subject || t.supportChat.topicProduct}
                         </Typography>
                         <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mt: 0.5 }}>
-                          {historyChat.last_message_preview}
+                          {formatChatPreview(historyChat.last_message_preview)}
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
                           <TimeIcon size={14} color="#86868b" />

@@ -110,12 +110,12 @@ interface Order {
 
 const STATUS_ICONS: Record<TrackingStatus, ReactNode> = {
   pending: <Schedule size={18} className="text-slate-400" />,
-  picked_up: <Flight size={18} className="text-violet-400" />,
-  in_transit: <LocalShipping size={18} className="text-blue-400" />,
-  out_for_delivery: <LocalShipping size={18} className="text-cyan-400" />,
-  delivered: <CheckCircle size={18} className="text-green-500" />,
-  returned: <ErrorIcon size={18} className="text-amber-500" />,
-  failed: <ErrorIcon size={18} className="text-red-500" />,
+  picked_up: <Flight size={18} className="text-primary" />,
+  in_transit: <LocalShipping size={18} className="text-primary" />,
+  out_for_delivery: <LocalShipping size={18} className="text-primary" />,
+  delivered: <CheckCircle size={18} className="text-success" />,
+  returned: <ErrorIcon size={18} className="text-warning" />,
+  failed: <ErrorIcon size={18} className="text-destructive" />,
   unknown: <Schedule size={18} className="text-slate-400" />,
 };
 
@@ -139,7 +139,7 @@ function getShippingProviderInfo(provider: unknown) {
 function getShippingOptionBadge(order: Order) {
   if (order.shippingOption === 'pickup') {
     return (
-      <Badge className="h-[22px] gap-1 border-transparent bg-emerald-500/20 text-[0.7rem] text-emerald-500">
+      <Badge className="h-[22px] gap-1 border-transparent bg-success/20 text-[0.7rem] text-success">
         <Home size={14} />
         รับหน้าร้าน
       </Badge>
@@ -147,7 +147,7 @@ function getShippingOptionBadge(order: Order) {
   }
   if (order.shippingOption === 'delivery_legacy') {
     return (
-      <Badge className="h-[22px] gap-1 border-transparent bg-amber-400/20 text-[0.7rem] text-amber-400">
+      <Badge className="h-[22px] gap-1 border-transparent bg-warning/20 text-[0.7rem] text-warning">
         <LocalShipping size={14} />
         จัดส่ง (เดิม)
       </Badge>
@@ -155,7 +155,7 @@ function getShippingOptionBadge(order: Order) {
   }
   if (order.shippingOption === 'thailand_post_ems') {
     return (
-      <Badge className="h-[22px] gap-1 border-transparent bg-blue-400/20 text-[0.7rem] text-blue-400">
+      <Badge className="h-[22px] gap-1 border-transparent bg-primary/20 text-[0.7rem] text-primary">
         <LocalShipping size={14} />
         EMS ไปรษณีย์ไทย
       </Badge>
@@ -164,7 +164,7 @@ function getShippingOptionBadge(order: Order) {
   if (order.shippingProvider) {
     const providerInfo = getShippingProviderInfo(order.shippingProvider);
     return (
-      <Badge className="h-[22px] gap-1 border-transparent bg-blue-400/20 text-[0.7rem] text-blue-400">
+      <Badge className="h-[22px] gap-1 border-transparent bg-primary/20 text-[0.7rem] text-primary">
         <LocalShipping size={14} />
         {providerInfo?.nameThai || order.shippingProvider}
       </Badge>
@@ -181,7 +181,7 @@ function getShippingOptionBadge(order: Order) {
       order.shippingOption === 'scg' ? 'SCG Express' :
       order.shippingOption;
     return (
-      <Badge className="h-[22px] gap-1 border-transparent bg-blue-400/20 text-[0.7rem] text-blue-400">
+      <Badge className="h-[22px] gap-1 border-transparent bg-primary/20 text-[0.7rem] text-primary">
         <LocalShipping size={14} />
         {label}
       </Badge>
@@ -448,7 +448,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
         {/* Header */}
         <div className="mb-6">
           <h2 className="mb-1 flex items-center gap-3 text-xl font-bold text-[var(--foreground)]">
-            <LocalShipping size={24} className="text-blue-800" />
+            <LocalShipping size={24} className="text-primary" />
             จัดการการจัดส่ง
           </h2>
           <p className="text-[0.9rem] text-[var(--text-muted)]">
@@ -458,16 +458,16 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
 
         {/* Quick Stats */}
         <div className="mb-6 flex flex-wrap gap-4">
-          <Card className="min-w-[150px] flex-1 rounded-lg border-amber-400/30 bg-amber-400/10 py-0 shadow-none">
+          <Card className="min-w-[150px] flex-1 rounded-lg border-warning/30 bg-warning/10 py-0 shadow-none">
             <CardContent className="px-4 py-3">
-              <p className="text-2xl font-bold text-amber-400">{pendingOrders.length}</p>
-              <p className="text-[0.8rem] text-amber-400">รอจัดส่ง</p>
+              <p className="text-2xl font-bold text-warning">{pendingOrders.length}</p>
+              <p className="text-[0.8rem] text-warning">รอจัดส่ง</p>
             </CardContent>
           </Card>
-          <Card className="min-w-[150px] flex-1 rounded-lg border-cyan-400/30 bg-cyan-400/10 py-0 shadow-none">
+          <Card className="min-w-[150px] flex-1 rounded-lg border-primary/30 bg-primary/10 py-0 shadow-none">
             <CardContent className="px-4 py-3">
-              <p className="text-2xl font-bold text-cyan-400">{shippedOrders.length}</p>
-              <p className="text-[0.8rem] text-cyan-400">จัดส่งแล้ว</p>
+              <p className="text-2xl font-bold text-primary">{shippedOrders.length}</p>
+              <p className="text-[0.8rem] text-primary">จัดส่งแล้ว</p>
             </CardContent>
           </Card>
         </div>
@@ -481,19 +481,19 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
           <TabsList variant="line" className="mb-6 w-full justify-start bg-transparent">
             <TabsTrigger
               value="0"
-              className="data-[state=active]:text-blue-800 after:bg-blue-800"
+              className="data-[state=active]:text-primary after:bg-primary"
             >
               รายการออเดอร์
             </TabsTrigger>
             <TabsTrigger
               value="1"
-              className="data-[state=active]:text-blue-800 after:bg-blue-800"
+              className="data-[state=active]:text-primary after:bg-primary"
             >
               เพิ่มเลขพัสดุแบบกลุ่ม
             </TabsTrigger>
             <TabsTrigger
               value="2"
-              className="data-[state=active]:text-blue-800 after:bg-blue-800"
+              className="data-[state=active]:text-primary after:bg-primary"
             >
               ค้นหาพัสดุ
             </TabsTrigger>
@@ -547,7 +547,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                     size="sm"
                     variant="ghost"
                     onClick={selectAllOrders}
-                    className="text-blue-400"
+                    className="text-primary"
                   >
                     <SelectAll />
                     เลือกทั้งหมด
@@ -568,7 +568,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                     size="sm"
                     variant="outline"
                     onClick={handleExportShipping}
-                    className="border-emerald-500 text-emerald-500 hover:bg-emerald-500/10"
+                    className="border-success text-success hover:bg-success/10"
                   >
                     <Download />
                     ส่งออก CSV {selectedOrders.size > 0 ? `(${selectedOrders.size})` : `(${pendingOrders.length})`}
@@ -588,7 +588,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                         key={key}
                         asChild
                         size="sm"
-                        className="bg-blue-800/10 text-[0.75rem] text-violet-400 hover:bg-blue-800/20"
+                        className="bg-primary/10 text-[0.75rem] text-primary hover:bg-primary/20"
                       >
                         <a
                           href={CARRIER_LABEL_URLS[key]}
@@ -608,7 +608,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                     <Loader2 className="size-8 animate-spin text-[var(--text-muted)]" />
                   </div>
                 ) : filteredOrders.length === 0 ? (
-                  <Alert className="border-blue-500/20 bg-blue-500/10">
+                  <Alert className="border-primary/20 bg-primary/10">
                     <AlertDescription>ไม่พบออเดอร์ที่ตรงกับเงื่อนไข</AlertDescription>
                   </Alert>
                 ) : (
@@ -641,7 +641,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                             data-state={selectedOrders.has(order.ref) ? 'selected' : undefined}
                             className={cn(
                               'border-[var(--glass-border)] hover:bg-[var(--surface-2)]/50',
-                              selectedOrders.has(order.ref) && 'bg-blue-800/10'
+                              selectedOrders.has(order.ref) && 'bg-primary/10'
                             )}
                           >
                             <TableCell className="border-[var(--glass-border)]">
@@ -658,8 +658,8 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                                 className={cn(
                                   'mt-0.5 h-[18px] border-transparent text-[0.65rem]',
                                   order.trackingNumber
-                                    ? 'bg-cyan-400/20 text-cyan-400'
-                                    : 'bg-amber-400/20 text-amber-400'
+                                    ? 'bg-primary/20 text-primary'
+                                    : 'bg-warning/20 text-warning'
                                 )}
                               >
                                 {order.status}
@@ -668,7 +668,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                             <TableCell className="border-[var(--glass-border)]">
                               <div className="flex flex-col gap-0.5">
                                 <div className="flex items-center gap-1">
-                                  <Person size={14} className="text-violet-400" />
+                                  <Person size={14} className="text-primary" />
                                   <span className="text-[0.85rem] text-[var(--foreground)]">
                                     {order.customerName || order.name || '-'}
                                   </span>
@@ -701,7 +701,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                             <TableCell className="border-[var(--glass-border)]">
                               {order.trackingNumber ? (
                                 <div className="flex items-center gap-1">
-                                  <span className="font-mono text-[0.85rem] font-semibold text-emerald-500">
+                                  <span className="font-mono text-[0.85rem] font-semibold text-success">
                                     {order.trackingNumber}
                                   </span>
                                   <Button
@@ -712,7 +712,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                                     <ContentCopy size={14} className="text-slate-500" />
                                   </Button>
                                   {providerInfo && (
-                                    <Badge className="h-[18px] border-transparent bg-blue-400/20 text-[0.6rem] text-blue-400">
+                                    <Badge className="h-[18px] border-transparent bg-primary/20 text-[0.6rem] text-primary">
                                       {providerInfo.nameThai}
                                     </Badge>
                                   )}
@@ -728,7 +728,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="h-8 gap-1 border-blue-500/30 bg-blue-500/10 px-2.5 text-xs text-blue-400 hover:bg-blue-500/20"
+                                  className="h-8 gap-1 border-primary/30 bg-primary/10 px-2.5 text-xs text-primary hover:bg-primary/20"
                                   onClick={() => {
                                     setEditingOrder(order);
                                     setEditTrackingNumber(order.trackingNumber || '');
@@ -744,7 +744,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-8 gap-1 border-violet-500/30 bg-violet-500/10 px-2.5 text-xs text-violet-400 hover:bg-violet-500/20"
+                                      className="h-8 gap-1 border-primary/30 bg-primary/10 px-2.5 text-xs text-primary hover:bg-primary/20"
                                       onClick={() => {
                                         setSearchTrackingNumber(order.trackingNumber!);
                                         setSearchProvider(order.shippingProvider || '');
@@ -759,7 +759,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-8 gap-1 border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                                      className="h-8 gap-1 border-destructive/30 bg-destructive/10 px-2.5 text-xs text-destructive hover:bg-destructive/20 hover:text-destructive"
                                       onClick={() => handleDeleteTracking(order)}
                                     >
                                       <Delete size={14} />
@@ -789,7 +789,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                 </h3>
                 <p className="mb-4 text-[0.85rem] text-[var(--text-muted)]">
                   ใส่ข้อมูลในรูปแบบ{' '}
-                  <code className="text-violet-400">เลขออเดอร์:เลขพัสดุ</code>{' '}
+                  <code className="text-primary">เลขออเดอร์:เลขพัสดุ</code>{' '}
                   บรรทัดละ 1 รายการ
                 </p>
 
@@ -824,7 +824,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                   <Button
                     onClick={handleBulkAddTracking}
                     disabled={!bulkTrackingInput.trim()}
-                    className="bg-emerald-500 text-white hover:bg-emerald-600"
+                    className="bg-success text-white hover:bg-success"
                   >
                     <Save />
                     บันทึกทั้งหมด
@@ -870,7 +870,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
             <Card className={glassCardClass}>
               <CardContent className="p-6">
                 <h3 className="mb-4 flex items-center gap-2 font-bold text-[var(--foreground)]">
-                  <Search size={20} className="text-blue-400" />
+                  <Search size={20} className="text-primary" />
                   ค้นหาสถานะพัสดุ
                 </h3>
 
@@ -908,7 +908,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                     <Button
                       onClick={handleTrack}
                       disabled={loadingTracking || !searchTrackingNumber.trim()}
-                      className="min-w-[120px] bg-blue-600 text-white hover:bg-blue-700"
+                      className="min-w-[120px] bg-primary text-white hover:bg-primary/90"
                     >
                       {loadingTracking ? (
                         <Loader2 className="animate-spin" />
@@ -950,7 +950,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                           className={cn(
                             'font-semibold',
                             trackingResult.status === 'delivered'
-                              ? 'border-transparent bg-green-500/20 text-green-500'
+                              ? 'border-transparent bg-success/20 text-success'
                               : 'border-transparent bg-slate-500/20 text-slate-400'
                           )}
                         >
@@ -987,7 +987,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                     {/* External Links */}
                     <div className="mt-4 flex gap-2">
                       {trackingResult.trackingUrl && (
-                        <Button asChild size="sm" variant="ghost" className="text-blue-400">
+                        <Button asChild size="sm" variant="ghost" className="text-primary">
                           <a href={trackingResult.trackingUrl} target="_blank" rel="noopener noreferrer">
                             <OpenInNew />
                             ติดตามที่เว็บขนส่ง
@@ -995,7 +995,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                         </Button>
                       )}
                       {trackingResult.track123Url && (
-                        <Button asChild size="sm" variant="ghost" className="text-violet-400">
+                        <Button asChild size="sm" variant="ghost" className="text-primary">
                           <a href={trackingResult.track123Url} target="_blank" rel="noopener noreferrer">
                             <OpenInNew />
                             Track123
@@ -1022,7 +1022,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
             <DialogHeader>
               <div className="flex items-center justify-between">
                 <DialogTitle className="flex items-center gap-2">
-                  <LocalShipping size={24} className="text-blue-800" />
+                  <LocalShipping size={24} className="text-primary" />
                   {editingOrder?.trackingNumber ? 'แก้ไขเลขพัสดุ' : 'เพิ่มเลขพัสดุ'}
                 </DialogTitle>
                 <Button
@@ -1046,7 +1046,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                   </p>
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-1">
-                      <Person size={14} className="text-violet-400" />
+                      <Person size={14} className="text-primary" />
                       <span className="text-[0.85rem] text-[var(--text-muted)]">
                         {editingOrder.customerName || editingOrder.name || '-'}
                       </span>
@@ -1106,7 +1106,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
               <Button
                 onClick={handleSaveTracking}
                 disabled={saving}
-                className="bg-emerald-500 text-white hover:bg-emerald-600"
+                className="bg-success text-white hover:bg-success"
               >
                 {saving ? (
                   <>

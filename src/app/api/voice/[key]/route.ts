@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
-import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { requireAuth } from '@/lib/auth';
+import { secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,12 +20,13 @@ const s3Client = new S3Client({
 });
 
 function isAllowedVoiceRequest(req: NextRequest): boolean {
-  const dest = req.headers.get('sec-fetch-dest') || '';
-  if (dest === 'audio' || dest === 'media' || dest === 'empty' || dest === '') return true;
   const site = req.headers.get('sec-fetch-site') || '';
+  if (site === 'cross-site') return false;
   if (site === 'same-origin' || site === 'same-site') return true;
   const referer = req.headers.get('referer') || '';
-  if (/localhost|127\.0\.0\.1|psuscc|sccshop|vercel\.app/i.test(referer)) return true;
+  if (referer && /localhost|127\.0\.0\.1|psuscc|sccshop|vercel\.app/i.test(referer)) return true;
+  const dest = req.headers.get('sec-fetch-dest') || '';
+  if (dest === 'audio' || dest === 'media' || dest === 'empty' || dest === '') return true;
   return false;
 }
 
@@ -52,6 +54,11 @@ export async function GET(
   { params }: { params: Promise<{ key: string }> }
 ) {
   try {
+    const authResult = await requireAuth(req);
+    if (authResult instanceof NextResponse || !('email' in authResult)) {
+      return authResult;
+    }
+
     if (!bucket || !accessKeyId || !secretAccessKey) {
       return await secureJsonResponse({ error: 'Voice storage not configured' }, { status: 503 });
     }

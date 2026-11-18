@@ -59,7 +59,10 @@ html {
   --text-disabled: rgba(245, 245, 247, 0.25);
   --error: #ff453a;
   --success: #30d158;
-  --warning: #ffd60a;
+  --warning: #ff9f0a;
+  /* Theme-aware institutional accent used by payment/order flows. */
+  --payment-accent: #64b5ff;
+  --payment-accent-soft: rgba(100, 181, 255, 0.12);
   --shadow-opacity: 0.45;
   --card-radius: 16px;
   --card-shadow:
@@ -107,9 +110,12 @@ html {
   --surface-3: #e5e5ea;
   --text-muted: #8e8e93;
   --text-disabled: rgba(29, 29, 31, 0.25);
-  --error: #ff3b30;
-  --success: #34c759;
-  --warning: #ff9f0a;
+  --error: #e5281e;
+  /* Slightly deeper than iOS tints so status text stays readable on white */
+  --success: #1f8f3f;
+  --warning: #c76a00;
+  --payment-accent: #1e3a5f;
+  --payment-accent-soft: rgba(30, 58, 95, 0.08);
   --shadow-opacity: 0.03;
   --card-radius: 16px;
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 14px rgba(0, 0, 0, 0.03);
@@ -152,6 +158,9 @@ html {
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -1696,3 +1705,21 @@ textarea::placeholder {
 }
 
 /* Site footer layout uses Tailwind utilities in Footer.tsx */
+
+/* ==================== STOREFRONT: PRINTED-CATALOG STYLE ====================
+   Plain surfaces, hairline rules, real type. Overrides the older decorative
+   effects (3D lift, spotlight glow, shimmer, floating badges, glowing prices). */
+body {
+  --font-store: var(--font-plex-thai), "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-store-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+.store-type { font-family: var(--font-store); letter-spacing: 0; }
+.store-mono { font-family: var(--font-store-mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+
+.product-card-hover { transition: border-color 0.15s ease; will-change: auto; }
+.product-card-hover:hover { transform: none; }
+.product-card-hover::before { display: none; }
+.product-card-hover:hover .product-image-zoom { transform: scale(1.025); }
+.floating-badge { animation: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.shimmer-btn::after { display: none; }
+.price-glow { text-shadow: none; }

@@ -161,8 +161,8 @@ function Notice({
     <div
       className={cn(
         'flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-xs [&_svg]:mt-px [&_svg]:size-4 [&_svg]:shrink-0',
-        tone === 'success' && 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
-        tone === 'warning' && 'bg-amber-500/12 text-amber-800 dark:text-amber-300',
+        tone === 'success' && 'bg-success/10 text-success dark:text-success',
+        tone === 'warning' && 'bg-warning/12 text-warning dark:text-warning',
         tone === 'muted' && 'bg-muted text-muted-foreground',
       )}
     >
@@ -384,7 +384,7 @@ export const SettingsView = React.memo(function SettingsView({
           ))}
         </div>
         <p className="mt-4 hidden items-center gap-2 px-2.5 text-xs text-muted-foreground lg:flex">
-          <span className={cn('size-1.5 shrink-0 rounded-full', hasChanges ? 'bg-amber-500' : 'bg-emerald-500')} />
+          <span className={cn('size-1.5 shrink-0 rounded-full', hasChanges ? 'bg-warning' : 'bg-success')} />
           {hasChanges
             ? 'ยังไม่ได้บันทึก'
             : lastSavedTime
@@ -406,11 +406,11 @@ export const SettingsView = React.memo(function SettingsView({
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.7rem] font-semibold',
                   localConfig.isOpen
-                    ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400'
-                    : 'bg-rose-500/12 text-rose-700 dark:text-rose-400',
+                    ? 'bg-success/12 text-success dark:text-success'
+                    : 'bg-destructive/12 text-destructive dark:text-destructive',
                 )}
               >
-                <span className={cn('size-1.5 rounded-full', localConfig.isOpen ? 'bg-emerald-500' : 'bg-rose-500')} />
+                <span className={cn('size-1.5 rounded-full', localConfig.isOpen ? 'bg-success' : 'bg-destructive')} />
                 {localConfig.isOpen ? 'เปิดอยู่' : 'ปิดอยู่'}
               </span>
             }
@@ -836,7 +836,7 @@ export const SettingsView = React.memo(function SettingsView({
             ) : (
               productsWithPickup.map((p) => (
                 <div key={p.id} className="flex items-start gap-3 px-4 py-3 md:px-5">
-                  <Check className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <Check className="mt-0.5 size-4 shrink-0 text-success dark:text-success" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{p.name}</p>
                     <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
@@ -868,7 +868,7 @@ export const SettingsView = React.memo(function SettingsView({
             role="status"
             className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-popover py-1.5 pr-1.5 pl-4 text-sm shadow-lg"
           >
-            <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />
+            <span className="size-1.5 shrink-0 rounded-full bg-warning" />
             <span className="font-medium whitespace-nowrap">มีการแก้ไขที่ยังไม่บันทึก</span>
             <Button variant="ghost" size="sm" className="rounded-full" onClick={onReset} disabled={loading}>
               <Undo2 /> <span className="hidden sm:inline">ยกเลิก</span>

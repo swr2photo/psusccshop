@@ -179,7 +179,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-[14px] bg-gradient-to-br from-violet-600 to-violet-700 shadow-[0_4px_14px_rgba(124,58,237,0.3)]">
+            <div className="grid size-11 place-items-center rounded-[14px] bg-primary shadow-[0_4px_14px_rgba(124,58,237,0.3)]">
               <RotateCcw size={22} className="text-white" />
             </div>
             <div>
@@ -236,7 +236,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
         {/* Content */}
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 className="size-9 animate-spin text-violet-600" />
+            <Loader2 className="size-9 animate-spin text-primary" />
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] py-16 text-center">
@@ -254,7 +254,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
               return (
                 <div
                   key={order.ref}
-                  className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] transition-colors hover:border-violet-500/30"
+                  className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] transition-colors hover:border-primary/30"
                 >
                   <div
                     onClick={() => setExpandedRef(isExpanded ? null : order.ref)}
@@ -283,7 +283,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                     </div>
 
                     <div className="shrink-0 text-right">
-                      <p className="text-[0.95rem] font-extrabold text-amber-500">
+                      <p className="text-[0.95rem] font-extrabold text-warning">
                         ฿{order.refundAmount?.toLocaleString() || '0'}
                       </p>
                       <p className="text-[0.65rem] text-muted-foreground">
@@ -300,7 +300,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                     <div className="border-t border-[var(--border)] px-4 pb-4">
                       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-                          <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-indigo-300">
+                          <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-primary">
                             <Package size={14} /> ข้อมูลออเดอร์
                           </p>
                           <div className="flex flex-col gap-2">
@@ -322,8 +322,8 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                           )}
                         </div>
 
-                        <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
-                          <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-violet-400">
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                          <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-primary">
                             <RotateCcw size={14} /> ข้อมูลคำขอคืนเงิน
                           </p>
                           {(() => {
@@ -380,8 +380,8 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                           })()}
                         </div>
 
-                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 sm:col-span-2">
-                          <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-emerald-400">
+                        <div className="rounded-xl border border-success/20 bg-success/5 p-4 sm:col-span-2">
+                          <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-success">
                             <Banknote size={14} /> ข้อมูลบัญชีรับเงิน
                           </p>
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -403,14 +403,14 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                           <Button
                             variant="outline"
                             onClick={() => openActionDialog(order.ref, 'REJECTED')}
-                            className="border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                            className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20"
                           >
                             <XCircle size={16} className="mr-1" />
                             ปฏิเสธ
                           </Button>
                           <Button
                             onClick={() => openActionDialog(order.ref, 'APPROVED')}
-                            className="bg-gradient-to-br from-emerald-500 to-emerald-600 font-bold shadow-[0_4px_14px_rgba(16,185,129,0.3)]"
+                            className="bg-success font-bold shadow-[0_4px_14px_rgba(16,185,129,0.3)]"
                           >
                             <CheckCircle size={16} className="mr-1" />
                             อนุมัติ
@@ -419,7 +419,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                       )}
                       {order.refundStatus === 'APPROVED' && (
                         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                          <Alert className="flex-1 border-blue-500/20 bg-blue-500/10 py-2">
+                          <Alert className="flex-1 border-primary/20 bg-primary/10 py-2">
                             <Info className="size-4" />
                             <AlertDescription className="text-[0.75rem]">
                               อนุมัติแล้ว — กรุณาโอนเงินคืนแล้วกดยืนยัน
@@ -427,7 +427,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                           </Alert>
                           <Button
                             onClick={() => openActionDialog(order.ref, 'COMPLETED')}
-                            className="bg-gradient-to-br from-violet-600 to-violet-700 font-bold shadow-[0_4px_14px_rgba(124,58,237,0.3)]"
+                            className="bg-primary font-bold shadow-[0_4px_14px_rgba(124,58,237,0.3)]"
                           >
                             <Banknote size={16} className="mr-1" />
                             ยืนยันโอนเงินแล้ว
@@ -447,9 +447,9 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
           <DialogContent className="max-w-xs rounded-2xl border-[var(--border)] bg-[var(--card)] backdrop-blur-xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-base">
-                {actionType === 'APPROVED' && <><CheckCircle size={20} className="text-emerald-500" /> อนุมัติคำขอคืนเงิน</>}
-                {actionType === 'REJECTED' && <><XCircle size={20} className="text-red-500" /> ปฏิเสธคำขอคืนเงิน</>}
-                {actionType === 'COMPLETED' && <><Banknote size={20} className="text-violet-500" /> ยืนยันการโอนเงินคืน</>}
+                {actionType === 'APPROVED' && <><CheckCircle size={20} className="text-success" /> อนุมัติคำขอคืนเงิน</>}
+                {actionType === 'REJECTED' && <><XCircle size={20} className="text-destructive" /> ปฏิเสธคำขอคืนเงิน</>}
+                {actionType === 'COMPLETED' && <><Banknote size={20} className="text-primary" /> ยืนยันการโอนเงินคืน</>}
               </DialogTitle>
               <DialogDescription className="text-[0.82rem]">
                 {actionType === 'APPROVED' && 'คำขอคืนเงินจะถูกอนุมัติ คุณจะต้องดำเนินการโอนเงินและยืนยันในขั้นตอนถัดไป'}
@@ -482,9 +482,9 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                 disabled={actionLoading}
                 className={cn(
                   'rounded-[10px] px-6 font-bold',
-                  actionType === 'REJECTED' && 'bg-gradient-to-br from-red-500 to-red-600',
-                  actionType === 'COMPLETED' && 'bg-gradient-to-br from-violet-600 to-violet-700',
-                  actionType === 'APPROVED' && 'bg-gradient-to-br from-emerald-500 to-emerald-600',
+                  actionType === 'REJECTED' && 'bg-destructive',
+                  actionType === 'COMPLETED' && 'bg-primary',
+                  actionType === 'APPROVED' && 'bg-success',
                 )}
               >
                 {actionLoading ? (
@@ -509,7 +509,7 @@ function DetailRow({ label, value, highlight }: { label: string; value: string; 
       <span className="shrink-0 text-[0.72rem] text-muted-foreground">{label}</span>
       <span className={cn(
         'break-all text-right text-[0.72rem]',
-        highlight ? 'font-bold text-amber-500' : 'font-medium text-[var(--foreground)]',
+        highlight ? 'font-bold text-warning' : 'font-medium text-[var(--foreground)]',
       )}>
         {value}
       </span>

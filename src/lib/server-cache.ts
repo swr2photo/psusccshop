@@ -141,7 +141,6 @@ async function redisDeleteKey(key: string): Promise<void> {
 
 
 async function redisDeletePrefix(prefix: string): Promise<void> {
-
   if (isCloudflareWorkersRuntime()) return;
 
   const redis = getRedisClient();
@@ -149,13 +148,18 @@ async function redisDeletePrefix(prefix: string): Promise<void> {
   if (!redis) return;
 
   try {
-
-    const keys = await redis.keys(`${REDIS_PREFIX}${prefix}*`);
-
-    if (keys.length > 0) await redis.del(...keys);
-
+    const match = `${REDIS_PREFIX}${prefix}*`;
+    let cursor = '0';
+    let iterations = 0;
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, { match, count: 100 });
+      if (Array.isArray(keys) && keys.length > 0) {
+        await redis.del(...keys);
+      }
+      cursor = String(nextCursor);
+      iterations += 1;
+    } while (cursor !== '0' && iterations < 50);
   } catch {}
-
 }
 
 

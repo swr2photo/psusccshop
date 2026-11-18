@@ -30,7 +30,7 @@ function ToggleRow({
       <Switch
         checked={checked}
         onCheckedChange={onChange}
-        className="data-[state=checked]:bg-emerald-500"
+        className="data-[state=checked]:bg-success"
       />
     </div>
   );
@@ -72,8 +72,8 @@ export default function ShirtNameConfigFields({ value, onChange, compact }: Shir
         </div>
       </div>
 
-      <div className="rounded-[10px] border border-indigo-500/20 bg-indigo-500/[0.08] p-3">
-        <p className="mb-2 flex items-center gap-1 text-[0.8rem] font-bold text-indigo-400">
+      <div className="rounded-[10px] border border-primary/20 bg-primary/[0.08] p-3">
+        <p className="mb-2 flex items-center gap-1 text-[0.8rem] font-bold text-primary">
           <Users size={14} /> ภาษาที่อนุญาต
         </p>
         <div className="flex flex-wrap gap-2">
@@ -127,8 +127,8 @@ export default function ShirtNameConfigFields({ value, onChange, compact }: Shir
         </div>
       )}
 
-      <div className="rounded-[10px] border border-emerald-500/20 bg-emerald-500/[0.08] p-2.5">
-        <p className="mb-1 flex items-center gap-1 text-[0.72rem] font-semibold text-emerald-500">
+      <div className="rounded-[10px] border border-success/20 bg-success/[0.08] p-2.5">
+        <p className="mb-1 flex items-center gap-1 text-[0.72rem] font-semibold text-success">
           <Shirt size={13} /> ตัวอย่างที่ใช้ได้
         </p>
         <p className="text-[0.78rem] text-[var(--text-muted)]">

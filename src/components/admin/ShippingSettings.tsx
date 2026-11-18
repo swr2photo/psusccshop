@@ -63,7 +63,7 @@ const glassCardClass =
   'rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]';
 
 const gradientBtnClass =
-  'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
+  'rounded-[10px] bg-primary font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
 
 const inputClass = 'rounded-[10px]';
 
@@ -175,7 +175,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <LocalShipping size={28} className="text-indigo-500" />
+          <LocalShipping size={28} className="text-primary" />
           <h2 className="text-xl font-bold text-[var(--foreground)]">
             ตั้งค่าการจัดส่ง
           </h2>
@@ -206,7 +206,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
       )}
 
       {success && (
-        <Alert className="relative mb-4 border-emerald-500/30 bg-emerald-500/10 pr-10 text-emerald-700 dark:text-emerald-400">
+        <Alert className="relative mb-4 border-success/30 bg-success/10 pr-10 text-success dark:text-success">
           <CircleCheck />
           <AlertDescription>{success}</AlertDescription>
           <Button
@@ -239,7 +239,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               <Switch
                 checked={config.showOptions}
                 onCheckedChange={(checked) => setConfig(prev => ({ ...prev, showOptions: checked }))}
-                className="data-[state=checked]:bg-indigo-500"
+                className="data-[state=checked]:bg-primary"
               />
             </div>
 
@@ -255,7 +255,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               <Switch
                 checked={config.allowPickup}
                 onCheckedChange={(checked) => setConfig(prev => ({ ...prev, allowPickup: checked }))}
-                className="data-[state=checked]:bg-indigo-500"
+                className="data-[state=checked]:bg-primary"
               />
             </div>
 
@@ -312,9 +312,9 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
       </Card>
 
       {/* Track123 API Info */}
-      <Card className="mb-6 rounded-xl border border-blue-700/30 bg-blue-900/10">
+      <Card className="mb-6 rounded-xl border border-primary/30 bg-primary/10">
         <CardContent className="pt-6">
-          <p className="mb-4 flex items-center gap-2 text-base font-bold text-violet-400">
+          <p className="mb-4 flex items-center gap-2 text-base font-bold text-primary">
             <OpenInNew size={20} />
             Track123 API (ระบบติดตามพัสดุ)
           </p>
@@ -329,14 +329,14 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               <Badge variant="secondary">Kerry Express</Badge>
               <Badge variant="secondary">J&T Express</Badge>
               <Badge variant="secondary">Flash Express</Badge>
-              <Badge className="border-0 bg-blue-700/20 text-violet-400">+1700 carriers</Badge>
+              <Badge className="border-0 bg-primary/20 text-primary">+1700 carriers</Badge>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="outline"
-                className="border-blue-700/50 text-violet-400 hover:border-indigo-500 hover:bg-indigo-500/10"
+                className="border-primary/50 text-primary hover:border-primary hover:bg-primary/10"
                 asChild
               >
                 <a href="https://member.track123.com/api" target="_blank" rel="noopener noreferrer">
@@ -347,7 +347,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               <Button
                 size="sm"
                 variant="outline"
-                className="text-[var(--text-muted)] hover:border-indigo-500"
+                className="text-[var(--text-muted)] hover:border-primary"
                 asChild
               >
                 <a href="https://docs.track123.com/reference/request" target="_blank" rel="noopener noreferrer">
@@ -357,7 +357,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               </Button>
             </div>
 
-            <Alert className="border-blue-500/20 bg-blue-500/10">
+            <Alert className="border-primary/20 bg-primary/10">
               <Info />
               <AlertDescription className="text-xs">
                 ตั้งค่า <code className="rounded bg-black/20 px-1 py-0.5">TRACK123_API_KEY</code> ใน .env.local เพื่อเปิดใช้งานการติดตามพัสดุอัตโนมัติ
@@ -378,7 +378,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
             <Button
               variant="outline"
               size="sm"
-              className="border-indigo-500 text-indigo-500 hover:border-violet-600 hover:bg-indigo-500/10"
+              className="border-primary text-primary hover:border-primary hover:bg-primary/10"
               onClick={() => setAddDialogOpen(true)}
             >
               <Add />
@@ -435,7 +435,7 @@ function ShippingOptionCard({
       className={cn(
         'rounded-[10px] transition-all duration-200',
         option.enabled
-          ? 'border-indigo-500/30 bg-indigo-500/10'
+          ? 'border-primary/30 bg-primary/10'
           : 'border-[var(--border)] bg-[var(--card)]/50',
       )}
     >
@@ -445,7 +445,7 @@ function ShippingOptionCard({
           <Switch
             checked={option.enabled}
             onCheckedChange={onToggleEnabled}
-            className="data-[state=checked]:bg-indigo-500"
+            className="data-[state=checked]:bg-primary"
           />
 
           <div className="min-w-0 flex-1">
@@ -460,7 +460,7 @@ function ShippingOptionCard({
             )}
           </div>
 
-          <p className="min-w-[60px] text-right font-bold text-cyan-400">
+          <p className="min-w-[60px] text-right font-bold text-primary">
             {option.baseFee === 0 ? 'ฟรี' : `฿${option.baseFee}`}
           </p>
 
@@ -704,7 +704,7 @@ function AddShippingOptionDialog({
             ยกเลิก
           </Button>
           <Button
-            className="bg-blue-800 hover:bg-violet-600"
+            className="bg-primary hover:bg-primary"
             onClick={handleAdd}
           >
             เพิ่ม

@@ -9,6 +9,7 @@ import { withCronMonitor } from '@/lib/sentry-cron';
 import { cleanupExpiredRateLimits } from '@/lib/rate-limit-supabase';
 import { autoRotateExpiringKeys, cleanupOldKeys } from '@/lib/api-key-rotation';
 import { cleanupOldChatImages } from '@/lib/support-chat';
+import { cleanupExpiredFormResponses } from '@/lib/forms-server';
 import { verifyCronAuth } from '@/lib/cron-auth';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
@@ -140,6 +141,26 @@ export async function GET(req: NextRequest) {
     } catch (error) {
       console.error('[Cron Cleanup] Chat image cleanup error:', error);
       results.tasks.chatImageCleanup = {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+
+    // ==================== 6. CLEANUP EXPIRED FORM RESPONSES (PDPA) ====================
+    try {
+      console.log('[Cron Cleanup] Cleaning expired form responses (PDPA)...');
+
+      const formCleanup = await cleanupExpiredFormResponses();
+
+      results.tasks.expiredFormResponsesCleanup = {
+        status: 'success',
+        deletedResponses: formCleanup.deletedResponses,
+      };
+
+      console.log(`[Cron Cleanup] Expired form responses cleanup: ${formCleanup.deletedResponses} deleted`);
+    } catch (error) {
+      console.error('[Cron Cleanup] Form responses cleanup error:', error);
+      results.tasks.expiredFormResponsesCleanup = {
         status: 'error',
         error: error instanceof Error ? error.message : 'Unknown error',
       };

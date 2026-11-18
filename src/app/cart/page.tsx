@@ -1,10 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import {
   Box,
   Container,
@@ -16,7 +14,6 @@ import {
   Chip,
   Card,
   CircularProgress,
-  Skeleton,
 } from '@mui/material';
 import {
   ShoppingCart,
@@ -32,38 +29,34 @@ import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import { useCartStore } from '@/store/cartStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { apiFetch } from '@/lib/api-client';
+import { useShopCatalog } from '@/hooks/usePageData';
+import { useHydrated } from '@/hooks/useHydrated';
+import ProductImage from '@/components/storefront/ProductImage';
 
 export default function StandaloneCartPage() {
-  const router = useRouter();
   const { lang } = useTranslation();
   const cart = useCartStore((s) => s.cart);
   const removeFromCart = useCartStore((s) => s.removeFromCart);
   const updateItem = useCartStore((s) => s.updateItem);
   const clearCart = useCartStore((s) => s.clearCart);
 
-  // Wait for client hydration so Zustand persist loads cart from localStorage
-  const [mounted, setMounted] = useState(false);
-  const [catalogMap, setCatalogMap] = useState<Record<string, any>>({});
+  // Stock data is useful only when the persisted cart has items. Keep it
+  // out of the empty-cart path and let SWR reuse the home-page catalog cache.
+  const { shops } = useShopCatalog(cart.length > 0);
 
-  useEffect(() => {
-    setMounted(true);
-    apiFetch('/api/shops/catalog')
-      .then((r: Response) => r.json())
-      .then((data: any) => {
-        const shops = data.shops || data.data || [];
-        if (Array.isArray(shops)) {
-          const map: Record<string, any> = {};
-          for (const s of shops) {
-            for (const p of s.products || []) {
-              map[p.id] = p;
-            }
-          }
-          setCatalogMap(map);
+  // Wait for client hydration so Zustand persist loads cart from localStorage
+  const mounted = useHydrated();
+  const catalogMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    if (Array.isArray(shops)) {
+      for (const s of shops) {
+        for (const p of s.products || []) {
+          map[p.id] = p;
         }
-      })
-      .catch(() => null);
-  }, []);
+      }
+    }
+    return map;
+  }, [shops]);
 
   const getItemUnitPrice = (item: any) => Number(item.unitPrice ?? item.price ?? 0);
   const getItemQty = (item: any) => Number(item.quantity ?? item.qty ?? 1);
@@ -73,7 +66,11 @@ export default function StandaloneCartPage() {
     return getItemUnitPrice(item) * getItemQty(item);
   };
   const getItemName = (item: any) => item.productName || item.name || 'สินค้า';
-  const getItemImage = (item: any) => item.image || item.coverImage || item.images?.[0] || '/icon.png';
+  const getItemImageSources = (item: any) => [
+    item.image,
+    item.coverImage,
+    ...(Array.isArray(item.images) ? item.images : []),
+  ];
 
   const getItemStock = (item: any): number | null => {
     const pId = item.productId || item.id?.split('-')[0];
@@ -231,7 +228,7 @@ export default function StandaloneCartPage() {
                   const qty = getItemQty(item);
                   const price = getItemUnitPrice(item);
                   const itemTotal = getItemTotal(item);
-                  const image = getItemImage(item);
+                  const imageSources = getItemImageSources(item);
                   const maxStock = getItemStock(item);
                   const isOutOfStock = maxStock !== null && maxStock <= 0;
                   const isExceedingStock = maxStock !== null && qty > maxStock;
@@ -253,11 +250,14 @@ export default function StandaloneCartPage() {
                     >
                       {/* Item Image */}
                       <Box sx={{ width: { xs: 80, sm: 100 }, height: { xs: 80, sm: 100 }, borderRadius: 2, overflow: 'hidden', bgcolor: '#f1f5f9', position: 'relative' }}>
-                        <Image
-                          src={image}
+                        <ProductImage
+                          src={imageSources[0]}
+                          fallbackSrcs={imageSources.slice(1)}
                           alt={name}
-                          fill
-                          style={{ objectFit: 'cover' }}
+                          width="100%"
+                          height="100%"
+                          objectFit="cover"
+                          style={{ position: 'absolute', inset: 0 }}
                         />
                       </Box>
 

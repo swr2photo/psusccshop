@@ -55,7 +55,7 @@ import {
 } from '@/lib/config';
 
 import { useGalleryImagePreload, isGalleryImageInRange } from '@/hooks/useGalleryImagePreload';
-import OptimizedImage from '@/components/OptimizedImage';
+import ProductImage from '@/components/storefront/ProductImage';
 import { type ShopEvent } from '@/components/EventBanner';
 import { resolveSizeMeasurement, getAvailableStock, getCartItemCount } from '@/lib/shop-constants';
 
@@ -659,8 +659,9 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                           }}
                         >
                           {isGalleryImageInRange(idx, activeImageIndex) ? (
-                            <OptimizedImage
+                            <ProductImage
                               src={img}
+                              fallbackSrcs={productImages.filter((_, imageIndex) => imageIndex !== idx)}
                               alt={`${selectedProduct.name} - รูปที่ ${idx + 1}`}
                               width="100%"
                               height="100%"
@@ -832,8 +833,9 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                             '&:hover': { opacity: 1, borderColor: 'rgba(0,113,227,0.5)' },
                           }}
                         >
-                          <OptimizedImage
+                          <ProductImage
                             src={img}
+                            fallbackSrcs={productImages.filter((_, imageIndex) => imageIndex !== idx)}
                             alt={`${selectedProduct.name}-${idx}`}
                             width="100%"
                             height="100%"
@@ -2286,11 +2288,16 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
           </IconButton>
           {lightboxImage && (
             <Box sx={{ display: 'flex', alignItems: 'center', justifycontent: 'center', justifyContent: 'center', width: '100%', height: '100%', p: 2 }}>
-              <Box
-                component="img"
+              <ProductImage
                 src={lightboxImages.length > 1 ? lightboxImages[lightboxIndex] : lightboxImage}
                 alt="Full size"
-                sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px', userSelect: 'none' }}
+                fallbackSrcs={lightboxImages.filter((_, imageIndex) => imageIndex !== lightboxIndex)}
+                width="100%"
+                height="100%"
+                objectFit="contain"
+                placeholder="none"
+                disableFade
+                style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '8px', userSelect: 'none' }}
               />
             </Box>
           )}
@@ -2314,7 +2321,16 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                     '&:hover': { opacity: 1 },
                   }}
                 >
-                  <Box component="img" src={img} alt={`Thumbnail ${idx + 1}`} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  <ProductImage
+                    src={img}
+                    fallbackSrcs={lightboxImages.filter((_, imageIndex) => imageIndex !== idx)}
+                    alt={`Thumbnail ${idx + 1}`}
+                    width="100%"
+                    height="100%"
+                    objectFit="cover"
+                    placeholder="none"
+                    disableFade
+                  />
                 </Box>
               ))}
             </Box>
@@ -2418,11 +2434,16 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
         )}
         {lightboxImage && (
           <Box sx={{ display: 'flex', alignItems: 'center', justifycontent: 'center', justifyContent: 'center', width: '100%', height: '100%', p: 4 }}>
-            <Box
-              component="img"
+            <ProductImage
               src={lightboxImages.length > 1 ? lightboxImages[lightboxIndex] : lightboxImage}
               alt="Full size"
-              sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px', userSelect: 'none' }}
+              fallbackSrcs={lightboxImages.filter((_, imageIndex) => imageIndex !== lightboxIndex)}
+              width="100%"
+              height="100%"
+              objectFit="contain"
+              placeholder="none"
+              disableFade
+              style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '8px', userSelect: 'none' }}
             />
           </Box>
         )}
@@ -2446,7 +2467,16 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                   '&:hover': { opacity: 1 },
                 }}
               >
-                <Box component="img" src={img} alt={`Thumbnail ${idx + 1}`} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <ProductImage
+                  src={img}
+                  fallbackSrcs={lightboxImages.filter((_, imageIndex) => imageIndex !== idx)}
+                  alt={`Thumbnail ${idx + 1}`}
+                  width="100%"
+                  height="100%"
+                  objectFit="cover"
+                  placeholder="none"
+                  disableFade
+                />
               </Box>
             ))}
           </Box>

@@ -171,7 +171,7 @@ function CartItemCard({
     <li
       className={cn(
         'rounded-xl border bg-background/50 p-3 md:p-4',
-        hasPriceDiff ? 'border-amber-500/40' : showLegacyOption ? 'border-destructive/40' : 'border-border',
+        hasPriceDiff ? 'border-warning/40' : showLegacyOption ? 'border-destructive/40' : 'border-border',
       )}
     >
       {/* product row */}
@@ -311,7 +311,7 @@ function CartItemCard({
           className={cn(
             'flex h-9 cursor-pointer items-center justify-between gap-2 self-end rounded-md border px-3 text-sm',
             patterns.length > 0 ? 'col-span-2' : 'col-span-1 md:col-span-3',
-            item.options?.isLongSleeve ? 'border-amber-500/50 bg-amber-500/10' : 'border-input',
+            item.options?.isLongSleeve ? 'border-warning/50 bg-warning/10' : 'border-input',
           )}
         >
           <span className="truncate">แขนยาว (+{baht(product?.options?.longSleevePrice ?? 50)})</span>
@@ -329,7 +329,7 @@ function CartItemCard({
             {item.quantity} × {baht(orderedPrice)}
           </span>
           {hasPriceDiff ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/12 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-400">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/12 px-2 py-0.5 font-medium text-warning dark:text-warning">
               ราคาในระบบ {baht(catalogPrice)} ({priceDiff > 0 ? '+' : ''}
               {baht(priceDiff)})
               <button
@@ -341,7 +341,7 @@ function CartItemCard({
               </button>
             </span>
           ) : product ? (
-            <span className="text-emerald-600 dark:text-emerald-400">ราคาตรงกับระบบ</span>
+            <span className="text-success dark:text-success">ราคาตรงกับระบบ</span>
           ) : null}
         </div>
         <span className="font-semibold tabular-nums">{baht(item.quantity * orderedPrice)}</span>
@@ -436,7 +436,7 @@ export function OrderEditorDialog(props: OrderEditorDialogProps) {
                   <span className="text-2xl font-bold tabular-nums">{baht(cartTotal)}</span>
                 </div>
                 {amountChanged ? (
-                  <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+                  <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-warning/10 px-2.5 py-1.5 text-xs text-warning dark:text-warning">
                     <AlertTriangle className="size-3.5 shrink-0" />
                     ยอดเดิมในออเดอร์ {baht(editor.amount)} — จะถูกแทนด้วยยอดใหม่เมื่อบันทึก
                   </p>

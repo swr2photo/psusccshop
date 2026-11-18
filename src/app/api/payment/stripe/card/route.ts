@@ -133,6 +133,7 @@ export async function POST(req: NextRequest) {
       paymentMethodTypes: ['card'],
       description: `PSU SCC Shop Order #${order.ref}`,
       metadata: {
+        orderId: order.ref,
         orderRef: order.ref,
         customerEmail: order.customerEmail || userEmail,
         shopId: order.shopId || '',
@@ -189,6 +190,15 @@ export async function GET(req: NextRequest) {
     const order = orderRows[0];
     if (!order) {
       return await secureJsonResponse({ status: 'error', message: 'order not found' }, { status: 404 });
+    }
+
+    if (userEmail && order.customerEmail) {
+      if (!isResourceOwner(order.customerEmail, userEmail) && !(await isAdminEmailAsync(userEmail))) {
+        return await secureJsonResponse(
+          { status: 'error', message: 'ไม่มีสิทธิ์ตรวจสอบคำสั่งซื้อนี้' },
+          { status: 403 }
+        );
+      }
     }
 
     if (PAID_STATUSES.includes(order.status) || order.paymentVerified) {
