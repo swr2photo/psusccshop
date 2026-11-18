@@ -35,7 +35,7 @@ import { useHydrated } from '@/hooks/useHydrated';
 import ProductImage from '@/components/storefront/ProductImage';
 import { getCart, saveCart as saveCartApi, getPublicConfig } from '@/lib/api-client';
 import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
-import { ensureUniqueCartLineIds } from '@/lib/shop-constants';
+import { ensureUniqueCartLineIds, isProductCurrentlyOpen, isProductOutOfStock } from '@/lib/shop-constants';
 
 export default function StandaloneCartPage() {
   const { lang } = useTranslation();
@@ -134,6 +134,25 @@ export default function StandaloneCartPage() {
     }
     return map;
   }, [shops, mainProducts]);
+
+  // Automatically remove any item whose product is not yet open (COMING_SOON), ended, inactive, or out of stock
+  useEffect(() => {
+    if (!mounted || cart.length === 0) return;
+    if (Object.keys(catalogMap).length === 0) return;
+    const now = new Date();
+    const validCart = cart.filter((item: any) => {
+      const pId = item.productId || item.id?.split('-')[0];
+      const catProd = catalogMap[pId];
+      if (!catProd) return true;
+      return isProductCurrentlyOpen(catProd, now) && !isProductOutOfStock(catProd);
+    });
+    if (validCart.length !== cart.length) {
+      setCart(validCart as any);
+      if (email) {
+        void saveCartApi(email, validCart as any).catch(() => {});
+      }
+    }
+  }, [mounted, cart, catalogMap, setCart, email]);
 
   const persistServerCart = (nextCart: any[]) => {
     if (email) {

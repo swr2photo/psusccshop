@@ -141,19 +141,21 @@ export async function POST(req: NextRequest) {
 
     const now = new Date();
     const catalogCache = new Map<string, Product[]>();
+    const validCart: CartItemLike[] = [];
 
     for (const item of cart) {
       const products = await resolveProductsForCartItem(item, catalogCache);
       const prod = products.find((p) => p.id === item.productId);
-      // We no longer block saving the cart if an item is expired, missing, or out of stock.
-      // The frontend UI handles displaying these states (e.g. disabled, "out of stock" label).
-      // Validation for purchasing happens in the checkout route (POST /api/orders).
+      if (!prod) continue;
+      if (!isProductCurrentlyOpen(prod, now)) continue;
+      if (isProductOutOfStock(prod)) continue;
+      validCart.push(item);
     }
 
     // Get old cart for comparison
     const oldCart = (await getJson(cartKey(email))) || [];
 
-    await putJson(cartKey(email), cart);
+    await putJson(cartKey(email), validCart);
     
     // Log cart change (only if items changed significantly)
     const oldCount = Array.isArray(oldCart) ? oldCart.length : 0;

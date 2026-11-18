@@ -44,7 +44,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useSession } from 'next-auth/react';
 import { apiFetch, getCart, getProfile, getPublicConfig, saveCart as saveCartApi, saveProfile as saveProfileApi } from '@/lib/api-client';
 import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
-import { ensureUniqueCartLineIds } from '@/lib/shop-constants';
+import { ensureUniqueCartLineIds, isProductCurrentlyOpen, isProductOutOfStock } from '@/lib/shop-constants';
 import { ShippingConfig, ShippingOption } from '@/lib/shipping';
 import { usePageShipping, usePagePaymentConfig } from '@/hooks/usePageData';
 import { useHydrated } from '@/hooks/useHydrated';
@@ -124,6 +124,25 @@ export default function StandaloneCheckoutPage() {
       active = false;
     };
   }, []);
+
+  // Automatically prune any cart item whose product is not currently open (COMING_SOON / ORDER_ENDED) or out of stock
+  useEffect(() => {
+    if (!mounted || cart.length === 0) return;
+    if (Object.keys(catalogMap).length === 0) return;
+    const now = new Date();
+    const validCart = cart.filter((item: any) => {
+      const pId = item.productId || item.id?.split('-')[0];
+      const catProd = catalogMap[pId];
+      if (!catProd) return true;
+      return isProductCurrentlyOpen(catProd, now) && !isProductOutOfStock(catProd);
+    });
+    if (validCart.length !== cart.length) {
+      setCart(validCart as any);
+      if (session?.user?.email) {
+        void saveCartApi(session.user.email, validCart as any).catch(() => {});
+      }
+    }
+  }, [mounted, cart, catalogMap, setCart, session?.user?.email]);
 
   // Flush any queued items added from the Flagship 360° page into the cart store
   useEffect(() => {

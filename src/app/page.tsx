@@ -567,7 +567,7 @@ const normalizeStatus = (status: string) => (status || '').trim().toUpperCase();
 // Check if product is currently open based on startDate/endDate
 const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?: string; endDate?: string }, nowOverride?: Date): boolean => {
   if (!product.isActive) return false;
-  const now = nowOverride || new Date();
+  const now = (nowOverride && !isNaN(nowOverride.getTime())) ? nowOverride : new Date();
   const start = product.startDate && isValidDate(product.startDate) ? parseThailandDateTime(product.startDate, false) : null;
   const end = product.endDate && isValidDate(product.endDate) ? parseThailandDateTime(product.endDate, true) : null;
   // Not yet started
@@ -2151,6 +2151,27 @@ export default function HomePage() {
     // Block cart operations when shop is closed
     if (!activeProductCatalog.isOpen) {
       showToast('warning', t.checkout.shopClosedWarning);
+      return null;
+    }
+
+    // Block cart operations if product is not currently open (e.g. COMING_SOON / ORDER_ENDED / inactive)
+    if (!selectedProduct || getProductStatus(selectedProduct, now) !== 'OPEN' || !isProductCurrentlyOpen(selectedProduct, now)) {
+      const status = selectedProduct ? getProductStatus(selectedProduct, now) : 'TEMPORARILY_CLOSED';
+      const toast = getProductUnavailableToast({
+        status,
+        outOfStock: selectedProduct ? isProductOutOfStock(selectedProduct) : false,
+        productName: selectedProduct ? getProductName(selectedProduct, lang) : '',
+        labels: {
+          comingSoon: t.shopStatus.comingSoon,
+          waitingToOpen: t.shopStatus.waitingToOpen,
+          orderEnded: t.shopStatus.closedEnded,
+          closed: t.shopStatus.closed,
+          soldOut: t.product.soldOut,
+          unavailable: lang === 'en' ? 'This product is not open for ordering yet' : 'สินค้านี้ยังไม่เปิดให้สั่งซื้อ',
+        },
+      });
+      showToast(toast.severity, toast.message);
+      resetProductDialog();
       return null;
     }
     

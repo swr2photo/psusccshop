@@ -1316,6 +1316,26 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       return null;
     }
 
+    if (getProductStatus(selectedProduct, now) !== 'OPEN') {
+      const status = getProductStatus(selectedProduct, now);
+      const toast = getProductUnavailableToast({
+        status,
+        outOfStock: false,
+        productName: getProductName(selectedProduct, lang),
+        labels: {
+          comingSoon: t.shopStatus.comingSoon,
+          waitingToOpen: t.shopStatus.waitingToOpen,
+          orderEnded: t.shopStatus.closedEnded,
+          closed: t.shopStatus.closed,
+          soldOut: t.product.soldOut,
+          unavailable: lang === 'en' ? 'This product is not open for ordering yet' : 'สินค้านี้ยังไม่เปิดให้สั่งซื้อ',
+        },
+      });
+      showToast(toast.severity, toast.message);
+      setSelectedProduct(null);
+      return null;
+    }
+
     const needsSize = productRequiresSize(selectedProduct);
     const hasVariants = !needsSize && !!selectedProduct.variants?.length;
 

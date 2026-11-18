@@ -453,7 +453,7 @@ export const parseThailandDateTime = (dateString: string, isEnd: boolean): Date 
 
 export const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?: string; endDate?: string }, nowOverride?: Date): boolean => {
   if (!product.isActive) return false;
-  const now = nowOverride || new Date();
+  const now = (nowOverride && !isNaN(nowOverride.getTime())) ? nowOverride : new Date();
   const start = product.startDate && isValidDate(product.startDate) ? parseThailandDateTime(product.startDate, false) : null;
   const end = product.endDate && isValidDate(product.endDate) ? parseThailandDateTime(product.endDate, true) : null;
   if (start && now < start) return false;

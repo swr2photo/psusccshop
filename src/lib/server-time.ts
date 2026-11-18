@@ -1,4 +1,6 @@
 // Client-side server time synchronization helper
+import { apiFetch } from '@/lib/api-client';
+
 let timeOffset = 0; // ms difference: serverTime - clientTime
 let isInitialized = false;
 let syncPromise: Promise<void> | null = null;
@@ -16,18 +18,24 @@ export async function initServerTimeSync(): Promise<void> {
   syncPromise = (async () => {
     try {
       const start = Date.now();
-      const res = await fetch('/api/time');
+      const res = await apiFetch('/api/time');
       const end = Date.now();
 
       if (res.ok) {
         const data = await res.json();
-        const serverTime = new Date(data.timestamp).getTime();
-        // Estimate network latency (round-trip / 2)
-        const latency = (end - start) / 2;
-        const clientTimeAtServerMoment = start + latency;
-        timeOffset = serverTime - clientTimeAtServerMoment;
-        isInitialized = true;
-        console.log(`[ServerTimeSync] Synced. Latency: ${latency}ms, Offset: ${timeOffset}ms`);
+        const rawTs = data?.timestamp ?? data?.data?.timestamp;
+        const serverTime = rawTs ? new Date(rawTs).getTime() : NaN;
+        if (Number.isFinite(serverTime)) {
+          // Estimate network latency (round-trip / 2)
+          const latency = (end - start) / 2;
+          const clientTimeAtServerMoment = start + latency;
+          const computedOffset = serverTime - clientTimeAtServerMoment;
+          if (Number.isFinite(computedOffset)) {
+            timeOffset = computedOffset;
+            isInitialized = true;
+            console.log(`[ServerTimeSync] Synced. Latency: ${latency}ms, Offset: ${timeOffset}ms`);
+          }
+        }
       }
     } catch (error) {
       console.warn('[ServerTimeSync] Failed to sync server time:', error);
@@ -45,5 +53,6 @@ export function getSyncedDate(): Date {
   if (!isInitialized && isBrowser()) {
     void initServerTimeSync();
   }
-  return new Date(Date.now() + timeOffset);
+  const safeOffset = Number.isFinite(timeOffset) ? timeOffset : 0;
+  return new Date(Date.now() + safeOffset);
 }

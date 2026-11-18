@@ -85,7 +85,7 @@ const isValidDate = (dateString?: string): boolean => {
 
 // Helper to determine shop status
 export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: string, nowOverride?: Date): ShopStatusType => {
-  const now = nowOverride || new Date();
+  const now = (nowOverride && !isNaN(nowOverride.getTime())) ? nowOverride : new Date();
   
   // Check if shop is explicitly closed
   if (!isOpen) return 'TEMPORARILY_CLOSED';
@@ -107,7 +107,7 @@ export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: st
 
 // Helper to determine product status
 export const getProductStatus = (product: { isActive?: boolean; startDate?: string; endDate?: string }, nowOverride?: Date): ShopStatusType => {
-  const now = nowOverride || new Date();
+  const now = (nowOverride && !isNaN(nowOverride.getTime())) ? nowOverride : new Date();
   const start = isValidDate(product.startDate) ? parseThailandDateTime(product.startDate!, false) : null;
   const end = isValidDate(product.endDate) ? parseThailandDateTime(product.endDate!, true) : null;
   
