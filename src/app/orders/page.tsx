@@ -4,8 +4,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Typography } from '@mui/material';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { Clock, MapPin, Package, X } from 'lucide-react';
+import { signIn, useSession } from 'next-auth/react';
+import { Clock, LogIn, MapPin, Package, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import OrderHistoryDrawer from '@/components/OrderHistoryDrawer';
@@ -163,31 +163,86 @@ export default function StandaloneOrdersPage() {
     <>
       <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background)', color: 'var(--foreground)' }}>
         <StorefrontNavbar />
+
+        {sessionStatus === 'unauthenticated' && !email && (
+          <Box
+            sx={{
+              maxWidth: 1080,
+              mx: 'auto',
+              px: { xs: 2, sm: 3, md: 4 },
+              pt: { xs: 2.5, md: 3.5 },
+            }}
+          >
+            <Box
+              sx={{
+                p: { xs: 2, sm: 2.5 },
+                borderRadius: '18px',
+                bgcolor: 'rgba(0,113,227,0.08)',
+                border: '1px solid rgba(0,113,227,0.24)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 1.5,
+              }}
+            >
+              <Box>
+                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  {lang === 'en' ? 'Sign in to view your orders' : 'เข้าสู่ระบบเพื่อดูประวัติคำสั่งซื้อของคุณ'}
+                </Typography>
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mt: 0.25 }}>
+                  {lang === 'en'
+                    ? 'Sign in with the Google account used when placing your order.'
+                    : 'กรุณาเข้าสู่ระบบด้วยบัญชี Google ที่ใช้สั่งซื้อเพื่อซิงก์รายการคำสั่งซื้อและใบเสร็จรับเงิน'}
+                </Typography>
+              </Box>
+              <Button
+                onClick={() => { void signIn('google'); }}
+                startIcon={<LogIn size={16} />}
+                sx={{
+                  px: 2.25,
+                  py: 0.9,
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                  color: '#fff',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  boxShadow: '0 4px 12px rgba(0,113,227,0.28)',
+                  '&:hover': { opacity: 0.92 },
+                }}
+              >
+                {lang === 'en' ? 'Sign in with Google' : 'เข้าสู่ระบบด้วย Google'}
+              </Button>
+            </Box>
+          </Box>
+        )}
+
+        <OrderHistoryDrawer
+          standalone
+          open
+          onClose={() => router.push('/')}
+          orderHistory={orders}
+          loadingHistory={loading || sessionStatus === 'loading'}
+          loadingHistoryMore={loadingMore}
+          historyHasMore={hasMore}
+          historyFilter={filter}
+          onFilterChange={setFilter}
+          onLoadMore={() => { void loadPage(true); }}
+          onOpenPayment={(ref) => router.push(`/payment/${encodeURIComponent(ref)}`)}
+          onCancelOrder={setConfirmCancelRef}
+          onShowQR={setQrOrderRef}
+          cancellingRef={cancellingRef}
+          isShopOpen={isShopOpen}
+          realtimeConnected={realtime.isConnected}
+          config={config}
+          onImageClick={setLightboxImage}
+          onRefundRequested={() => { void loadPage(false, true); }}
+          onBrowseShop={() => router.push('/shop')}
+        />
+
         <MobileBottomNav activeKey="history" />
       </Box>
-
-      <OrderHistoryDrawer
-        standalone
-        open
-        onClose={() => router.push('/')}
-        orderHistory={orders}
-        loadingHistory={loading || sessionStatus === 'loading'}
-        loadingHistoryMore={loadingMore}
-        historyHasMore={hasMore}
-        historyFilter={filter}
-        onFilterChange={setFilter}
-        onLoadMore={() => { void loadPage(true); }}
-        onOpenPayment={(ref) => router.push(`/payment/${encodeURIComponent(ref)}`)}
-        onCancelOrder={setConfirmCancelRef}
-        onShowQR={setQrOrderRef}
-        cancellingRef={cancellingRef}
-        isShopOpen={isShopOpen}
-        realtimeConnected={realtime.isConnected}
-        config={config}
-        onImageClick={setLightboxImage}
-        onRefundRequested={() => { void loadPage(false, true); }}
-        onBrowseShop={() => router.push('/shop')}
-      />
 
       <Dialog
         open={Boolean(lightboxImage)}

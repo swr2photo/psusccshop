@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
         width: 130,
         margin: 1,
         errorCorrectionLevel: 'M',
-        color: { dark: '#047857', light: '#ffffff' },
+        color: { dark: '#1e3a5f', light: '#ffffff' },
       });
     } catch (pQrErr) {
       console.error('[PaymentNotice] Payment QR generate failed:', pQrErr);
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
         'Cache-Control': API_CACHE.private,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Payment notice error';
     console.error('GET /api/payment-notice error:', error);
     return await secureJsonResponse({ error: message }, { status: 500 });

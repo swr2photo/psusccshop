@@ -9,7 +9,7 @@ import {
   X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Download,
   Copy, Smartphone, Sparkles, AlertTriangle, Info, Mail, FileText, Printer, Headphones, Maximize2,
 } from 'lucide-react';
-import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Checkbox, FormControlLabel, TextField } from '@mui/material';
+import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
 import { PaymentCountdown } from './OrderCountdown';
 import StripePromptPay from './StripePromptPay';
@@ -144,10 +144,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess, standalone 
   const [stripeEnabled, setStripeEnabled] = useState(false);
   const [payMethod, setPayMethod] = useState<'stripe' | 'manual'>('manual');
 
-  const [wantFullReceipt, setWantFullReceipt] = useState(false);
-  const [receiptTaxOrStudentId, setReceiptTaxOrStudentId] = useState('');
-  const [receiptOrgName, setReceiptOrgName] = useState('');
-  const [receiptAddress, setReceiptAddress] = useState('');
+  const wantFullReceipt = false;
+  const receiptTaxOrStudentId = '';
+  const receiptOrgName = '';
+  const receiptAddress = '';
 
   const isPaid = PAID_STATUSES.includes(orderStatus.toUpperCase());
 
@@ -1703,69 +1703,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess, standalone 
                         </Typography>
                       </Box>
                     </Box>
-                  </Box>
-                </Box>
-
-                {/* Full E-Receipt / tax invoice options */}
-                <Box className="payment-notice-no-print" sx={sectionSx}>
-                  <Box sx={sectionHeaderSx}>
-                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: NAVY }}>
-                      {lang === 'th' ? 'ใบเสร็จ / ใบกำกับภาษี' : 'Receipt / Tax invoice'}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ p: 2 }}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={wantFullReceipt}
-                          onChange={(e) => setWantFullReceipt(e.target.checked)}
-                          size="small"
-                          sx={{
-                            color: NAVY,
-                            '&.Mui-checked': { color: EMERALD },
-                          }}
-                        />
-                      }
-                      label={
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', lineHeight: 1.4 }}>
-                          {t.payment.wantFullReceipt}
-                        </Typography>
-                      }
-                      sx={{ alignItems: 'flex-start', m: 0 }}
-                    />
-                    {wantFullReceipt && (
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mt: 1.5 }}>
-                        <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                          {t.payment.receiptFieldsHint}
-                        </Typography>
-                        <TextField
-                          size="small"
-                          fullWidth
-                          label={t.payment.receiptTaxOrStudentId}
-                          value={receiptTaxOrStudentId}
-                          onChange={(e) => setReceiptTaxOrStudentId(e.target.value)}
-                          inputProps={{ maxLength: 64 }}
-                        />
-                        <TextField
-                          size="small"
-                          fullWidth
-                          label={t.payment.receiptOrgName}
-                          value={receiptOrgName}
-                          onChange={(e) => setReceiptOrgName(e.target.value)}
-                          inputProps={{ maxLength: 160 }}
-                        />
-                        <TextField
-                          size="small"
-                          fullWidth
-                          multiline
-                          minRows={2}
-                          label={t.payment.receiptAddress}
-                          value={receiptAddress}
-                          onChange={(e) => setReceiptAddress(e.target.value)}
-                          inputProps={{ maxLength: 400 }}
-                        />
-                      </Box>
-                    )}
                   </Box>
                 </Box>
 

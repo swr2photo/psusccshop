@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import {
   Box,
   Container,
@@ -32,13 +33,20 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useShopCatalog } from '@/hooks/usePageData';
 import { useHydrated } from '@/hooks/useHydrated';
 import ProductImage from '@/components/storefront/ProductImage';
+import { getCart, saveCart as saveCartApi, getPublicConfig } from '@/lib/api-client';
+import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
+import { ensureUniqueCartLineIds } from '@/lib/shop-constants';
 
 export default function StandaloneCartPage() {
   const { lang } = useTranslation();
+  const { data: session } = useSession();
+  const email = session?.user?.email;
   const cart = useCartStore((s) => s.cart);
   const removeFromCart = useCartStore((s) => s.removeFromCart);
   const updateItem = useCartStore((s) => s.updateItem);
   const clearCart = useCartStore((s) => s.clearCart);
+  const setCart = useCartStore((s) => s.setCart);
+  const [mainProducts, setMainProducts] = useState<any[]>([]);
 
   // Stock data is useful only when the persisted cart has items. Keep it
   // out of the empty-cart path and let SWR reuse the home-page catalog cache.
@@ -46,8 +54,77 @@ export default function StandaloneCartPage() {
 
   // Wait for client hydration so Zustand persist loads cart from localStorage
   const mounted = useHydrated();
+
+  // 1. Flush any pending Flagship cart queue items into the cart store on mount
+  useEffect(() => {
+    if (!mounted) return;
+    const pending = flushFlagshipCartQueue(true);
+    if (pending.length > 0) {
+      const current = useCartStore.getState().cart;
+      const merged = ensureUniqueCartLineIds([...current, ...(pending as any[])]);
+      setCart(merged as any);
+      if (email) {
+        saveCartApi(email, merged).catch(() => {});
+      }
+    }
+  }, [mounted, email, setCart]);
+
+  // 2. Sync cart from server (/api/cart) if logged in (recovers items added on / before store sync)
+  useEffect(() => {
+    if (!mounted || !email) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getCart(email);
+        if (cancelled) return;
+        const serverCart = (res.data as any)?.cart || (res as any)?.cart;
+        if (res.status !== 'success' || !Array.isArray(serverCart)) return;
+        const localCart = useCartStore.getState().cart;
+        if (serverCart.length > 0 && localCart.length === 0) {
+          setCart(ensureUniqueCartLineIds(serverCart) as any);
+        } else if (serverCart.length > 0 && localCart.length > 0) {
+          // Merge any server items whose line id is not in localCart
+          const localIds = new Set(localCart.map((i: any) => i.id));
+          const missing = serverCart.filter((i: any) => i?.id && !localIds.has(i.id));
+          if (missing.length > 0) {
+            const combined = ensureUniqueCartLineIds([...localCart, ...missing]);
+            setCart(combined as any);
+          }
+        } else if (serverCart.length === 0 && localCart.length > 0) {
+          saveCartApi(email, localCart).catch(() => {});
+        }
+      } catch (err) {
+        console.error('[CartPage] Failed to sync server cart:', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, email, setCart]);
+
+  // 3. Load main shop products for image and stock lookup
+  useEffect(() => {
+    if (!mounted || cart.length === 0) return;
+    let active = true;
+    getPublicConfig()
+      .then((res) => {
+        if (!active || res.status !== 'success') return;
+        const cfg = (res.data as any) || (res as any).config;
+        if (Array.isArray(cfg?.products)) {
+          setMainProducts(cfg.products);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [mounted, cart.length]);
+
   const catalogMap = useMemo(() => {
     const map: Record<string, any> = {};
+    for (const p of mainProducts) {
+      if (p?.id) map[p.id] = p;
+    }
     if (Array.isArray(shops)) {
       for (const s of shops) {
         for (const p of s.products || []) {
@@ -56,7 +133,13 @@ export default function StandaloneCartPage() {
       }
     }
     return map;
-  }, [shops]);
+  }, [shops, mainProducts]);
+
+  const persistServerCart = (nextCart: any[]) => {
+    if (email) {
+      saveCartApi(email, nextCart).catch(() => {});
+    }
+  };
 
   const getItemUnitPrice = (item: any) => Number(item.unitPrice ?? item.price ?? 0);
   const getItemQty = (item: any) => Number(item.quantity ?? item.qty ?? 1);
@@ -66,11 +149,17 @@ export default function StandaloneCartPage() {
     return getItemUnitPrice(item) * getItemQty(item);
   };
   const getItemName = (item: any) => item.productName || item.name || 'สินค้า';
-  const getItemImageSources = (item: any) => [
-    item.image,
-    item.coverImage,
-    ...(Array.isArray(item.images) ? item.images : []),
-  ];
+  const getItemImageSources = (item: any) => {
+    const pId = item.productId || item.id?.split('-')[0];
+    const catProd = catalogMap[pId];
+    return [
+      item.image,
+      item.coverImage,
+      ...(Array.isArray(item.images) ? item.images : []),
+      catProd?.coverImage,
+      ...(Array.isArray(catProd?.images) ? catProd.images : []),
+    ].filter(Boolean);
+  };
 
   const getItemStock = (item: any): number | null => {
     const pId = item.productId || item.id?.split('-')[0];
@@ -94,9 +183,20 @@ export default function StandaloneCartPage() {
     [cart]
   );
 
+  const handleRemoveItem = (index: number) => {
+    const nextCart = cart.filter((_, i) => i !== index);
+    removeFromCart(index);
+    persistServerCart(nextCart);
+  };
+
+  const handleClearCart = () => {
+    clearCart();
+    persistServerCart([]);
+  };
+
   const handleQtyChange = (index: number, newQty: number) => {
     if (newQty <= 0) {
-      removeFromCart(index);
+      handleRemoveItem(index);
       return;
     }
     const item = cart[index];
@@ -114,6 +214,9 @@ export default function StandaloneCartPage() {
       total: unitPrice * newQty,
     };
     updateItem(index, updated);
+    const nextCart = [...cart];
+    nextCart[index] = updated;
+    persistServerCart(nextCart);
   };
 
   if (!mounted) {
@@ -214,7 +317,7 @@ export default function StandaloneCartPage() {
                 </Typography>
                 <Button
                   size="small"
-                  onClick={clearCart}
+                  onClick={handleClearCart}
                   startIcon={<Trash2 size={14} />}
                   sx={{ color: '#ef4444', textTransform: 'none', fontSize: '0.8rem' }}
                 >
@@ -270,11 +373,19 @@ export default function StandaloneCartPage() {
                           {item.size && item.size !== '-' && (
                             <Chip label={`ไซส์ ${item.size}`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#e2e8f0' }} />
                           )}
-                          {item.sleeve && (
-                            <Chip label={item.sleeve === 'LONG' ? 'แขนยาว' : 'แขนสั้น'} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#fef3c7', color: '#92400e' }} />
+                          {(item.sleeve || item.options?.isLongSleeve !== undefined) && (
+                            <Chip
+                              label={item.sleeve === 'LONG' || item.options?.isLongSleeve ? 'แขนยาว' : 'แขนสั้น'}
+                              size="small"
+                              sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#fef3c7', color: '#92400e' }}
+                            />
                           )}
-                          {item.selectedVariant && (
-                            <Chip label={item.selectedVariant.name} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#e0f2fe', color: '#0369a1' }} />
+                          {(item.selectedVariant?.name || item.options?.variantName) && (
+                            <Chip
+                              label={item.selectedVariant?.name || item.options?.variantName}
+                              size="small"
+                              sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#e0f2fe', color: '#0369a1' }}
+                            />
                           )}
                           {item.shopSlug && (
                             <Chip label={`ร้าน: ${item.shopSlug}`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#f1f5f9', color: '#475569' }} />
@@ -286,9 +397,10 @@ export default function StandaloneCartPage() {
                             <Chip label={`คงเหลือ ${maxStock} ชิ้น`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: maxStock <= 5 ? '#ffedd5' : '#f1f5f9', color: maxStock <= 5 ? '#c2410c' : '#475569' }} />
                           )}
                         </Box>
-                        {(item.customName || item.customNumber) && (
+                        {(item.customName || item.options?.customName || item.customNumber || item.options?.customNumber) && (
                           <Typography sx={{ fontSize: '0.75rem', color: '#475569' }}>
-                            สกรีน: {item.customName ? `ชื่อ ${item.customName}` : ''} {item.customNumber ? `เบอร์ ${item.customNumber}` : ''}
+                            สกรีน: {(item.customName || item.options?.customName) ? `ชื่อ ${item.customName || item.options?.customName}` : ''}{' '}
+                            {(item.customNumber || item.options?.customNumber) ? `เบอร์ ${item.customNumber || item.options?.customNumber}` : ''}
                           </Typography>
                         )}
                         <Typography sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)', mt: 0.5 }}>
@@ -318,7 +430,7 @@ export default function StandaloneCartPage() {
                           <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: 'var(--navy, #1e3a5f)' }}>
                             ฿{itemTotal.toLocaleString()}
                           </Typography>
-                          <IconButton size="small" onClick={() => removeFromCart(index)} sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}>
+                          <IconButton size="small" onClick={() => handleRemoveItem(index)} sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}>
                             <Trash2 size={16} />
                           </IconButton>
                         </Box>

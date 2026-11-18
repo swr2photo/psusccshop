@@ -22,6 +22,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import {
+  ArrowLeft,
   Camera,
   CheckCircle,
   ChevronDown,
@@ -36,6 +37,7 @@ import {
   Package,
   FileText,
   RotateCcw,
+  Search,
   ShoppingBag,
   Truck,
   X,
@@ -311,6 +313,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     onShowQR,
     cancellingRef,
     isShopOpen,
+    realtimeConnected,
     config,
     onImageClick,
     onRefundRequested,
@@ -661,6 +664,8 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     refundSelectedPayload.length > 0 &&
     refundComputedAmount > 0;
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Filter counts
   const filterCounts = React.useMemo(() => {
     const counts: Record<string, number> = { ALL: orderHistory.length };
@@ -671,14 +676,30 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     return counts;
   }, [orderHistory]);
 
-  // Filtered orders
+  // Filtered orders (by status tab + search query)
   const filteredOrders = React.useMemo(() => {
-    if (historyFilter === 'ALL') return orderHistory;
-    return orderHistory.filter((order) => {
-      const category = getStatusCategory(normalizeStatus(order.status));
-      return category === historyFilter;
+    const byCategory = historyFilter === 'ALL'
+      ? orderHistory
+      : orderHistory.filter((order) => {
+          const category = getStatusCategory(normalizeStatus(order.status));
+          return category === historyFilter;
+        });
+
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return byCategory;
+
+    return byCategory.filter((order) => {
+      if (order.ref?.toLowerCase().includes(q)) return true;
+      if (order.trackingNumber?.toLowerCase().includes(q)) return true;
+      const items = order.items || order.cart || [];
+      return items.some((item: any) => {
+        const name = String(item?.productName || item?.name || '').toLowerCase();
+        const size = String(item?.size || '').toLowerCase();
+        const customName = String(item?.customName || item?.options?.customName || '').toLowerCase();
+        return name.includes(q) || size.includes(q) || customName.includes(q);
+      });
     });
-  }, [orderHistory, historyFilter]);
+  }, [orderHistory, historyFilter, searchQuery]);
 
   // Progressive rendering: only mount a chunk of order cards at a time so the
   // drawer opens instantly even with a long history; more cards render as the
@@ -688,11 +709,11 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const loadingMoreLockRef = useRef(false);
 
-  // Reset chunk size when the drawer reopens or the filter changes
+  // Reset chunk size when the drawer reopens or the filter/search changes
   useEffect(() => {
     setVisibleCount(ORDERS_PER_CHUNK);
     loadingMoreLockRef.current = false;
-  }, [open, historyFilter]);
+  }, [open, historyFilter, searchQuery]);
 
   const visibleOrders = React.useMemo(
     () => filteredOrders.slice(0, visibleCount),
@@ -714,8 +735,8 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     const attach = () => {
       if (cancelled) return;
       const sentinel = sentinelRef.current;
-      const root = scrollContainerRef.current;
-      if (!sentinel || !root) {
+      const root = standalone ? null : scrollContainerRef.current;
+      if (!sentinel || (!standalone && !root)) {
         raf = requestAnimationFrame(attach);
         return;
       }
@@ -744,7 +765,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       if (raf) cancelAnimationFrame(raf);
       observer?.disconnect();
     };
-  }, [open, loadingHistory, filteredOrders.length, visibleCount, historyHasMore, loadingHistoryMore]);
+  }, [open, standalone, loadingHistory, filteredOrders.length, visibleCount, historyHasMore, loadingHistoryMore]);
 
   // Release load-more lock when the remote page finishes
   useEffect(() => {
@@ -781,73 +802,418 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
 
   React.useEffect(() => { if (!open) { setDragOffset(0); setIsDragging(false); } }, [open]);
 
-  return (
-    <Drawer
-      anchor={isMobile ? 'bottom' : 'right'}
-      open={open}
-      onClose={onClose}
-      PaperProps={{
-        sx: {
-          height: isMobile ? { xs: '92vh', sm: '85vh' } : '100vh',
-          maxHeight: isMobile ? '92vh' : '100vh',
-          width: isMobile ? '100%' : '520px',
-          borderTopLeftRadius: isMobile ? { xs: 20, sm: 24 } : { xs: 0, sm: 24 },
-          borderTopRightRadius: isMobile ? { xs: 20, sm: 24 } : 0,
-          borderBottomLeftRadius: isMobile ? 0 : { xs: 0, sm: 24 },
-          bgcolor: 'var(--background)',
-          color: 'var(--foreground)',
-          overflow: 'hidden',
-          transform: isMobile && dragOffset > 0 ? `translateY(${dragOffset}px) !important` : undefined,
-          transition: isDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
+  const filterTabsBar = (
+    <Box
+      sx={{
+        display: 'flex',
+        gap: 0.5,
+        p: 0.5,
+        borderRadius: '14px',
+        bgcolor: 'var(--surface)',
+        border: '1px solid var(--glass-border)',
+        overflowX: 'auto',
+        '&::-webkit-scrollbar': { display: 'none' },
+        scrollbarWidth: 'none',
+      }}
+    >
+      {historyFilters.map((filter) => {
+        const isActive = historyFilter === filter.key;
+        const count = filterCounts[filter.key] ?? 0;
+        const isCancelled = filter.key === 'CANCELLED';
+        const showCount = filter.key === 'ALL' || count > 0;
+        return (
+          <Box
+            key={filter.key}
+            onClick={() => onFilterChange(filter.key as any)}
+            sx={{
+              px: standalone ? 1.8 : 1.4,
+              py: standalone ? 0.85 : 0.7,
+              borderRadius: '10px',
+              bgcolor: isActive ? 'var(--surface-2)' : 'transparent',
+              border: isActive ? '1px solid var(--glass-border)' : '1px solid transparent',
+              boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+              color: isActive
+                ? 'var(--foreground)'
+                : isCancelled
+                  ? 'rgba(148,163,184,0.85)'
+                  : 'var(--text-muted)',
+              fontSize: standalone ? '0.82rem' : '0.78rem',
+              fontWeight: isActive ? 700 : 500,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.6,
+              flexShrink: 0,
+              '&:hover': {
+                color: 'var(--foreground)',
+                bgcolor: isActive ? 'var(--surface-2)' : 'rgba(100,116,139,0.06)',
+              },
+            }}
+          >
+            {filterLabelMap[filter.key] || filter.label}
+            {showCount && (
+              <Box
+                component="span"
+                sx={{
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  px: 0.65,
+                  py: 0.1,
+                  borderRadius: '999px',
+                  bgcolor: isActive ? 'rgba(0,113,227,0.14)' : 'rgba(100,116,139,0.1)',
+                  color: isActive ? '#2997ff' : 'inherit',
+                  opacity: isCancelled && !isActive ? 0.55 : 1,
+                  minWidth: 18,
+                  textAlign: 'center',
+                }}
+              >
+                {count}
+              </Box>
+            )}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+
+  const searchInputBar = (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        px: 1.5,
+        py: 0.75,
+        borderRadius: '12px',
+        bgcolor: 'var(--surface)',
+        border: '1px solid var(--glass-border)',
+        flex: standalone ? { xs: '1 1 100%', md: '0 1 320px' } : '1 1 auto',
+        transition: 'border-color 0.15s ease',
+        '&:focus-within': {
+          borderColor: '#0071e3',
         },
       }}
     >
+      <Search size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <Box
+        component="input"
+        type="text"
+        value={searchQuery}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+        placeholder={
+          lang === 'en'
+            ? 'Search order #ref, product, size, tracking...'
+            : 'ค้นหาเลขคำสั่งซื้อ (#ORD-...), ชื่อสินค้า, เลขพัสดุ...'
+        }
+        sx={{
+          border: 'none',
+          outline: 'none',
+          background: 'transparent',
+          color: 'var(--foreground)',
+          fontSize: '0.82rem',
+          width: '100%',
+          fontFamily: 'inherit',
+          '&::placeholder': {
+            color: 'var(--text-muted)',
+            opacity: 0.75,
+          },
+        }}
+      />
+      {searchQuery && (
+        <IconButton
+          size="small"
+          onClick={() => setSearchQuery('')}
+          sx={{ p: 0.25, color: 'var(--text-muted)', '&:hover': { color: 'var(--foreground)' } }}
+        >
+          <X size={14} />
+        </IconButton>
+      )}
+    </Box>
+  );
+
+  const innerContent = (
+    <>
       {/* Header */}
-      <Box sx={{
-        px: { xs: 2, sm: 3 },
-        py: { xs: 1.5, sm: 2 },
-        borderBottom: '1px solid var(--glass-border)',
-        background: 'var(--glass-strong)',
-        backdropFilter: 'blur(20px)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-      }}>
-        {/* Drag Handle - Swipe to dismiss */}
-        {isMobile && (
+      {standalone ? (
+        <Box sx={{ mb: 3 }}>
+          {/* Top navigation & live status bar */}
           <Box
-            onTouchStart={handleSwipeStart}
-            onTouchMove={handleSwipeMove}
-            onTouchEnd={handleSwipeEnd}
-            sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.5, cursor: 'grab', touchAction: 'none' }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 1.5,
+              mb: 2,
+            }}
           >
-            <Box sx={{ width: isDragging ? 48 : 36, height: 4, bgcolor: isDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 2, transition: 'all 0.2s ease' }} />
-          </Box>
-        )}
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-              display: 'grid',
-              placeItems: 'center',
-            }}>
-              <Package size={20} color="white" />
+            <Button
+              onClick={onClose}
+              startIcon={<ArrowLeft size={16} />}
+              sx={{
+                px: 1.75,
+                py: 0.75,
+                borderRadius: '10px',
+                bgcolor: 'var(--surface)',
+                border: '1px solid var(--glass-border)',
+                color: 'var(--foreground)',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                textTransform: 'none',
+                '&:hover': { bgcolor: 'var(--surface-2)' },
+              }}
+            >
+              {lang === 'en' ? 'Back to Store' : 'กลับหน้าร้าน'}
+            </Button>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: '999px',
+                  bgcolor: realtimeConnected ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
+                  border: `1px solid ${realtimeConnected ? 'rgba(16,185,129,0.28)' : 'var(--glass-border)'}`,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    bgcolor: realtimeConnected ? '#10b981' : '#94a3b8',
+                    boxShadow: realtimeConnected ? '0 0 8px #10b981' : 'none',
+                  }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: realtimeConnected ? '#10b981' : 'var(--text-muted)',
+                  }}
+                >
+                  {realtimeConnected
+                    ? lang === 'en'
+                      ? 'Live Sync'
+                      : 'อัปเดตสถานะอัตโนมัติ'
+                    : lang === 'en'
+                      ? 'Standard Sync'
+                      : 'โหมดปกติ'}
+                </Typography>
+              </Box>
+
+              {onBrowseShop && (
+                <Button
+                  onClick={onBrowseShop}
+                  startIcon={<ShoppingBag size={15} />}
+                  sx={{
+                    px: 1.75,
+                    py: 0.75,
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                    color: '#fff',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    boxShadow: '0 4px 12px rgba(0,113,227,0.25)',
+                    '&:hover': { opacity: 0.92 },
+                  }}
+                >
+                  {lang === 'en' ? 'Browse Shop' : 'เลือกซื้อสินค้า'}
+                </Button>
+              )}
             </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                {t.orderHistory.title}
-              </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {orderHistory.length} {t.common.items}
-              </Typography>
+          </Box>
+
+          {/* Hero Banner + KPI Summary Strip */}
+          <Box
+            sx={{
+              p: { xs: 2.25, sm: 3 },
+              borderRadius: '22px',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
+              backgroundImage:
+                'radial-gradient(circle at 100% 0%, rgba(0,113,227,0.12), transparent 55%), radial-gradient(circle at 0% 100%, rgba(16,185,129,0.08), transparent 50%)',
+              mb: 2.5,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75 }}>
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    boxShadow: '0 8px 20px rgba(0,113,227,0.28)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Package size={24} color="white" />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' }, fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
+                    {t.orderHistory.title}
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.82rem', color: 'var(--text-muted)', mt: 0.25 }}>
+                    {lang === 'en'
+                      ? 'Track order status, attach payment slips, follow shipments, and download official receipts.'
+                      : 'ติดตามสถานะคำสั่งซื้อ แนบสลิปชำระเงิน ตรวจสอบเลขพัสดุ และดาวน์โหลดใบเสร็จรับเงินอิเล็กทรอนิกส์'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* 4 Interactive KPI Summary Cards */}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+                gap: 1.25,
+                mt: 2.5,
+              }}
+            >
+              {[
+                {
+                  key: 'ALL' as const,
+                  label: lang === 'en' ? 'All Orders' : 'คำสั่งซื้อทั้งหมด',
+                  value: filterCounts.ALL || 0,
+                  accent: '#2997ff',
+                  bg: 'rgba(0,113,227,0.08)',
+                  border: 'rgba(0,113,227,0.22)',
+                  icon: <Package size={16} />,
+                },
+                {
+                  key: 'WAITING_PAYMENT' as const,
+                  label: lang === 'en' ? 'Awaiting Payment' : 'รอชำระเงิน',
+                  value: filterCounts.WAITING_PAYMENT || 0,
+                  accent: '#f59e0b',
+                  bg: 'rgba(245,158,11,0.08)',
+                  border: 'rgba(245,158,11,0.24)',
+                  icon: <Clock size={16} />,
+                },
+                {
+                  key: 'SHIPPED' as const,
+                  label: lang === 'en' ? 'In Transit' : 'กำลังจัดส่ง',
+                  value: filterCounts.SHIPPED || 0,
+                  accent: '#0ea5e9',
+                  bg: 'rgba(14,165,233,0.08)',
+                  border: 'rgba(14,165,233,0.24)',
+                  icon: <Truck size={16} />,
+                },
+                {
+                  key: 'COMPLETED' as const,
+                  label: lang === 'en' ? 'Paid & Completed' : 'ชำระแล้ว / สำเร็จ',
+                  value: (filterCounts.COMPLETED || 0) + (filterCounts.RECEIVED || 0),
+                  accent: '#10b981',
+                  bg: 'rgba(16,185,129,0.08)',
+                  border: 'rgba(16,185,129,0.24)',
+                  icon: <CheckCircle size={16} />,
+                },
+              ].map((card) => {
+                const active = historyFilter === card.key;
+                return (
+                  <Box
+                    key={card.key}
+                    onClick={() => onFilterChange(card.key)}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: '14px',
+                      bgcolor: active ? card.bg : 'var(--surface)',
+                      border: `1px solid ${active ? card.accent : 'var(--glass-border)'}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.18s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: 0.75,
+                      '&:hover': {
+                        borderColor: card.border,
+                        transform: 'translateY(-1px)',
+                      },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                        {card.label}
+                      </Typography>
+                      <Box sx={{ color: card.accent, display: 'flex', alignItems: 'center' }}>{card.icon}</Box>
+                    </Box>
+                    <Typography sx={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.1 }}>
+                      {card.value.toLocaleString()}
+                    </Typography>
+                  </Box>
+                );
+              })}
             </Box>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            {!standalone && (
+
+          {/* Search & Filter Row */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: { xs: 'stretch', md: 'center' },
+              justifyContent: 'space-between',
+              gap: 1.25,
+            }}
+          >
+            {filterTabsBar}
+            {searchInputBar}
+          </Box>
+        </Box>
+      ) : (
+        <Box sx={{
+          px: { xs: 2, sm: 3 },
+          py: { xs: 1.5, sm: 2 },
+          borderBottom: '1px solid var(--glass-border)',
+          background: 'var(--glass-strong)',
+          backdropFilter: 'blur(20px)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}>
+          {/* Drag Handle - Swipe to dismiss */}
+          {isMobile && (
+            <Box
+              onTouchStart={handleSwipeStart}
+              onTouchMove={handleSwipeMove}
+              onTouchEnd={handleSwipeEnd}
+              sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.5, cursor: 'grab', touchAction: 'none' }}
+            >
+              <Box sx={{ width: isDragging ? 48 : 36, height: 4, bgcolor: isDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 2, transition: 'all 0.2s ease' }} />
+            </Box>
+          )}
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{
+                width: 40,
+                height: 40,
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                display: 'grid',
+                placeItems: 'center',
+              }}>
+                <Package size={20} color="white" />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  {t.orderHistory.title}
+                </Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {orderHistory.length} {t.common.items}
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <IconButton
                 component={Link}
                 href="/orders"
@@ -858,97 +1224,44 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               >
                 <Maximize2 size={18} />
               </IconButton>
-            )}
-            <IconButton onClick={onClose} sx={{ color: 'var(--text-muted)' }}>
-              <X size={20} />
-            </IconButton>
+              <IconButton onClick={onClose} sx={{ color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </IconButton>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {searchInputBar}
+            {filterTabsBar}
           </Box>
         </Box>
-
-        {/* Filter Tabs — muted segmented control */}
-        <Box
-          sx={{
-            display: 'flex',
-            gap: 0.4,
-            p: 0.45,
-            borderRadius: '14px',
-            bgcolor: 'var(--surface)',
-            border: '1px solid var(--glass-border)',
-            overflowX: 'auto',
-            '&::-webkit-scrollbar': { display: 'none' },
-            scrollbarWidth: 'none',
-          }}
-        >
-          {historyFilters.map((filter) => {
-            const isActive = historyFilter === filter.key;
-            const count = filterCounts[filter.key] ?? 0;
-            const isCancelled = filter.key === 'CANCELLED';
-            const showCount = filter.key === 'ALL' || count > 0;
-            return (
-              <Box
-                key={filter.key}
-                onClick={() => onFilterChange(filter.key as any)}
-                sx={{
-                  px: 1.4,
-                  py: 0.7,
-                  borderRadius: '10px',
-                  bgcolor: isActive ? 'var(--surface-2)' : 'transparent',
-                  border: isActive ? '1px solid var(--glass-border)' : '1px solid transparent',
-                  boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
-                  color: isActive
-                    ? 'var(--foreground)'
-                    : isCancelled
-                      ? 'rgba(148,163,184,0.85)'
-                      : 'var(--text-muted)',
-                  fontSize: '0.78rem',
-                  fontWeight: isActive ? 700 : 500,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.6,
-                  flexShrink: 0,
-                  '&:hover': {
-                    color: 'var(--foreground)',
-                    bgcolor: isActive ? 'var(--surface-2)' : 'rgba(100,116,139,0.06)',
-                  },
-                }}
-              >
-                {filterLabelMap[filter.key] || filter.label}
-                {showCount && (
-                  <Box
-                    component="span"
-                    sx={{
-                      fontSize: '0.68rem',
-                      fontWeight: 600,
-                      opacity: isCancelled && !isActive ? 0.55 : isActive ? 0.85 : 0.65,
-                      color: 'inherit',
-                      minWidth: 14,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {count}
-                  </Box>
-                )}
-              </Box>
-            );
-          })}
-        </Box>
-      </Box>
+      )}
 
       {/* Content */}
       <Box ref={scrollContainerRef} sx={{
         flex: 1,
-        overflow: 'auto',
-        px: { xs: 1.5, sm: 2.5 },
-        py: 2,
+        overflow: standalone ? 'visible' : 'auto',
+        px: standalone ? 0 : { xs: 1.5, sm: 2.5 },
+        py: standalone ? 0 : 2,
         WebkitOverflowScrolling: 'touch',
       }}>
         {loadingHistory ? (
           <OrderListSkeleton count={4} ariaLabel={t.orderHistory.loading} />
         ) : filteredOrders.length === 0 ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2, px: 2 }}>
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: 8,
+            gap: 2,
+            px: 2,
+            ...(standalone ? {
+              borderRadius: '22px',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
+            } : {}),
+          }}>
             <Box sx={{
               width: 88,
               height: 88,
@@ -961,42 +1274,65 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               <Package size={36} style={{ color: 'var(--text-muted)', opacity: 0.7 }} />
             </Box>
             <Typography sx={{ color: 'var(--foreground)', fontSize: '0.98rem', fontWeight: 700, textAlign: 'center' }}>
-              {t.orderHistory.empty}
+              {searchQuery.trim()
+                ? (lang === 'en' ? 'No orders match your search' : 'ไม่พบคำสั่งซื้อที่ตรงกับคำค้นหา')
+                : t.orderHistory.empty}
             </Typography>
             <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center' }}>
-              {historyFilter === 'ALL' ? t.orderHistory.noOrders : t.orderHistory.tryFilter}
+              {searchQuery.trim()
+                ? (lang === 'en' ? 'Try searching with a different order reference or product name.' : 'ลองค้นหาด้วยรหัสคำสั่งซื้อหรือชื่อสินค้าอื่น')
+                : historyFilter === 'ALL' ? t.orderHistory.noOrders : t.orderHistory.tryFilter}
             </Typography>
-            <Button
-              onClick={() => {
-                if (standalone && onBrowseShop) {
-                  onBrowseShop();
-                } else {
-                  onClose();
-                  onBrowseShop?.();
-                }
-              }}
-              startIcon={<ShoppingBag size={16} />}
-              sx={{
-                mt: 1,
-                px: 2.5,
-                py: 1,
-                borderRadius: '12px',
-                textTransform: 'none',
-                fontWeight: 700,
-                bgcolor: 'var(--foreground)',
-                color: 'var(--background)',
-                '&:hover': { opacity: 0.9, bgcolor: 'var(--foreground)' },
-              }}
-            >
-              {t.orderHistory.goShop}
-            </Button>
+            {searchQuery.trim() ? (
+              <Button
+                onClick={() => setSearchQuery('')}
+                sx={{
+                  mt: 0.5,
+                  px: 2.5,
+                  py: 0.9,
+                  borderRadius: '12px',
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  bgcolor: 'var(--surface)',
+                  border: '1px solid var(--glass-border)',
+                  color: 'var(--foreground)',
+                }}
+              >
+                {lang === 'en' ? 'Clear search' : 'ล้างคำค้นหา'}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  if (standalone && onBrowseShop) {
+                    onBrowseShop();
+                  } else {
+                    onClose();
+                    onBrowseShop?.();
+                  }
+                }}
+                startIcon={<ShoppingBag size={16} />}
+                sx={{
+                  mt: 1,
+                  px: 2.5,
+                  py: 1,
+                  borderRadius: '12px',
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  bgcolor: 'var(--foreground)',
+                  color: 'var(--background)',
+                  '&:hover': { opacity: 0.9, bgcolor: 'var(--foreground)' },
+                }}
+              >
+                {t.orderHistory.goShop}
+              </Button>
+            )}
           </Box>
         ) : (
           <Box sx={{
             display: 'flex',
             flexDirection: 'column',
             gap: 2,
-            maxWidth: 800,
+            maxWidth: standalone ? '100%' : 800,
             mx: 'auto',
             width: '100%',
           }}>
@@ -1105,7 +1441,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           <IconButton
                             component={Link}
                             href={`/orders/${encodeURIComponent(order.ref)}`}
-                            onClick={(e) => { e.stopPropagation(); onClose(); }}
+                            onClick={(e) => { e.stopPropagation(); if (!standalone) onClose(); }}
                             size="small"
                             title="เปิดหน้าติดตามคำสั่งซื้อแบบเต็ม"
                             sx={{ color: 'var(--text-muted)', p: 0.25, '&:hover': { color: 'var(--foreground)' } }}
@@ -1313,12 +1649,36 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           {cancellingRef === order.ref ? t.orderHistory.cancelling : t.orderHistory.cancelOrder}
                         </Button>
                       )}
+                      {canViewReceipt && (
+                        <Button
+                          size="small"
+                          onClick={() => openReceipt(order.ref)}
+                          disabled={openingReceiptRef === order.ref}
+                          startIcon={
+                            openingReceiptRef === order.ref ? (
+                              <CircularProgress size={12} sx={{ color: '#2997ff' }} />
+                            ) : (
+                              <FileText size={14} />
+                            )
+                          }
+                          sx={{
+                            ...actionBtnSx,
+                            flex: '0 0 auto',
+                            bgcolor: 'rgba(0,113,227,0.08)',
+                            border: '1px solid rgba(0,113,227,0.2)',
+                            color: '#2997ff',
+                            '&:hover': { bgcolor: 'rgba(0,113,227,0.15)' },
+                          }}
+                        >
+                          {t.invoice?.download || (lang === 'en' ? 'View receipt' : 'ดูใบเสร็จ')}
+                        </Button>
+                      )}
                       <Button
                         size="small"
                         onClick={() => toggleExpanded(order.ref)}
                         sx={{
                           ...actionBtnSx,
-                          flex: canPay || canTrack || canReorder ? '0 0 auto' : 1,
+                          flex: canPay || canTrack || canReorder || canViewReceipt ? '0 0 auto' : 1,
                           bgcolor: 'transparent',
                           border: '1px solid var(--glass-border)',
                           color: 'var(--text-muted)',
@@ -1870,31 +2230,33 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       </Box>
 
       {/* Bottom */}
-      <Box sx={{
-        px: { xs: 2, sm: 3 },
-        py: 1.5,
-        borderTop: '1px solid var(--glass-border)',
-        background: 'var(--glass-strong)',
-        backdropFilter: 'blur(20px)',
-        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-      }}>
-        <Button
-          fullWidth
-          onClick={onClose}
-          sx={{
-            py: 1.3,
-            borderRadius: '12px',
-            bgcolor: 'var(--glass-bg)',
-            color: 'var(--text-muted)',
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            textTransform: 'none',
-            '&:hover': { bgcolor: 'var(--glass-bg)' },
-          }}
-        >
-          {t.common.close}
-        </Button>
-      </Box>
+      {!standalone && (
+        <Box sx={{
+          px: { xs: 2, sm: 3 },
+          py: 1.5,
+          borderTop: '1px solid var(--glass-border)',
+          background: 'var(--glass-strong)',
+          backdropFilter: 'blur(20px)',
+          paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+        }}>
+          <Button
+            fullWidth
+            onClick={onClose}
+            sx={{
+              py: 1.3,
+              borderRadius: '12px',
+              bgcolor: 'var(--glass-bg)',
+              color: 'var(--text-muted)',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': { bgcolor: 'var(--glass-bg)' },
+            }}
+          >
+            {t.common.close}
+          </Button>
+        </Box>
+      )}
 
       {/* Refund Request Dialog */}
       <Dialog
@@ -2371,6 +2733,50 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           </Button>
         </DialogActions>
       </Dialog>
+    </>
+  );
+
+  if (standalone) {
+    return (
+      <Box
+        component="main"
+        sx={{
+          width: '100%',
+          maxWidth: 1080,
+          mx: 'auto',
+          px: { xs: 2, sm: 3, md: 4 },
+          pt: { xs: 2.5, md: 4 },
+          pb: { xs: 12, md: 8 },
+          color: 'var(--foreground)',
+        }}
+      >
+        {innerContent}
+      </Box>
+    );
+  }
+
+  return (
+    <Drawer
+      anchor={isMobile ? 'bottom' : 'right'}
+      open={open}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          height: isMobile ? { xs: '92vh', sm: '85vh' } : '100vh',
+          maxHeight: isMobile ? '92vh' : '100vh',
+          width: isMobile ? '100%' : '520px',
+          borderTopLeftRadius: isMobile ? { xs: 20, sm: 24 } : { xs: 0, sm: 24 },
+          borderTopRightRadius: isMobile ? { xs: 20, sm: 24 } : 0,
+          borderBottomLeftRadius: isMobile ? 0 : { xs: 0, sm: 24 },
+          bgcolor: 'var(--background)',
+          color: 'var(--foreground)',
+          overflow: 'hidden',
+          transform: isMobile && dragOffset > 0 ? `translateY(${dragOffset}px) !important` : undefined,
+          transition: isDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
+        },
+      }}
+    >
+      {innerContent}
     </Drawer>
   );
 }

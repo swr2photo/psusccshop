@@ -39,6 +39,16 @@ export interface CartItem extends Product {
   shopSlug?: string;
   /** Original product ID */
   productId?: string;
+  /** Main shop nested options compatibility */
+  options?: {
+    isLongSleeve?: boolean;
+    customName?: string;
+    customNumber?: string;
+    variantId?: string;
+    variantName?: string;
+    campId?: string;
+    shopSlug?: string;
+  };
 }
 
 interface CartState {

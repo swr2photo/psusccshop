@@ -1389,65 +1389,83 @@ export function buildPaymentNoticeHtml(
       color: var(--navy);
     }
     .pay-notice-box {
-      margin-top: 16px;
-      border: 1.5px solid #059669;
-      border-radius: 8px;
-      background: #f0fdf4;
-      padding: 12px 14px;
+      margin-top: 18px;
+      border: 1px solid var(--navy);
+      background: #ffffff;
+    }
+    .pay-notice-header {
+      background: var(--navy);
+      color: #ffffff;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 6px 12px;
+      text-transform: uppercase;
     }
     .pay-notice-box.cancelled {
-      border-color: #dc2626;
-      background: #fef2f2;
+      border-color: #991b1b;
+    }
+    .pay-notice-box.cancelled .pay-notice-header {
+      background: #991b1b;
+    }
+    .pay-notice-body {
+      padding: 12px 14px;
     }
     .pay-notice-grid {
       display: grid;
-      grid-template-columns: 130px 1fr;
+      grid-template-columns: 136px 1fr;
       gap: 16px;
       align-items: center;
     }
     .pay-qr-wrapper {
       text-align: center;
+      border-right: 1px solid var(--line);
+      padding-right: 14px;
     }
     .pay-qr-svg {
       display: inline-flex;
-      width: 120px;
-      height: 120px;
-      border: 1px solid #a7f3d0;
-      border-radius: 6px;
+      width: 116px;
+      height: 116px;
+      border: 1px solid var(--line);
       padding: 4px;
       background: #ffffff;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
     }
     .pay-qr-svg svg { width: 100%; height: 100%; display: block; }
+    .pay-qr-caption {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-top: 5px;
+    }
     .pay-qr-link {
       display: inline-block;
-      margin-top: 4px;
-      font-size: 10.5px;
-      font-weight: 700;
-      color: #047857;
+      margin-top: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--navy);
       text-decoration: underline;
     }
     .pay-steps-title {
-      font-size: 12.5px;
-      font-weight: 800;
-      color: #065f46;
-      margin-bottom: 5px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
     }
     .pay-steps-list {
-      font-size: 11px;
-      color: #1e293b;
-      margin-left: 16px;
-      line-height: 1.45;
+      font-size: 11.5px;
+      color: var(--ink);
+      margin-left: 18px;
+      line-height: 1.55;
     }
     .pay-time-badge {
-      margin-top: 8px;
-      padding: 5px 8px;
-      border-radius: 5px;
-      background: #dcfce7;
-      border: 1px solid #86efac;
-      color: #14532d;
-      font-size: 10.5px;
-      font-weight: 700;
+      margin-top: 10px;
+      padding: 7px 10px;
+      background: var(--wash);
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--navy);
+      color: var(--ink);
+      font-size: 11px;
+      line-height: 1.45;
     }
     .footer-grid {
       display: grid;
@@ -1580,16 +1598,16 @@ export function buildPaymentNoticeHtml(
 
     <div class="doc-title">
       <h1>${escapeHtml(docTitle)}</h1>
-      <div class="sub">${escapeHtml(ISSUER.shortTh)}</div>
+      <div class="sub">${escapeHtml(lang === 'th' ? 'ELECTRONIC PAYMENT NOTICE · เอกสารแจ้งยอดชำระเงินอย่างเป็นทางการ' : 'OFFICIAL ELECTRONIC BILLING STATEMENT')}</div>
     </div>
 
-    <section class="meta">
+    <section class="meta" style="border: 1px solid var(--line); background: var(--wash); padding: 12px 14px; margin-top: 14px;">
       <div>
-        <div class="label">${escapeHtml(L.customer)}</div>
+        <div class="label">${escapeHtml(lang === 'th' ? 'ชื่อผู้สั่งซื้อ / ผู้ชำระเงิน' : L.customer)}</div>
         <div class="value">${escapeHtml(customerName)}</div>
       </div>
       <div>
-        <div class="label">เลขที่หนังสือแจ้งชำระเงิน</div>
+        <div class="label">${escapeHtml(lang === 'th' ? 'เลขที่เอกสารแจ้งชำระเงิน (Document No.)' : 'Payment Notice No.')}</div>
         <div class="value mono">${escapeHtml(noticeNo)}</div>
       </div>
       <div>
@@ -1597,20 +1615,20 @@ export function buildPaymentNoticeHtml(
         <div class="value">${escapeHtml(customerEmail)}</div>
       </div>
       <div>
-        <div class="label">${escapeHtml(L.orderRef)}</div>
+        <div class="label">${escapeHtml(lang === 'th' ? 'เลขที่อ้างอิงคำสั่งซื้อ (Order Reference)' : L.orderRef)}</div>
         <div class="value mono">${escapeHtml(ref)}</div>
       </div>
       <div>
-        <div class="label">${escapeHtml(L.phone)} ${studentId ? `· รหัสนักศึกษา: ${escapeHtml(studentId)}` : ''}</div>
+        <div class="label">${escapeHtml(L.phone)}${studentId ? ` (${lang === 'th' ? 'รหัสนักศึกษา' : 'Student ID'}: ${escapeHtml(studentId)})` : ''}</div>
         <div class="value">${escapeHtml(customerPhone)}</div>
       </div>
       <div>
-        <div class="label">วันที่ออกเอกสาร</div>
+        <div class="label">${escapeHtml(lang === 'th' ? 'วันที่ออกเอกสาร (Issue Date)' : 'Issue Date')}</div>
         <div class="value">${escapeHtml(formatDateTime(orderDate, lang))}</div>
       </div>
       ${
         customerAddress
-          ? `<div style="grid-column:1/-1">
+          ? `<div style="grid-column:1/-1; border-top: 1px solid var(--line); padding-top: 8px;">
         <div class="label">${escapeHtml(L.address)}</div>
         <div class="value">${escapeHtml(customerAddress)}</div>
       </div>`
@@ -1667,38 +1685,44 @@ export function buildPaymentNoticeHtml(
     ${
       !isPaid && (status === 'CANCELLED' || status === 'EXPIRED')
         ? `<div class="pay-notice-box cancelled">
-            <div style="color: #991b1b; font-size: 13px; font-weight: 800; text-align: center;">
-              ❌ คำสั่งซื้อนี้ถูกยกเลิกหรือหมดอายุแล้ว (${escapeHtml(statusLabel(status, lang))})
+            <div class="pay-notice-header">${lang === 'th' ? 'ประกาศสถานะเอกสาร / DOCUMENT STATUS' : 'DOCUMENT STATUS'}</div>
+            <div class="pay-notice-body">
+              <div style="color: #991b1b; font-size: 12.5px; font-weight: 700; text-align: center;">
+                ${lang === 'th' ? 'เอกสารแจ้งชำระเงินฉบับนี้ถูกยกเลิกหรือสิ้นสุดระยะเวลาชำระเงินแล้ว' : 'This payment notice has been cancelled or expired'} (${escapeHtml(statusLabel(status, lang))})
+              </div>
+              <p style="color: #475569; font-size: 11px; text-align: center; margin-top: 4px;">
+                ${lang === 'th' ? 'ไม่สามารถใช้เอกสารฉบับนี้เพื่อชำระเงินได้ หากมีความประสงค์ต้องการสั่งซื้อ กรุณาทำรายการสั่งซื้อใหม่ผ่านระบบ' : 'This notice can no longer be used for payment. Please place a new order on the storefront.'}
+              </p>
             </div>
-            <p style="color: #7f1d1d; font-size: 11px; text-align: center; margin-top: 4px;">
-              คำสั่งซื้อไม่สามารถชำระเงินได้อีก หากต้องการสินค้ากรุณาสร้างคำสั่งซื้อใหม่
-            </p>
           </div>`
         : !isPaid
           ? `<div class="pay-notice-box">
-              <div class="pay-notice-grid">
-                <div class="pay-qr-wrapper">
-                  ${
-                    options.paymentQrSvg
-                      ? `<div class="pay-qr-svg">${options.paymentQrSvg}</div>`
-                      : `<div style="font-size:11px;color:#047857;font-weight:700;">PromptPay / Stripe</div>`
-                  }
-                  <div style="font-size:10px;font-weight:700;color:#047857;margin-top:4px;">สแกนเพื่อชำระเงิน</div>
-                  ${
-                    options.paymentUrl
-                      ? `<a class="pay-qr-link" href="${escapeHtml(options.paymentUrl)}" target="_blank" rel="noopener noreferrer">เปิดหน้าชำระเงิน →</a>`
-                      : ''
-                  }
-                </div>
-                <div>
-                  <div class="pay-steps-title">💳 ขั้นตอนการชำระเงิน (Stripe PromptPay / บัตรเครดิต)</div>
-                  <ol class="pay-steps-list">
-                    <li><strong>สแกน QR Code:</strong> ใช้แอปธนาคารสแกน QR Code ฝั่งซ้าย หรือกดลิงก์เพื่อชำระเงิน</li>
-                    <li><strong>ยอดสุทธิ:</strong> ชำระยอด <strong>${formatMoney(grandTotal, lang)}</strong> ให้ตรงกับจำนวน</li>
-                    <li><strong>ยืนยันอัตโนมัติ:</strong> ระบบ Stripe PromptPay และตัดบัตรจะยืนยันการชำระเงินอัตโนมัติทันที ไม่ต้องแนบสลิป</li>
-                  </ol>
-                  <div class="pay-time-badge">
-                    ⏳ <strong>ระยะเวลาชำระเงิน:</strong> กรุณาชำระเงินภายใน <strong>15 - 30 นาที</strong> (สำหรับ Stripe PromptPay QR) หรือไม่เกิน <strong>24 ชั่วโมง</strong> เพื่อรักษาสิทธิ์คำสั่งซื้อก่อนระบบยกเลิกอัตโนมัติ
+              <div class="pay-notice-header">${lang === 'th' ? 'คำชี้แจงและขั้นตอนการชำระเงิน / PAYMENT INSTRUCTIONS' : 'PAYMENT INSTRUCTIONS'}</div>
+              <div class="pay-notice-body">
+                <div class="pay-notice-grid">
+                  <div class="pay-qr-wrapper">
+                    ${
+                      options.paymentQrSvg
+                        ? `<div class="pay-qr-svg">${options.paymentQrSvg}</div>`
+                        : `<div style="font-size:11px;color:var(--navy);font-weight:700;">PromptPay / Stripe</div>`
+                    }
+                    <div class="pay-qr-caption">${lang === 'th' ? 'รหัส QR สำหรับเข้าหน้าชำระเงิน' : 'Scan to open payment portal'}</div>
+                    ${
+                      options.paymentUrl
+                        ? `<a class="pay-qr-link" href="${escapeHtml(options.paymentUrl)}" target="_blank" rel="noopener noreferrer">${lang === 'th' ? 'เปิดหน้าชำระเงินออนไลน์' : 'Open Payment Page'}</a>`
+                        : ''
+                    }
+                  </div>
+                  <div>
+                    <div class="pay-steps-title">${lang === 'th' ? 'วิธีการชำระเงินผ่านระบบอิเล็กทรอนิกส์' : 'Electronic Payment Procedure'}</div>
+                    <ol class="pay-steps-list">
+                      <li><strong>${lang === 'th' ? 'เข้าสู่หน้าชำระเงิน:' : 'Access Payment Page:'}</strong> ${lang === 'th' ? 'สแกนรหัส QR ด้านซ้าย หรือเข้าสู่หน้าชำระเงินของคำสั่งซื้ออ้างอิง' : 'Scan the QR code on the left or open the payment link for order'} <span class="mono">${escapeHtml(ref)}</span></li>
+                      <li><strong>${lang === 'th' ? 'ตรวจสอบยอดชำระ:' : 'Verify Amount:'}</strong> ${lang === 'th' ? 'ชำระเงินตามยอดสุทธิ' : 'Pay the exact total amount of'} <strong>${formatMoney(grandTotal, lang)}</strong> ${lang === 'th' ? 'ผ่านช่องทาง PromptPay อัตโนมัติ บัตรเครดิต/เดบิต หรือโอนเงินผ่านบัญชีธนาคารและแนบหลักฐาน' : 'via PromptPay QR, Credit/Debit Card, or Bank Transfer with slip verification'}</li>
+                      <li><strong>${lang === 'th' ? 'การออกใบเสร็จรับเงิน:' : 'Receipt Issuance:'}</strong> ${lang === 'th' ? 'เมื่อระบบยืนยันการรับชำระเงินเรียบร้อยแล้ว ท่านสามารถดาวน์โหลดใบเสร็จรับเงินอิเล็กทรอนิกส์ได้ทันทีที่หน้าประวัติคำสั่งซื้อ' : 'Once payment is verified, the official electronic receipt will be issued automatically.'}</li>
+                    </ol>
+                    <div class="pay-time-badge">
+                      <strong>${lang === 'th' ? 'กำหนดระยะเวลาชำระเงิน:' : 'Payment Deadline:'}</strong> ${lang === 'th' ? 'กรุณาชำระเงินภายใน 24 ชั่วโมงนับจากวันที่ออกเอกสาร (สำหรับรหัส QR PromptPay ในหน้าชำระเงินจะมีอายุการใช้งาน 15–30 นาทีต่อครั้ง) หากพ้นกำหนดระบบจะยกเลิกรายการและคืนสต็อกโดยอัตโนมัติ' : 'Please complete payment within 24 hours of document issuance to retain your order reservation.'}
+                    </div>
                   </div>
                 </div>
               </div>

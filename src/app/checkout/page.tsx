@@ -15,7 +15,6 @@ import {
   Radio,
   RadioGroup,
   FormControlLabel,
-  Switch,
   Alert,
   CircularProgress,
   Card,
@@ -30,7 +29,6 @@ import {
   ShieldCheck,
   CreditCard,
   QrCode,
-  FileText,
   User,
   Tag,
   Truck,
@@ -79,10 +77,10 @@ export default function StandaloneCheckoutPage() {
   const [manualEnabled, setManualEnabled] = useState(true);
 
   const [turnstileToken, setTurnstileToken] = useState('');
-  const [wantReceipt, setWantReceipt] = useState(false);
-  const [taxId, setTaxId] = useState('');
-  const [orgName, setOrgName] = useState('');
-  const [receiptAddress, setReceiptAddress] = useState('');
+  const wantReceipt = false;
+  const taxId = '';
+  const orgName = '';
+  const receiptAddress = '';
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
@@ -600,44 +598,6 @@ export default function StandaloneCheckoutPage() {
                       </Card>
                     )}
                   </RadioGroup>
-                )}
-              </Paper>
-
-              {/* Full Tax Invoice / E-Receipt Options */}
-              <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <FileText size={20} color="#1e3a5f" />
-                    <Typography sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)' }}>
-                      ต้องการใบเสร็จรับเงิน / ใบกำกับภาษีเต็มรูปแบบ
-                    </Typography>
-                  </Box>
-                  <Switch checked={wantReceipt} onChange={(e) => setWantReceipt(e.target.checked)} />
-                </Box>
-
-                {wantReceipt && (
-                  <Box sx={{ mt: 2.5, display: 'grid', gridTemplateColumns: '1fr', gap: 2, pt: 2, borderTop: '1px solid #f1f5f9' }}>
-                    <TextField
-                      label="เลขประจำตัวผู้เสียภาษี / รหัสนักศึกษา"
-                      fullWidth
-                      value={taxId}
-                      onChange={(e) => setTaxId(e.target.value)}
-                    />
-                    <TextField
-                      label="ชื่อบริษัท / หน่วยงาน / คณะ"
-                      fullWidth
-                      value={orgName}
-                      onChange={(e) => setOrgName(e.target.value)}
-                    />
-                    <TextField
-                      label="ที่อยู่สำหรับออกใบเสร็จ"
-                      multiline
-                      rows={2}
-                      fullWidth
-                      value={receiptAddress}
-                      onChange={(e) => setReceiptAddress(e.target.value)}
-                    />
-                  </Box>
                 )}
               </Paper>
             </Box>

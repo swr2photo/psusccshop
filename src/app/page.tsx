@@ -123,6 +123,7 @@ import StorefrontNavbar from '@/components/StorefrontNavbar';
 import HomeTrustStrip from '@/components/HomeTrustStrip';
 import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct, getMergedFlagshipConfig } from '@/lib/flagship/config';
 import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
+import { useCartStore } from '@/store/cartStore';
 import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, getProductUnavailableToast, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
 import ServerStatusBanner from '@/components/ServerStatusBanner';
@@ -1302,6 +1303,14 @@ export default function HomePage() {
     }
   }, [config?.products, now]);
 
+  // Hydrate initial cart from persistent Zustand store (shared with /cart, /checkout, and /shop/[slug])
+  useEffect(() => {
+    const persisted = useCartStore.getState().cart;
+    if (Array.isArray(persisted) && persisted.length > 0) {
+      setCart((prev) => (prev.length > 0 ? prev : ensureUniqueCartLineIds(persisted as unknown as CartItem[])));
+    }
+  }, []);
+
   // Merge guest cart items queued from /flagship/[slug]; open cart via ?cart=1
   useEffect(() => {
     if (loading && !config) return;
@@ -1309,6 +1318,7 @@ export default function HomePage() {
     if (pending.length > 0) {
       setCart((prev) => {
         const next = ensureUniqueCartLineIds([...prev, ...pending]);
+        useCartStore.getState().setCart(next as any);
         if (session?.user?.email) {
           saveCartApi(session.user.email, next).catch((err) =>
             console.error('Failed to persist flagship cart', err),
@@ -1433,8 +1443,16 @@ export default function HomePage() {
         if (res.status !== 'success' || !Array.isArray(serverCart)) return;
         // Don't wipe a non-empty local cart with an ambiguous empty server response
         setCart((prev) => {
-          if (serverCart.length === 0 && prev.length > 0) return prev;
-          return ensureUniqueCartLineIds(serverCart as CartItem[]);
+          const storeItems = useCartStore.getState().cart as unknown as CartItem[];
+          const fallbackLocal = prev.length > 0 ? prev : storeItems;
+          if (serverCart.length === 0 && fallbackLocal.length > 0) {
+            const uniqueLocal = ensureUniqueCartLineIds(fallbackLocal);
+            useCartStore.getState().setCart(uniqueLocal as any);
+            return uniqueLocal;
+          }
+          const uniqueServer = ensureUniqueCartLineIds(serverCart as CartItem[]);
+          useCartStore.getState().setCart(uniqueServer as any);
+          return uniqueServer;
         });
       } catch (error) {
         console.error('Failed to load cart:', error);
@@ -1468,6 +1486,7 @@ export default function HomePage() {
 
     setCart(uniqueCart);
     cartRef.current = uniqueCart;
+    useCartStore.getState().setCart(uniqueCart as any);
     const email = session?.user?.email;
     if (email) {
       saveCartApi(email, uniqueCart).catch((err) => {
@@ -2122,6 +2141,7 @@ export default function HomePage() {
   const saveCart = async (newCart: CartItem[]) => {
     const uniqueCart = ensureUniqueCartLineIds(newCart);
     setCart(uniqueCart);
+    useCartStore.getState().setCart(uniqueCart as any);
     if (!session?.user?.email) return;
     try {
       await saveCartApi(session.user.email, uniqueCart);
@@ -2864,6 +2884,7 @@ export default function HomePage() {
         }
         
         setCart([]);
+        useCartStore.getState().clearCart();
         if (session?.user?.email) {
           saveCartApi(session.user.email, []).catch((err) => console.error('Failed to clear saved cart', err));
         }
