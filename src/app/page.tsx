@@ -130,6 +130,7 @@ import ServerStatusBanner from '@/components/ServerStatusBanner';
 import type { SavedAddress } from '@/components/ProfileModal';
 import { useTheme } from '@mui/material';
 import { formatFriendlyError } from '@/utils/error';
+import { toast as globalToast } from '@/components/ui/toast';
 import { useHomePageCatalog } from '@/hooks/useHomePageCatalog';
 import { useHomePageDialogs } from '@/hooks/useHomePageDialogs';
 import { ProductGridSection } from '@/components/storefront/ProductGridSection';
@@ -1394,7 +1395,12 @@ export default function HomePage() {
 
         const nextName = typeof profile.name === 'string' ? profile.name.trim() : '';
         const nextPhone = typeof profile.phone === 'string' ? onlyDigitsPhone(profile.phone) : '';
-        const nextAddress = typeof profile.address === 'string' ? profile.address.trim() : '';
+        const rawAddrList = Array.isArray(profile.savedAddresses) ? profile.savedAddresses : [];
+        const defaultSavedAddress = rawAddrList.find((a: any) => a?.isDefault)?.address || rawAddrList[0]?.address || '';
+        const nextAddress =
+          (typeof profile.address === 'string' && profile.address.trim())
+            ? profile.address.trim()
+            : (typeof defaultSavedAddress === 'string' ? defaultSavedAddress.trim() : '');
         const nextIg = typeof profile.instagram === 'string' ? profile.instagram.trim() : '';
         const nextImage = typeof profile.profileImage === 'string' ? profile.profileImage : '';
         const nextMarketingConsent = profile.marketingConsent === true;
@@ -2115,27 +2121,11 @@ export default function HomePage() {
 
   function showToast(type: ToastSeverity, message: string) {
     const friendlyMessage = formatFriendlyError(message);
-    const id = `${type}-${friendlyMessage}`;
-    
-    // ป้องกันการซ้ำซ้อน - ถ้ามี toast เดียวกันอยู่แล้วให้ข้าม
-    setToasts((prev) => {
-      if (prev.some((t) => t.id === id)) return prev;
-      return [...prev, { id, type, message: friendlyMessage }].slice(-3); // เก็บแค่ 3 อันล่าสุด
+    globalToast.add({
+      type,
+      title: friendlyMessage,
+      timeout: type === 'error' ? 4800 : 3200,
     });
-    
-    // ลบ toast อัตโนมัติหลัง 3 วินาที
-    if (toastTimeoutsRef.current.has(id)) {
-      clearTimeout(toastTimeoutsRef.current.get(id)!);
-    }
-    toastTimeoutsRef.current.set(id, setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-      toastTimeoutsRef.current.delete(id);
-    }, 3000));
-    
-    if (productDialogOpen) {
-      setInlineNotice({ id, type, message: friendlyMessage });
-      setTimeout(() => setInlineNotice(null), 2000);
-    }
   };
 
   const saveCart = async (newCart: CartItem[]) => {
@@ -6220,125 +6210,6 @@ export default function HomePage() {
           <span className="droplet" />
           <span className="droplet-ripple" />
         </Box>
-      )}
-
-      {/* Enhanced Modern Toast Container - rendered via portal to always be on top */}
-      {toasts.length > 0 && createPortal(
-        <Box
-          sx={{
-            position: 'fixed',
-            top: { xs: 16, sm: 16, md: 24 },
-            left: '50%',
-            right: 'auto',
-            transform: 'translateX(-50%)',
-            zIndex: 2147483647,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1.5,
-            width: { xs: 'calc(100% - 32px)', sm: 'auto' },
-            maxWidth: 420,
-            pointerEvents: 'none',
-          }}
-        >
-          {toasts.map((t) => {
-            const colors = {
-              success: { 
-                bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.98) 0%, rgba(5, 150, 105, 0.98) 100%)', 
-                icon: <CheckCircle2 size={18} />,
-                shadow: '0 8px 32px rgba(16, 185, 129, 0.35)',
-              },
-              error: { 
-                bg: 'linear-gradient(135deg, rgba(239, 68, 68, 0.98) 0%, rgba(220, 38, 38, 0.98) 100%)', 
-                icon: <AlertCircle size={18} />,
-                shadow: '0 8px 32px rgba(239, 68, 68, 0.35)',
-              },
-              warning: { 
-                bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.98) 0%, rgba(234, 88, 12, 0.98) 100%)', 
-                icon: <AlertTriangle size={18} />,
-                shadow: '0 8px 32px rgba(245, 158, 11, 0.35)',
-              },
-              info: { 
-                bg: 'linear-gradient(135deg, rgba(0,113,227, 0.98) 0%, rgba(0,113,227, 0.98) 100%)', 
-                icon: <Info size={18} />,
-                shadow: '0 8px 32px rgba(0,113,227, 0.35)',
-              },
-            };
-            return (
-              <Slide key={t.id} in direction="down" timeout={350}>
-                <Box
-                  sx={{
-                    background: colors[t.type].bg,
-                    backdropFilter: 'blur(16px)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '16px',
-                    py: 1.5,
-                    px: 2,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    boxShadow: colors[t.type].shadow,
-                    cursor: 'pointer',
-                    pointerEvents: 'auto',
-                    animation: 'toastEnterTop 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                    '@keyframes toastEnterTop': {
-                      '0%': { opacity: 0, transform: 'translateY(-24px) scale(0.96)' },
-                      '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
-                    },
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'scale(1.02)',
-                      boxShadow: `${colors[t.type].shadow}, 0 0 0 2px rgba(255, 255, 255, 0.1)`,
-                    },
-                  }}
-                  onClick={() => setToasts((prev) => prev.filter((toast) => toast.id !== t.id))}
-                >
-                  <Box 
-                    sx={{ 
-                      width: 32,
-                      height: 32,
-                      borderRadius: '10px',
-                      bgcolor: 'rgba(255, 255, 255, 0.2)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      color: '#fff', 
-                      flexShrink: 0,
-                    }}
-                  >
-                    {colors[t.type].icon}
-                  </Box>
-                  <Typography
-                    sx={{
-                      color: '#fff',
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
-                      flex: 1,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {t.message}
-                  </Typography>
-                  <Box
-                    sx={{
-                      color: 'var(--foreground)',
-                      p: 0.5,
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      '&:hover': { 
-                        color: '#fff',
-                        bgcolor: 'rgba(255, 255, 255, 0.15)',
-                      },
-                    }}
-                  >
-                    <X size={16} />
-                  </Box>
-                </Box>
-              </Slide>
-            );
-          })}
-        </Box>,
-        document.body
       )}
 
       <Backdrop

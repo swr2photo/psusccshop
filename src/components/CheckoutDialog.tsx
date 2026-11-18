@@ -760,6 +760,13 @@ export default function CheckoutDialog({
                 {orderData.name || '—'}
               </Typography>
               <Typography sx={{ color: 'var(--foreground)', fontSize: '0.88rem' }}>
+                <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>{lang === 'en' ? 'Email:' : 'อีเมล:'}</Box>
+                {orderData.email || '—'}
+                <Box component="span" sx={{ color: 'var(--text-muted)', fontSize: '0.72rem', ml: 0.75 }}>
+                  ({lang === 'en' ? 'E-Receipt & Alerts' : 'รับใบเสร็จ E-Receipt & แจ้งเตือน'})
+                </Box>
+              </Typography>
+              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.88rem' }}>
                 <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>{`${t.common.phone}:`}</Box>
                 {orderData.phone || '—'}
               </Typography>
@@ -878,34 +885,50 @@ export default function CheckoutDialog({
                         </Typography>
                       </Box>
 
-                      {shippingMode === 'delivery' && deliveryOptions.length > 1 && (
+                      {deliveryOptions.length >= 1 && (
                         <RadioGroup
-                          value={selectedShipping}
+                          value={shippingMode === 'delivery' ? selectedShipping : ''}
                           onChange={(e) => {
                             e.stopPropagation();
+                            if (shippingMode !== 'delivery') {
+                              handleShippingModeChange('delivery');
+                            }
                             handleShippingChange(e.target.value);
                           }}
                           sx={{ mt: 1 }}
                         >
                           {deliveryOptions.map((option) => {
-                            const isSelected = selectedShipping === option.id;
+                            const isSelected = shippingMode === 'delivery' && selectedShipping === option.id;
                             const isFreeShipping = option.freeShippingMinimum && subtotal >= option.freeShippingMinimum;
+                            const optDesc = lang === 'en' && option.descriptionEn ? option.descriptionEn : option.description;
+                            const descHasDays = Boolean(optDesc && /(วัน|day)/i.test(optDesc));
                             return (
                               <FormControlLabel
                                 key={option.id}
                                 value={option.id}
-                                onClick={(e) => e.stopPropagation()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (shippingMode !== 'delivery') {
+                                    handleShippingModeChange('delivery');
+                                  }
+                                  handleShippingChange(option.id);
+                                }}
                                 control={<Radio size="small" sx={{ color: '#64d2ff', '&.Mui-checked': { color: '#64d2ff' } }} />}
                                 label={
                                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
                                     <Box>
-                                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                                      <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)' }}>
                                         {getShippingName(option)}
                                       </Typography>
-                                      {option.estimatedDays && (
+                                      {optDesc && (
+                                        <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mt: 0.1 }}>
+                                          {optDesc}
+                                        </Typography>
+                                      )}
+                                      {option.estimatedDays && !descHasDays && (
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4, mt: 0.2 }}>
                                           <Clock size={11} color="var(--text-muted)" />
-                                          <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                          <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                                             {option.estimatedDays.min === option.estimatedDays.max
                                               ? `${option.estimatedDays.min} ${t.checkout.estimatedDays}`
                                               : `${option.estimatedDays.min}-${option.estimatedDays.max} ${t.checkout.estimatedDays}`}
@@ -913,7 +936,7 @@ export default function CheckoutDialog({
                                         </Box>
                                       )}
                                     </Box>
-                                    <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: isFreeShipping ? 'var(--success)' : 'var(--foreground)' }}>
+                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: isFreeShipping ? 'var(--success)' : 'var(--foreground)' }}>
                                       {isFreeShipping ? t.common.free : `฿${(option.baseFee || 0)?.toLocaleString()}`}
                                     </Typography>
                                   </Box>
@@ -924,7 +947,7 @@ export default function CheckoutDialog({
                                   p: 0.75,
                                   borderRadius: '10px',
                                   bgcolor: isSelected ? 'rgba(0,113,227,0.08)' : 'transparent',
-                                  border: `1px solid ${isSelected ? 'rgba(0,113,227,0.25)' : 'transparent'}`,
+                                  border: `1px solid ${isSelected ? 'rgba(0,113,227,0.25)' : 'var(--glass-border)'}`,
                                   '& .MuiFormControlLabel-label': { flex: 1 },
                                 }}
                               />
@@ -934,10 +957,10 @@ export default function CheckoutDialog({
                       )}
 
                       {shippingMode === 'delivery' && (
-                        <Box sx={{ mt: 1 }} onClick={(e) => e.stopPropagation()}>
-                          {showAddressPicker ? (
+                        <Box sx={{ mt: 1.25, display: 'flex', flexDirection: 'column', gap: 1 }} onClick={(e) => e.stopPropagation()}>
+                          {showAddressPicker && (
                             <Box>
-                              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mb: 0.75 }}>
+                              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 600, mb: 0.6 }}>
                                 {t.checkout.selectAddress}
                                 <Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
                               </Typography>
@@ -978,16 +1001,27 @@ export default function CheckoutDialog({
                                 })}
                               </Box>
                             </Box>
-                          ) : (
-                            <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem', display: 'flex', alignItems: 'flex-start' }}>
-                              <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1, flexShrink: 0 }}>
-                                {`${t.common.address}:`}<Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
-                              </Box>
-                              <Box component="span" sx={{ color: orderData.address ? 'var(--foreground)' : 'var(--text-muted)' }}>
-                                {orderData.address || t.checkout.addressEmpty}
-                              </Box>
-                            </Typography>
                           )}
+                          <TextField
+                            label={lang === 'en' ? 'Delivery Address' : 'ที่อยู่สำหรับจัดส่งพัสดุ (Delivery Address)'}
+                            required
+                            multiline
+                            minRows={2}
+                            maxRows={4}
+                            size="small"
+                            fullWidth
+                            value={orderData.address || ''}
+                            onChange={(e) => onAddressChange?.(e.target.value)}
+                            placeholder={lang === 'en' ? 'House no., street, sub-district, district, province, postal code' : 'บ้านเลขที่, หมู่บ้าน/อาคาร, ถนน, ตำบล/แขวง, อำเภอ/เขต, จังหวัด, รหัสไปรษณีย์'}
+                            sx={{
+                              mt: 0.5,
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: '10px',
+                                bgcolor: 'var(--background)',
+                                fontSize: '0.82rem',
+                              },
+                            }}
+                          />
                         </Box>
                       )}
                     </Box>
@@ -1029,8 +1063,8 @@ export default function CheckoutDialog({
           </Box>
         )}
 
-        {/* Payment options — only when more than one method */}
-        {!loadingConfig && enabledPaymentOptions.length > 1 && (
+        {/* Payment options — always shown so customer sees selected payment method */}
+        {!loadingConfig && enabledPaymentOptions.length >= 1 && (
           <Box sx={sectionSx}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.25 }}>
               <CreditCard size={16} color="var(--text-muted)" strokeWidth={1.75} />

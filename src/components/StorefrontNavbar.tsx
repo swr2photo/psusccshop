@@ -225,6 +225,7 @@ export default function StorefrontNavbar({
 
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [remoteFlagshipEnabled, setRemoteFlagshipEnabled] = useState(true);
+  const [remoteFlagshipSlug, setRemoteFlagshipSlug] = useState('scc-jersey-2026');
 
   useEffect(() => {
     if (showFlagshipProp !== undefined) return;
@@ -235,6 +236,9 @@ export default function StorefrontNavbar({
       const cfg = (res.data as any) ?? (res as any).config;
       const enabled = cfg?.flagshipConfig?.enabled ?? cfg?.flagshipConfigs?.['scc-jersey-2026']?.enabled ?? true;
       setRemoteFlagshipEnabled(enabled !== false);
+      if (cfg?.flagshipConfig?.slug) {
+        setRemoteFlagshipSlug(String(cfg.flagshipConfig.slug));
+      }
     }).catch(() => undefined);
     return () => {
       active = false;
@@ -295,13 +299,13 @@ export default function StorefrontNavbar({
   const handleShop = () => {
     setMobileDrawerOpen(false);
     if (onShopClick) onShopClick();
-    else router.push('/shop');
+    else router.push('/#product-grid');
   };
 
   const handleFlagship = () => {
     setMobileDrawerOpen(false);
     if (onFlagshipClick) onFlagshipClick();
-    else router.push('/shop');
+    else router.push(`/flagship/${remoteFlagshipSlug}`);
   };
 
   const handleMenuClick = () => {

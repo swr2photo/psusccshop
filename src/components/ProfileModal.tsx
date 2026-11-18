@@ -15,6 +15,7 @@ import { type NameValidationConfig, DEFAULT_NAME_VALIDATION } from '@/lib/config
 import { useTranslation } from '@/hooks/useTranslation';
 import { Button as UiButton } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast as globalToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 
 /** Formal institutional UI tokens (shadcn-like, muted, lower radius). */
@@ -257,7 +258,12 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
   }, [notification]);
 
   const showNotification = (type: InlineNotification['type'], message: string) => {
-    setNotification({ type, message });
+    setNotification(null);
+    globalToast.add({
+      type,
+      title: message,
+      timeout: type === 'error' ? 4500 : 3000,
+    });
   };
 
   const sanitizeName = (value: string) => {

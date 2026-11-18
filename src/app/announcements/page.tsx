@@ -83,7 +83,7 @@ export default function StandaloneAnnouncementsPage() {
                 {item.summary}
               </Typography>
 
-              <Button component={Link} href="/shop" endIcon={<ChevronRight size={16} />} sx={{ color: '#1e3a5f', fontWeight: 700, textTransform: 'none', p: 0 }}>
+              <Button component={Link} href="/" endIcon={<ChevronRight size={16} />} sx={{ color: '#1e3a5f', fontWeight: 700, textTransform: 'none', p: 0 }}>
                 ไปยังหน้าร้านค้า
               </Button>
             </Card>

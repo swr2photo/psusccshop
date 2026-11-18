@@ -24,10 +24,12 @@ import {
 } from '@mui/material';
 import {
   ArrowLeft,
+  Check,
   CheckCircle2,
   MapPin,
   ShieldCheck,
   CreditCard,
+  Package,
   QrCode,
   User,
   Tag,
@@ -40,13 +42,14 @@ import TurnstileWidget from '@/components/TurnstileWidget';
 import { useCartStore } from '@/store/cartStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSession } from 'next-auth/react';
-import { apiFetch, getCart, getProfile, saveCart as saveCartApi } from '@/lib/api-client';
+import { apiFetch, getCart, getProfile, getPublicConfig, saveCart as saveCartApi, saveProfile as saveProfileApi } from '@/lib/api-client';
 import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
 import { ensureUniqueCartLineIds } from '@/lib/shop-constants';
 import { ShippingConfig, ShippingOption } from '@/lib/shipping';
 import { usePageShipping, usePagePaymentConfig } from '@/hooks/usePageData';
 import { useHydrated } from '@/hooks/useHydrated';
 import { formatFriendlyError } from '@/utils/error';
+import type { SavedAddress } from '@/components/ProfileModal';
 
 export default function StandaloneCheckoutPage() {
   const router = useRouter();
@@ -64,8 +67,63 @@ export default function StandaloneCheckoutPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [instagram, setInstagram] = useState('');
   const [address, setAddress] = useState('');
   const [studentId, setStudentId] = useState('');
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [catalogMap, setCatalogMap] = useState<Record<string, any>>({});
+
+  // Hydrate cached contact fields from localStorage ('orderData') immediately
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem('orderData');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.name) setCustomerName((prev) => prev || String(parsed.name));
+        if (parsed.email) setCustomerEmail((prev) => prev || String(parsed.email));
+        if (parsed.phone) setPhone((prev) => prev || String(parsed.phone));
+        if (parsed.instagram) setInstagram((prev) => prev || String(parsed.instagram));
+        if (parsed.address) setAddress((prev) => prev || String(parsed.address));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Fetch main & sub-shop product catalogs so Order Summary sidebar displays thumbnails & full product info
+  useEffect(() => {
+    let active = true;
+    const map: Record<string, any> = {};
+    Promise.allSettled([
+      getPublicConfig(),
+      apiFetch('/api/shops').then((r) => (r.ok ? r.json() : null)),
+    ]).then(([mainRes, shopsRes]) => {
+      if (!active) return;
+      if (mainRes.status === 'fulfilled') {
+        const cfg = (mainRes.value.data as any) ?? (mainRes.value as any).config;
+        if (Array.isArray(cfg?.products)) {
+          for (const p of cfg.products) {
+            if (p?.id) map[p.id] = p;
+          }
+        }
+      }
+      if (shopsRes.status === 'fulfilled' && Array.isArray(shopsRes.value?.shops)) {
+        for (const s of shopsRes.value.shops) {
+          if (Array.isArray(s?.products)) {
+            for (const p of s.products) {
+              if (p?.id) map[p.id] = p;
+            }
+          }
+        }
+      }
+      setCatalogMap(map);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Flush any queued items added from the Flagship 360° page into the cart store
   useEffect(() => {
@@ -120,10 +178,30 @@ export default function StandaloneCheckoutPage() {
         const pRes = profRes.value;
         const prof = (pRes.data as any)?.profile ?? (pRes.data as any) ?? (pRes as any).profile;
         if (prof && typeof prof === 'object') {
-          if (prof.name) setCustomerName((prev) => prev || String(prof.name));
-          if (prof.phone) setPhone((prev) => prev || String(prof.phone));
-          if (prof.address) setAddress((prev) => prev || String(prof.address));
-          if (prof.studentId) setStudentId((prev) => prev || String(prof.studentId));
+          // Saved profile name takes priority over Google OAuth display name
+          if (typeof prof.name === 'string' && prof.name.trim()) {
+            setCustomerName(prof.name.trim());
+          }
+          if (typeof prof.phone === 'string' && prof.phone.trim()) {
+            setPhone(prof.phone.replace(/\D/g, ''));
+          }
+          if (typeof prof.instagram === 'string' && prof.instagram.trim()) {
+            setInstagram(prof.instagram.trim());
+          }
+          if (typeof prof.studentId === 'string' && prof.studentId.trim()) {
+            setStudentId(prof.studentId.trim());
+          }
+          const addrList: SavedAddress[] = Array.isArray(prof.savedAddresses) ? prof.savedAddresses : [];
+          if (addrList.length > 0) {
+            setSavedAddresses(addrList);
+          }
+          const defaultSaved = addrList.find((a) => a?.isDefault)?.address || addrList[0]?.address || '';
+          const resolvedAddress = (typeof prof.address === 'string' && prof.address.trim())
+            ? prof.address.trim()
+            : (typeof defaultSaved === 'string' ? defaultSaved.trim() : '');
+          if (resolvedAddress) {
+            setAddress((prev) => prev || resolvedAddress);
+          }
         }
       }
     }).finally(() => {
@@ -323,6 +401,8 @@ export default function StandaloneCheckoutPage() {
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim().toLowerCase(),
         phone: phone.trim(),
+        customerPhone: phone.trim(),
+        customerInstagram: instagram.trim(),
         customerAddress: !isPickupSelected ? address.trim() : (shippingConfig?.pickupLocation || 'รับที่ห้องชุมนุม SCC'),
         studentId: studentId.trim(),
         pickupLocation: !isPickupSelected ? 'DELIVERY' : 'SCC_CLUB',
@@ -343,6 +423,33 @@ export default function StandaloneCheckoutPage() {
             }
           : undefined,
       };
+
+      // Sync updated contact info back to localStorage and user profile so sidebar & profile stay consistent
+      try {
+        const prevOrderDataRaw = localStorage.getItem('orderData');
+        const prevOrderData = prevOrderDataRaw ? JSON.parse(prevOrderDataRaw) : {};
+        localStorage.setItem(
+          'orderData',
+          JSON.stringify({
+            ...prevOrderData,
+            name: customerName.trim(),
+            email: customerEmail.trim().toLowerCase(),
+            phone: phone.trim(),
+            instagram: instagram.trim() || prevOrderData?.instagram || '',
+            address: address.trim() || prevOrderData?.address || '',
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
+      if (session?.user?.email) {
+        void saveProfileApi(session.user.email, {
+          name: customerName.trim(),
+          phone: phone.trim(),
+          instagram: instagram.trim(),
+          ...(address.trim() ? { address: address.trim() } : {}),
+        }).catch(() => undefined);
+      }
 
       const res = await apiFetch('/api/orders', {
         method: 'POST',
@@ -444,10 +551,10 @@ export default function StandaloneCheckoutPage() {
             {/* Left Form Column */}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {/* Customer Contact Details */}
-              <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+              <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid var(--glass-border, #e2e8f0)', bgcolor: 'var(--surface, #ffffff)' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
                   <User size={20} color="#1e3a5f" />
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--foreground, #1e3a5f)' }}>
                     ข้อมูลผู้สั่งซื้อ (Customer Information)
                   </Typography>
                 </Box>
@@ -471,24 +578,27 @@ export default function StandaloneCheckoutPage() {
                   />
                   <TextField
                     label="เบอร์โทรศัพท์ (Phone)"
+                    required
                     fullWidth
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => setPhone(e.target.value.replace(/[^\d-]/g, ''))}
+                    placeholder="08X-XXX-XXXX"
                   />
                   <TextField
-                    label="รหัสนักศึกษา / บุคลากร (Option)"
+                    label="Instagram (IG) / ช่องทางติดต่อสำรอง"
                     fullWidth
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
+                    value={instagram}
+                    onChange={(e) => setInstagram(e.target.value)}
+                    placeholder="@username"
                   />
                 </Box>
               </Paper>
 
               {/* Dynamic Shipping Options */}
-              <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+              <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid var(--glass-border, #e2e8f0)', bgcolor: 'var(--surface, #ffffff)' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <MapPin size={20} color="#1e3a5f" />
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--foreground, #1e3a5f)' }}>
                     รูปแบบการรับสินค้า / จัดส่ง (Shipping & Pickup)
                   </Typography>
                 </Box>
@@ -508,6 +618,7 @@ export default function StandaloneCheckoutPage() {
                       const optName = lang === 'en' && option.nameEn ? option.nameEn : option.name;
                       const optDesc = lang === 'en' && option.descriptionEn ? option.descriptionEn : option.description;
                       const isSelected = option.id === selectedShippingId;
+                      const descAlreadyHasDays = Boolean(optDesc && /(วัน|day)/i.test(optDesc));
 
                       let feeText = 'ฟรี';
                       if (!isPickup) {
@@ -525,8 +636,8 @@ export default function StandaloneCheckoutPage() {
                           variant="outlined"
                           sx={{
                             mb: 1.5,
-                            borderColor: isSelected ? '#1e3a5f' : '#e2e8f0',
-                            bgcolor: isSelected ? 'rgba(30, 58, 95, 0.02)' : '#ffffff',
+                            borderColor: isSelected ? '#0071e3' : 'var(--glass-border, #e2e8f0)',
+                            bgcolor: isSelected ? 'rgba(0, 113, 227, 0.05)' : 'var(--surface, #ffffff)',
                             borderRadius: 2,
                             transition: 'border-color 0.2s ease',
                           }}
@@ -541,16 +652,16 @@ export default function StandaloneCheckoutPage() {
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                                     {isPickup ? <Store size={20} color="#1e3a5f" /> : <Truck size={20} color="#1e3a5f" />}
                                     <Box>
-                                      <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e3a5f' }}>
+                                      <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--foreground, #1e3a5f)' }}>
                                         {optName}
                                       </Typography>
                                       {optDesc && (
-                                        <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                        <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
                                           {optDesc}
                                         </Typography>
                                       )}
-                                      {option.estimatedDays && (
-                                        <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.25 }}>
+                                      {option.estimatedDays && !descAlreadyHasDays && (
+                                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)', mt: 0.25 }}>
                                           ระยะเวลาจัดส่งประมาณ {option.estimatedDays.min}-{option.estimatedDays.max} วัน
                                         </Typography>
                                       )}
@@ -574,7 +685,47 @@ export default function StandaloneCheckoutPage() {
                 )}
 
                 {!isPickupSelected && (
-                  <Box sx={{ mt: 2.5 }}>
+                  <Box sx={{ mt: 2.5, display: 'flex', flexDirection: 'column', gap: 1.75 }}>
+                    {savedAddresses.length > 0 && (
+                      <Box>
+                        <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)', mb: 1 }}>
+                          {lang === 'en' ? 'Saved Addresses' : 'เลือกจากสมุดที่อยู่ที่บันทึกไว้'}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          {savedAddresses.map((addr) => {
+                            const isAddrSelected = address.trim() === addr.address.trim();
+                            return (
+                              <Box
+                                key={addr.id}
+                                onClick={() => setAddress(addr.address)}
+                                sx={{
+                                  p: 1.5,
+                                  borderRadius: 2,
+                                  cursor: 'pointer',
+                                  border: isAddrSelected ? '1.5px solid #0071e3' : '1px solid var(--glass-border, #e2e8f0)',
+                                  bgcolor: isAddrSelected ? 'rgba(0, 113, 227, 0.06)' : 'var(--surface-2, #f8fafc)',
+                                  display: 'flex',
+                                  alignItems: 'flex-start',
+                                  justifyContent: 'space-between',
+                                  gap: 1.5,
+                                }}
+                              >
+                                <Box sx={{ minWidth: 0 }}>
+                                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: isAddrSelected ? '#0071e3' : 'var(--foreground)' }}>
+                                    {addr.label} {addr.isDefault ? (lang === 'en' ? '(Default)' : '(ค่าเริ่มต้น)') : ''}
+                                  </Typography>
+                                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)', mt: 0.25, lineHeight: 1.45 }}>
+                                    {addr.address}
+                                  </Typography>
+                                </Box>
+                                {isAddrSelected && <Check size={16} color="#0071e3" style={{ flexShrink: 0, marginTop: 2 }} />}
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    )}
+
                     <TextField
                       label="ที่อยู่สำหรับจัดส่งพัสดุ (Delivery Address)"
                       required
@@ -590,10 +741,10 @@ export default function StandaloneCheckoutPage() {
               </Paper>
 
               {/* Payment Method Selector */}
-              <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
+              <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid var(--glass-border, #e2e8f0)', bgcolor: 'var(--surface, #ffffff)' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <CreditCard size={20} color="#1e3a5f" />
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--foreground, #1e3a5f)' }}>
                     วิธีการชำระเงิน (Payment Method)
                   </Typography>
                 </Box>
@@ -605,7 +756,7 @@ export default function StandaloneCheckoutPage() {
                 ) : (
                   <RadioGroup value={paymentGateway} onChange={(e) => setPaymentGateway(e.target.value as any)}>
                     {stripePromptPayEnabled && (
-                      <Card variant="outlined" sx={{ mb: 1.5, borderColor: paymentGateway === 'promptpay' ? '#1a237e' : '#e2e8f0', borderRadius: 2 }}>
+                      <Card variant="outlined" sx={{ mb: 1.5, borderColor: paymentGateway === 'promptpay' ? '#1a237e' : 'var(--glass-border, #e2e8f0)', bgcolor: 'var(--surface, #ffffff)', borderRadius: 2 }}>
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <FormControlLabel
                             value="promptpay"
@@ -614,10 +765,10 @@ export default function StandaloneCheckoutPage() {
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <QrCode size={20} color="#1a237e" />
                                 <Box>
-                                  <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#1a237e' }}>
+                                  <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--foreground, #1a237e)' }}>
                                     Stripe PromptPay (สแกน QR อัตโนมัติ)
                                   </Typography>
-                                  <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
                                     สแกนจ่ายผ่านแอปธนาคาร ระบบยืนยันยอดทันที 24 ชม.
                                   </Typography>
                                 </Box>
@@ -629,7 +780,7 @@ export default function StandaloneCheckoutPage() {
                     )}
 
                     {stripeCardEnabled && (
-                      <Card variant="outlined" sx={{ mb: 1.5, borderColor: paymentGateway === 'credit_card' ? '#1d4ed8' : '#e2e8f0', borderRadius: 2 }}>
+                      <Card variant="outlined" sx={{ mb: 1.5, borderColor: paymentGateway === 'credit_card' ? '#1d4ed8' : 'var(--glass-border, #e2e8f0)', bgcolor: 'var(--surface, #ffffff)', borderRadius: 2 }}>
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <FormControlLabel
                             value="credit_card"
@@ -638,10 +789,10 @@ export default function StandaloneCheckoutPage() {
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <CreditCard size={20} color="#1d4ed8" />
                                 <Box>
-                                  <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#1d4ed8' }}>
+                                  <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--foreground, #1d4ed8)' }}>
                                     บัตรเครดิต / เดบิต (Credit/Debit Card)
                                   </Typography>
-                                  <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
                                     ชำระด้วย Visa, Mastercard, JCB ปลอดภัย 256-bit SSL
                                   </Typography>
                                 </Box>
@@ -653,17 +804,17 @@ export default function StandaloneCheckoutPage() {
                     )}
 
                     {manualEnabled && (
-                      <Card variant="outlined" sx={{ borderColor: paymentGateway === 'manual' ? '#1e3a5f' : '#e2e8f0', borderRadius: 2 }}>
+                      <Card variant="outlined" sx={{ borderColor: paymentGateway === 'manual' ? '#0071e3' : 'var(--glass-border, #e2e8f0)', bgcolor: 'var(--surface, #ffffff)', borderRadius: 2 }}>
                         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                           <FormControlLabel
                             value="manual"
                             control={<Radio size="small" />}
                             label={
                               <Box>
-                                <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                                <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--foreground)' }}>
                                   โอนเงินผ่านบัญชีธนาคาร + แนบสลิป
                                 </Typography>
-                                <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted, #64748b)' }}>
                                   โอนเงินเข้าบัญชีร้านค้า และอัปโหลดสลิปเพื่อให้ทีมงานตรวจสอบ
                                 </Typography>
                               </Box>
@@ -678,31 +829,103 @@ export default function StandaloneCheckoutPage() {
             </Box>
 
             {/* Right Summary Column */}
-            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff', position: 'sticky', top: 90 }}>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: 'var(--navy, #1e3a5f)', mb: 2 }}>
+            <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid var(--glass-border, #e2e8f0)', bgcolor: 'var(--surface, #ffffff)', position: 'sticky', top: 90 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: 'var(--foreground, #1e3a5f)', mb: 2 }}>
                 รายการสั่งซื้อ ({totalItems} ชิ้น)
               </Typography>
 
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 260, overflowY: 'auto', pr: 0.5, mb: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 320, overflowY: 'auto', pr: 0.5, mb: 2 }}>
                 {cart.map((item: any, i: number) => {
-                  const name = getItemName(item);
+                  const pId = item.productId || item.id?.split('-')[0];
+                  const catProd = catalogMap[pId];
+                  const img =
+                    item.image ||
+                    item.coverImage ||
+                    (Array.isArray(item.images) ? item.images[0] : null) ||
+                    catProd?.coverImage ||
+                    (Array.isArray(catProd?.images) ? catProd.images[0] : null);
+                  const name = (lang === 'en' && catProd?.nameEn) ? catProd.nameEn : (catProd?.name || getItemName(item));
                   const qty = getItemQty(item);
                   const itemTotal = getItemTotal(item);
-                  const details = [
-                    item.size && item.size !== '-' ? `ไซส์ ${item.size}` : null,
-                    item.customName || item.options?.customName ? `สกรีนชื่อ: ${item.customName || item.options?.customName}` : null,
-                    item.customNumber || item.options?.customNumber ? `เบอร์: ${item.customNumber || item.options?.customNumber}` : null,
-                  ].filter(Boolean).join(' | ');
+                  const isLongSleeve = item.sleeve === 'LONG' || item.options?.isLongSleeve;
+                  const isShortSleeve = item.sleeve === 'SHORT' || (item.options?.isLongSleeve === false && catProd?.options?.hasLongSleeve);
+                  const patternName = item.selectedPattern?.name || item.pattern || item.options?.pattern;
+                  const customNameVal = item.customName || item.options?.customName;
+                  const customNumberVal = item.customNumber || item.options?.customNumber;
 
                   return (
-                    <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                      <Box sx={{ pr: 1 }}>
-                        <Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>{name}</Typography>
-                        <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
-                          {details ? `${details} • ` : ''}x{qty}
-                        </Typography>
+                    <Box
+                      key={item.id || i}
+                      sx={{
+                        display: 'flex',
+                        gap: 1.5,
+                        p: 1.25,
+                        borderRadius: 2,
+                        bgcolor: 'var(--surface-2, #f8fafc)',
+                        border: '1px solid var(--glass-border, #e2e8f0)',
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 1.5,
+                          bgcolor: 'var(--surface, #ffffff)',
+                          border: '1px solid var(--glass-border, #e2e8f0)',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {img ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={img} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                        ) : (
+                          <Package size={20} style={{ color: '#64748b' }} />
+                        )}
                       </Box>
-                      <Typography sx={{ fontWeight: 700 }}>฿{itemTotal.toLocaleString()}</Typography>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '0.86rem', color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {name}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.4 }}>
+                          {item.size && item.size !== '-' && (
+                            <Box sx={{ px: 0.7, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(0,113,227,0.12)', fontSize: '0.68rem', fontWeight: 600, color: '#0071e3' }}>
+                              {item.size}
+                            </Box>
+                          )}
+                          <Box sx={{ px: 0.7, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(100,116,139,0.12)', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>
+                            x{qty}
+                          </Box>
+                          {isLongSleeve && (
+                            <Box sx={{ px: 0.7, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.12)', fontSize: '0.68rem', fontWeight: 600, color: '#6366f1' }}>
+                              {t.common.longSleeve}
+                            </Box>
+                          )}
+                          {isShortSleeve && (
+                            <Box sx={{ px: 0.7, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(100,116,139,0.12)', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted, #64748b)' }}>
+                              {lang === 'en' ? 'Short Sleeve' : 'แขนสั้น'}
+                            </Box>
+                          )}
+                          {patternName && (
+                            <Box sx={{ px: 0.7, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(14,165,233,0.12)', fontSize: '0.68rem', fontWeight: 600, color: '#0284c7' }}>
+                              {patternName}
+                            </Box>
+                          )}
+                        </Box>
+                        {(customNameVal || customNumberVal) && (
+                          <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted, #64748b)', mt: 0.35 }}>
+                            {customNameVal ? `สกรีนชื่อ: ${customNameVal}` : ''}
+                            {customNameVal && customNumberVal ? ' · ' : ''}
+                            {customNumberVal ? `เบอร์: ${customNumberVal}` : ''}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Typography sx={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--foreground)', flexShrink: 0 }}>
+                        ฿{itemTotal.toLocaleString()}
+                      </Typography>
                     </Box>
                   );
                 })}

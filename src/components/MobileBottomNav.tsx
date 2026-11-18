@@ -52,7 +52,7 @@ export default function MobileBottomNav({
       onTabClick(key);
     } else {
       if (key === 'home') router.push('/');
-      else if (key === 'shop') router.push('/shop');
+      else if (key === 'shop') router.push('/#product-grid');
       else if (key === 'cart') router.push('/cart');
       else if (key === 'history') router.push('/orders');
     }

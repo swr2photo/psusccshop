@@ -238,7 +238,7 @@ export default function StandaloneOrdersPage() {
           config={config}
           onImageClick={setLightboxImage}
           onRefundRequested={() => { void loadPage(false, true); }}
-          onBrowseShop={() => router.push('/shop')}
+          onBrowseShop={() => router.push('/')}
         />
 
         <MobileBottomNav activeKey="history" />

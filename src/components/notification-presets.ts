@@ -8,51 +8,57 @@ export function getNotificationPalette(tone: NotificationTone) {
   switch (tone) {
     case 'success':
       return {
-        accent: '#34c759',
-        accentSoft: 'rgba(52, 199, 89, 0.18)',
-        shell: 'linear-gradient(180deg, rgba(52, 199, 89, 0.14) 0%, rgba(255,255,255,0.96) 100%)',
-        glow: '0 24px 60px rgba(52, 199, 89, 0.18)',
-        ring: 'rgba(52, 199, 89, 0.22)',
+        accent: '#10b981',
+        accentSoft: 'rgba(16, 185, 129, 0.14)',
+        shell:
+          'linear-gradient(135deg, color-mix(in srgb, #10b981 10%, var(--surface, #ffffff)) 0%, color-mix(in srgb, var(--surface, #ffffff) 96%, transparent) 100%)',
+        glow: '0 14px 36px -6px rgba(16, 185, 129, 0.22), 0 4px 14px -2px rgba(0, 0, 0, 0.12)',
+        ring: 'color-mix(in srgb, #10b981 34%, var(--glass-border, rgba(148,163,184,0.25)))',
       };
     case 'warning':
       return {
-        accent: '#ff9f0a',
-        accentSoft: 'rgba(255, 159, 10, 0.18)',
-        shell: 'linear-gradient(180deg, rgba(255, 159, 10, 0.14) 0%, rgba(255,255,255,0.96) 100%)',
-        glow: '0 24px 60px rgba(255, 159, 10, 0.16)',
-        ring: 'rgba(255, 159, 10, 0.22)',
+        accent: '#f59e0b',
+        accentSoft: 'rgba(245, 158, 11, 0.15)',
+        shell:
+          'linear-gradient(135deg, color-mix(in srgb, #f59e0b 10%, var(--surface, #ffffff)) 0%, color-mix(in srgb, var(--surface, #ffffff) 96%, transparent) 100%)',
+        glow: '0 14px 36px -6px rgba(245, 158, 11, 0.22), 0 4px 14px -2px rgba(0, 0, 0, 0.12)',
+        ring: 'color-mix(in srgb, #f59e0b 36%, var(--glass-border, rgba(148,163,184,0.25)))',
       };
     case 'error':
       return {
-        accent: '#ff453a',
-        accentSoft: 'rgba(255, 69, 58, 0.18)',
-        shell: 'linear-gradient(180deg, rgba(255, 69, 58, 0.16) 0%, rgba(255,255,255,0.96) 100%)',
-        glow: '0 24px 60px rgba(255, 69, 58, 0.18)',
-        ring: 'rgba(255, 69, 58, 0.22)',
+        accent: '#ef4444',
+        accentSoft: 'rgba(239, 68, 68, 0.15)',
+        shell:
+          'linear-gradient(135deg, color-mix(in srgb, #ef4444 11%, var(--surface, #ffffff)) 0%, color-mix(in srgb, var(--surface, #ffffff) 96%, transparent) 100%)',
+        glow: '0 14px 36px -6px rgba(239, 68, 68, 0.24), 0 4px 14px -2px rgba(0, 0, 0, 0.12)',
+        ring: 'color-mix(in srgb, #ef4444 38%, var(--glass-border, rgba(148,163,184,0.25)))',
       };
     case 'guide':
       return {
-        accent: '#5ac8fa',
-        accentSoft: 'rgba(90, 200, 250, 0.18)',
-        shell: 'linear-gradient(180deg, rgba(90, 200, 250, 0.14) 0%, rgba(255,255,255,0.96) 100%)',
-        glow: '0 24px 60px rgba(90, 200, 250, 0.16)',
-        ring: 'rgba(90, 200, 250, 0.24)',
+        accent: '#0ea5e9',
+        accentSoft: 'rgba(14, 165, 233, 0.14)',
+        shell:
+          'linear-gradient(135deg, color-mix(in srgb, #0ea5e9 10%, var(--surface, #ffffff)) 0%, color-mix(in srgb, var(--surface, #ffffff) 96%, transparent) 100%)',
+        glow: '0 14px 36px -6px rgba(14, 165, 233, 0.22), 0 4px 14px -2px rgba(0, 0, 0, 0.12)',
+        ring: 'color-mix(in srgb, #0ea5e9 34%, var(--glass-border, rgba(148,163,184,0.25)))',
       };
     case 'neutral':
       return {
-        accent: '#8e8e93',
-        accentSoft: 'rgba(142, 142, 147, 0.18)',
-        shell: 'linear-gradient(180deg, rgba(142, 142, 147, 0.12) 0%, rgba(255,255,255,0.96) 100%)',
-        glow: '0 24px 60px rgba(0, 0, 0, 0.14)',
-        ring: 'rgba(142, 142, 147, 0.2)',
+        accent: '#64748b',
+        accentSoft: 'rgba(100, 116, 139, 0.14)',
+        shell:
+          'linear-gradient(135deg, color-mix(in srgb, #64748b 8%, var(--surface, #ffffff)) 0%, color-mix(in srgb, var(--surface, #ffffff) 96%, transparent) 100%)',
+        glow: '0 14px 36px -6px rgba(0, 0, 0, 0.18), 0 4px 14px -2px rgba(0, 0, 0, 0.1)',
+        ring: 'var(--glass-border, rgba(148,163,184,0.25))',
       };
     default:
       return {
         accent: '#0071e3',
-        accentSoft: 'rgba(0, 113, 227, 0.18)',
-        shell: 'linear-gradient(180deg, rgba(0, 113, 227, 0.14) 0%, rgba(255,255,255,0.96) 100%)',
-        glow: '0 24px 60px rgba(0, 113, 227, 0.16)',
-        ring: 'rgba(0, 113, 227, 0.2)',
+        accentSoft: 'rgba(0, 113, 227, 0.14)',
+        shell:
+          'linear-gradient(135deg, color-mix(in srgb, #0071e3 10%, var(--surface, #ffffff)) 0%, color-mix(in srgb, var(--surface, #ffffff) 96%, transparent) 100%)',
+        glow: '0 14px 36px -6px rgba(0, 113, 227, 0.22), 0 4px 14px -2px rgba(0, 0, 0, 0.12)',
+        ring: 'color-mix(in srgb, #0071e3 34%, var(--glass-border, rgba(148,163,184,0.25)))',
       };
   }
 }
