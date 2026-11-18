@@ -5,6 +5,7 @@ import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { getShopById, updateShop, getShopAdminRole } from '@/lib/shops';
 import { API_CACHE } from '@/lib/api-helpers';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { sanitizePublicProducts, getReleaseAwareSmaxAge } from '@/lib/sanitize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,11 +20,20 @@ export async function GET(req: NextRequest, { params }: Params) {
     return await secureJsonResponse({ status: 'error', message: 'ไม่พบร้านค้า' }, { status: 404 });
   }
 
-  // Return only active products for public
-  const products = (shop.products || []).filter((p: any) => p.isActive !== false);
+  const now = new Date();
+  const activeProducts = (shop.products || []).filter((p: any) => p.isActive !== false);
+  const products = sanitizePublicProducts(activeProducts, now, shop.settings?.openDate);
+  const maxAge = getReleaseAwareSmaxAge(products, shop.settings?.openDate, 120, now);
+  const cacheControl =
+    maxAge <= 2
+      ? 'no-store'
+      : maxAge < 120
+      ? `public, max-age=0, s-maxage=${maxAge}`
+      : API_CACHE.medium;
+
   return await secureJsonResponse(
     { status: 'success', products, shopName: shop.name },
-    { headers: { 'Cache-Control': API_CACHE.medium } },
+    { headers: { 'Cache-Control': cacheControl } },
   );
 }
 

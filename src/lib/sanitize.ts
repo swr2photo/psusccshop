@@ -3,7 +3,7 @@
 // Data sanitization utilities for API responses
 
 import { ShopConfig, Product, NameValidationConfig, ShirtNameConfig } from './config';
-import { encryptImageUrl } from './image-crypto';
+import { encryptImageUrl, encryptBlurredPreviewUrl } from './image-crypto';
 import { isValidDate, parseThailandDateTime } from './shop-constants';
 
 // ==================== IMAGE URL PROXY ====================
@@ -38,14 +38,125 @@ function sanitizeProductImages(product: Product): Product {
   };
 }
 
-function isExpiredPublicProduct(product: Product, now = new Date()): boolean {
-  if (!product.endDate || !isValidDate(product.endDate)) return false;
-  return now > parseThailandDateTime(product.endDate, true);
+function getUnreleasedReleaseMs(
+  product: Product,
+  now = new Date(),
+  shopOpenDate?: string,
+): number | null {
+  const nowMs = now.getTime();
+  let latestFutureMs: number | null = null;
+
+  if (product.startDate && isValidDate(product.startDate)) {
+    const startMs = parseThailandDateTime(product.startDate, false).getTime();
+    if (startMs > nowMs) {
+      latestFutureMs = latestFutureMs === null ? startMs : Math.max(latestFutureMs, startMs);
+    }
+  }
+
+  if (shopOpenDate && isValidDate(shopOpenDate)) {
+    const openMs = parseThailandDateTime(shopOpenDate, false).getTime();
+    if (openMs > nowMs) {
+      latestFutureMs = latestFutureMs === null ? openMs : Math.max(latestFutureMs, openMs);
+    }
+  }
+
+  return latestFutureMs;
 }
 
-export function sanitizePublicProducts(products: Product[] | null | undefined, now = new Date()): Product[] {
-  return (products || [])
-    .map(sanitizeProductImages);
+/** Earliest future opening timestamp across shop/products (used to cap CDN cache TTL before launch). */
+export function getNextPublicReleaseMs(
+  products: Product[] | null | undefined,
+  shopOpenDate?: string,
+  now = new Date(),
+): number | null {
+  const nowMs = now.getTime();
+  let earliest: number | null = null;
+
+  if (shopOpenDate && isValidDate(shopOpenDate)) {
+    const openMs = parseThailandDateTime(shopOpenDate, false).getTime();
+    if (openMs > nowMs) earliest = openMs;
+  }
+
+  for (const product of products || []) {
+    if (product.startDate && isValidDate(product.startDate)) {
+      const startMs = parseThailandDateTime(product.startDate, false).getTime();
+      if (startMs > nowMs && (earliest === null || startMs < earliest)) {
+        earliest = startMs;
+      }
+    }
+  }
+
+  return earliest;
+}
+
+/** True when a cached public response still contains a redacted item whose release time has passed. */
+export function hasExpiredLockedPreview(
+  products: Product[] | null | undefined,
+  shopOpenDate?: string,
+  now = new Date(),
+): boolean {
+  return (products || []).some(
+    (product) => Boolean(product?.isLockedPreview) && getUnreleasedReleaseMs(product, now, shopOpenDate) === null,
+  );
+}
+
+/** Max safe CDN s-maxage (seconds) before the next scheduled release, or null if none upcoming soon. */
+export function getReleaseAwareSmaxAge(
+  products: Product[] | null | undefined,
+  shopOpenDate: string | undefined,
+  defaultSeconds: number,
+  now = new Date(),
+): number {
+  const nextReleaseMs = getNextPublicReleaseMs(products, shopOpenDate, now);
+  if (nextReleaseMs === null) return defaultSeconds;
+  const secsUntil = Math.max(0, Math.floor((nextReleaseMs - now.getTime()) / 1000));
+  return Math.min(defaultSeconds, secsUntil);
+}
+
+/**
+ * Redact unreleased product metadata and swap image URLs to server-blurred preview tokens
+ * so inspecting DevTools Network/HTML before opening cannot leak clear images or details.
+ */
+function redactUnreleasedProduct(product: Product, releaseAtMs: number): Product {
+  const primaryRawImage = product.coverImage || product.images?.[0] || '';
+  const blurredCover = primaryRawImage
+    ? encryptBlurredPreviewUrl(primaryRawImage, releaseAtMs)
+    : '';
+
+  return {
+    id: product.id,
+    name: product.name,
+    nameEn: product.nameEn,
+    description: '',
+    descriptionEn: '',
+    type: product.type,
+    category: product.category,
+    slug: product.slug,
+    images: blurredCover ? [blurredCover] : [],
+    coverImage: blurredCover,
+    basePrice: 0,
+    stock: null,
+    startDate: product.startDate,
+    endDate: product.endDate,
+    showStartDate: product.showStartDate,
+    isActive: product.isActive,
+    sortOrder: product.sortOrder,
+    isLockedPreview: true,
+  };
+}
+
+export function sanitizePublicProducts(
+  products: Product[] | null | undefined,
+  now = new Date(),
+  shopOpenDate?: string,
+): Product[] {
+  return (products || []).map((product) => {
+    const releaseAtMs = getUnreleasedReleaseMs(product, now, shopOpenDate);
+    if (releaseAtMs !== null) {
+      return redactUnreleasedProduct(product, releaseAtMs);
+    }
+    return sanitizeProductImages(product);
+  });
 }
 
 // ==================== SENSITIVE FIELD DEFINITIONS ====================
@@ -254,11 +365,11 @@ export function maskAccountNumber(accountNumber: string | null | undefined): str
  * SECURITY: Removes adminEmails, adminPermissions, sheetId, sheetUrl, vendorSheetId, vendorSheetUrl
  * SECURITY: Encodes all image URLs to hide real storage paths
  */
-export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopConfig | null {
+export function sanitizeConfigForPublic(config: ShopConfig | null, now = new Date()): PublicShopConfig | null {
   if (!config) return null;
   
-  // SECURITY: Explicitly pick only safe fields - NO sheet URLs, admin info!
-  // SECURITY: Encode all image URLs
+  // SECURITY: Explicitly pick only safe fields - NO sheet URLs, admin info, or API secrets!
+  // SECURITY: Encode all image URLs and redact unreleased coming-soon products
   const sanitized: PublicShopConfig = {
     isOpen: config.isOpen,
     closeDate: config.closeDate,
@@ -269,8 +380,8 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
     paymentDisabledMessage: config.paymentDisabledMessage,
     nameValidation: config.nameValidation,
     shirtNameConfig: config.shirtNameConfig,
-    products: sanitizePublicProducts(config.products),
-    // REMOVED: sheetUrl, vendorSheetUrl, adminEmails, adminPermissions - ไม่ส่งให้ frontend
+    products: sanitizePublicProducts(config.products, now, config.openDate),
+    // REMOVED: sheetUrl, vendorSheetUrl, adminEmails, adminPermissions, slipVerifyConfig - ไม่ส่งให้ frontend
   };
   
   // Copy announcement without postedBy email, encode image URLs
@@ -434,7 +545,21 @@ export function sanitizeConfigForAdmin(config: ShopConfig | null): ShopConfig | 
       // Keep postedBy for admin audit trail
     }));
   }
-  
+
+  // SECURITY: Never send raw Slip2Go Secret Key back to admin browser
+  const rawSlipSecret = config.slipVerifyConfig?.secretKey?.trim() || '';
+  const envSlipSecret = process.env.SLIP2GO_SECRET_KEY?.trim() || '';
+  result.slipVerifyConfig = {
+    provider: 'slip2go',
+    apiUrl: config.slipVerifyConfig?.apiUrl?.trim() || process.env.SLIP2GO_API_URL?.trim() || 'https://connect.slip2go.com',
+    hasSecretKey: Boolean(rawSlipSecret || envSlipSecret),
+    secretKeyMasked: rawSlipSecret
+      ? maskAccountNumber(rawSlipSecret)
+      : envSlipSecret
+      ? 'ENV (SLIP2GO_SECRET_KEY)'
+      : '',
+  };
+
   return result;
 }
 

@@ -76,7 +76,7 @@ const CONTENT = {
         title: '4. การชำระเงิน',
         items: [
           'รองรับการชำระเงินผ่าน PromptPay QR Code และการโอนเงินผ่านธนาคาร',
-          'หลักฐานการชำระเงิน (สลิป) จะถูกตรวจสอบอัตโนมัติผ่านระบบ SlipOK',
+          'หลักฐานการชำระเงิน (สลิป) จะถูกตรวจสอบอัตโนมัติผ่านระบบ Slip2Go',
           'หากสลิปไม่ถูกต้องหรือยอดไม่ตรง ทีมงานจะติดต่อท่านผ่านอีเมล',
           'เราไม่เก็บข้อมูลบัตรเครดิตหรือข้อมูลธนาคารของท่าน (ยกเว้นกรณีขอคืนเงิน)',
         ],
@@ -185,7 +185,7 @@ const CONTENT = {
         title: '4. Payment',
         items: [
           'We accept payment via PromptPay QR Code and bank transfer.',
-          'Payment proof (transfer slips) are automatically verified via the SlipOK service.',
+          'Payment proof (transfer slips) are automatically verified via the Slip2Go service.',
           'If a slip is invalid or the amount does not match, our team will contact you via email.',
           'We do not store credit card or bank account information (except for refund requests).',
         ],

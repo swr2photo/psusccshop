@@ -233,6 +233,7 @@ interface SettingsViewProps {
   userEmail: string | null | undefined;
   sheetSyncing: boolean;
   isSuperAdminUser: boolean;
+  isGlobalSettings?: boolean;
   onConfigChange: (newVal: ShopConfig) => void;
   onSave: () => void;
   onReset: () => void;
@@ -251,6 +252,7 @@ export const SettingsView = React.memo(function SettingsView({
   userEmail,
   sheetSyncing,
   isSuperAdminUser,
+  isGlobalSettings = true,
   onConfigChange,
   onSave,
   onReset,
@@ -498,6 +500,79 @@ export const SettingsView = React.memo(function SettingsView({
                   rows={2}
                 />
               </SettingRow>
+            )}
+            {isSuperAdminUser && isGlobalSettings && (
+              <>
+                <SettingRow
+                  label="ผู้ให้บริการตรวจสลิป (Slip2Go)"
+                  description={
+                    localConfig.slipVerifyConfig?.hasSecretKey
+                      ? `เชื่อมต่อแล้ว (${localConfig.slipVerifyConfig.secretKeyMasked || 'Secret Key'})`
+                      : 'ยังไม่ได้ตั้งค่า Secret Key — กรุณาคัดลอกคีย์จากหน้า API Connect'
+                  }
+                >
+                  <Button variant="outline" size="sm" asChild className="shrink-0">
+                    <a
+                      href="https://app.slip2go.com/shop/api-connect/auth"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ExternalLink /> Slip2Go API Connect
+                    </a>
+                  </Button>
+                </SettingRow>
+                <SettingRow
+                  label="Slip2Go API Connect URL"
+                  description="ค่าเริ่มต้น: https://connect.slip2go.com"
+                  htmlFor="st-slip2go-url"
+                  stacked
+                >
+                  <Input
+                    id="st-slip2go-url"
+                    type="url"
+                    placeholder="https://connect.slip2go.com"
+                    value={localConfig.slipVerifyConfig?.apiUrl ?? ''}
+                    onChange={(e) =>
+                      set({
+                        slipVerifyConfig: {
+                          ...localConfig.slipVerifyConfig,
+                          provider: 'slip2go',
+                          apiUrl: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-9 font-mono text-xs"
+                  />
+                </SettingRow>
+                <SettingRow
+                  label="Slip2Go Secret Key"
+                  description="ใช้ส่งผ่าน Authorization: Bearer ... (ระบบซ่อนค่าเดิมไว้เพื่อความปลอดภัย หรือตั้งผ่าน SLIP2GO_SECRET_KEY)"
+                  htmlFor="st-slip2go-secret"
+                  stacked
+                >
+                  <Input
+                    id="st-slip2go-secret"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder={
+                      localConfig.slipVerifyConfig?.hasSecretKey
+                        ? `ตั้งค่าแล้ว (${localConfig.slipVerifyConfig.secretKeyMasked || '••••'}) — ใส่ใหม่เฉพาะเมื่อต้องการเปลี่ยน`
+                        : 'วาง Secret Key จาก https://app.slip2go.com/shop/api-connect/auth'
+                    }
+                    value={localConfig.slipVerifyConfig?.secretKey ?? ''}
+                    onChange={(e) =>
+                      set({
+                        slipVerifyConfig: {
+                          ...localConfig.slipVerifyConfig,
+                          provider: 'slip2go',
+                          secretKey: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-9 font-mono text-xs"
+                  />
+                </SettingRow>
+              </>
             )}
           </SettingSection>
         )}

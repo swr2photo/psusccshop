@@ -120,7 +120,7 @@ export const FLAGSHIP_PRODUCTS: Record<string, FlagshipProductConfig> = {
         cta360Label: 'หมุนดูแบบ 360°',
         highlights: [
           'เลือกไซส์ ใส่ชื่อได้',
-          'จ่ายด้วย PromptPay + SlipOK',
+          'จ่ายด้วย PromptPay + Slip2Go',
           'รับที่ตึกคอมฯ',
           '500+ ออเดอร์',
         ],
@@ -136,7 +136,7 @@ export const FLAGSHIP_PRODUCTS: Record<string, FlagshipProductConfig> = {
         cta360Label: 'Spin it 360°',
         highlights: [
           'Pick a size, add your name',
-          'Pay with PromptPay + SlipOK',
+          'Pay with PromptPay + Slip2Go',
           'Pick up at CS dept.',
           '500+ orders',
         ],

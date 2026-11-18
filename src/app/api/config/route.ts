@@ -5,7 +5,13 @@ import { getJson, putJson, syncShopOpenStatusToRedis } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { resolveAdminSession } from '@/lib/admin-context';
-import { sanitizeConfigForPublic, sanitizeObjectUtf8 } from '@/lib/sanitize';
+import {
+  sanitizeConfigForAdmin,
+  sanitizeConfigForPublic,
+  sanitizeObjectUtf8,
+  hasExpiredLockedPreview,
+  getReleaseAwareSmaxAge,
+} from '@/lib/sanitize';
 import { saveAllAdminPermissionsToDB, getAllAdminPermissionsFromDB, deleteAdminPermissionsFromDB } from '@/lib/supabase';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import { mergeRealtimeStock } from '@/lib/redis-stock-merge';
@@ -77,34 +83,58 @@ const DEFAULT_CONFIG: ShopConfig = {
   bankAccount: { bankName: '', accountName: '', accountNumber: '' },
 };
 
+function sanitizeSlip2GoApiUrl(raw?: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return 'https://connect.slip2go.com';
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    if (parsed.protocol === 'https:' && (host === 'slip2go.com' || host.endsWith('.slip2go.com'))) {
+      return `${parsed.origin}${parsed.pathname.replace(/\/+$/, '')}`;
+    }
+  } catch {
+    // fallback below
+  }
+  return 'https://connect.slip2go.com';
+}
+
+async function loadPublicPayload(now: Date) {
+  let cfg = DEFAULT_CONFIG;
+  try {
+    const dbConfig = await getJson<ShopConfig>(CONFIG_KEY);
+    if (dbConfig) {
+      cfg = dbConfig;
+    }
+  } catch (error) {
+    console.error('[Config API] Failed to load config from database, falling back to default:', error);
+  }
+
+  const mergedCfg = await mergeRealtimeStock(cfg);
+  const sanitizedConfig = sanitizeConfigForPublic(mergedCfg, now);
+  return { status: 'success' as const, data: sanitizedConfig };
+}
+
 async function GETHandler() {
-  const payload = await getCached(PUBLIC_CONFIG_CACHE_KEY, CACHE_TTL.config, async () => {
-    let cfg = DEFAULT_CONFIG;
-    try {
-      const dbConfig = await getJson<ShopConfig>(CONFIG_KEY);
-      if (dbConfig) {
-        cfg = dbConfig;
-      }
-    } catch (error) {
-      console.error('[Config API] Failed to load config from database, falling back to default:', error);
-    }
+  const now = new Date();
+  let payload = await getCached(PUBLIC_CONFIG_CACHE_KEY, CACHE_TTL.config, () => loadPublicPayload(new Date()));
 
-    const mergedCfg = await mergeRealtimeStock(cfg);
-    const sanitizedConfig = sanitizeConfigForPublic(mergedCfg);
-    return { status: 'success' as const, data: sanitizedConfig };
-  });
+  if (hasExpiredLockedPreview(payload.data?.products, payload.data?.openDate, now)) {
+    invalidateCacheKey(PUBLIC_CONFIG_CACHE_KEY);
+    payload = await getCached(PUBLIC_CONFIG_CACHE_KEY, CACHE_TTL.config, () => loadPublicPayload(new Date()));
+  }
 
-  return await secureJsonResponse(
-    payload,
-    {
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        // Align with next.config + API_CDN_HEADERS.config (edge ~10s)
-        'Cache-Control': 'public, max-age=0, s-maxage=10, stale-while-revalidate=30',
-        'CDN-Cache-Control': 'public, max-age=10',
-      },
-    }
-  );
+  const maxAge = getReleaseAwareSmaxAge(payload.data?.products, payload.data?.openDate, 10, now);
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json; charset=utf-8',
+    ...(maxAge <= 2
+      ? { 'Cache-Control': 'no-store' }
+      : {
+          'Cache-Control': `public, max-age=0, s-maxage=${maxAge}, stale-while-revalidate=${maxAge < 10 ? 0 : 30}`,
+          'CDN-Cache-Control': `public, max-age=${maxAge}`,
+        }),
+  };
+
+  return await secureJsonResponse(payload, { headers });
 }
 
 async function POSTHandler(req: NextRequest) {
@@ -126,7 +156,7 @@ async function POSTHandler(req: NextRequest) {
     const body = await secureJsonRequest(req);
     const config = body?.config as ShopConfig | undefined;
     if (!config) return await secureJsonResponse({ status: 'error', message: 'missing config' }, { status: 400 });
-    
+
     // ⚠️ Safety: prevent saving config with empty products if DB already has products
     // This prevents accidental data wipe from race conditions or stale client state
     const currentConfig = await getJson<ShopConfig>(CONFIG_KEY);
@@ -149,7 +179,7 @@ async function POSTHandler(req: NextRequest) {
         { status: 409 }
       );
     }
-    
+
     // Protect admin management fields - only super admin can modify these
     if (!isSuperAdminEmail(authResult.email)) {
       if (currentConfig) {
@@ -168,10 +198,29 @@ async function POSTHandler(req: NextRequest) {
         config.flagshipConfigs = currentConfig.flagshipConfigs;
       }
     }
-    
+
+    // Normalize Slip2Go verification config & preserve stored Secret Key unless explicitly replaced
+    const existingSlipSecret = currentConfig?.slipVerifyConfig?.secretKey?.trim() || '';
+    const incomingSlipCfg = config.slipVerifyConfig;
+    const rawIncomingSecret = (incomingSlipCfg?.secretKey || '').trim();
+    const isMaskedOrEmpty =
+      !rawIncomingSecret ||
+      rawIncomingSecret.startsWith('*') ||
+      rawIncomingSecret.startsWith('•') ||
+      rawIncomingSecret.startsWith('ENV ');
+    config.slipVerifyConfig = {
+      provider: 'slip2go',
+      apiUrl: sanitizeSlip2GoApiUrl(incomingSlipCfg?.apiUrl || currentConfig?.slipVerifyConfig?.apiUrl),
+      ...(isMaskedOrEmpty
+        ? existingSlipSecret
+          ? { secretKey: existingSlipSecret }
+          : {}
+        : { secretKey: rawIncomingSecret }),
+    };
+
     // Sanitize UTF-8 input ก่อนบันทึก
     const sanitizedConfig = sanitizeObjectUtf8(config);
-    
+
     await putJson(CONFIG_KEY, sanitizedConfig);
     invalidateCacheKey(PUBLIC_CONFIG_CACHE_KEY);
     invalidateCacheKey(LIVE_CACHE_KEY);
@@ -182,14 +231,12 @@ async function POSTHandler(req: NextRequest) {
         console.error('[config] Failed to sync shop status to Redis cache:', e);
       }
     }
-    
+
     // Sync admin permissions to DB (if present in config)
     if (config.adminPermissions && typeof config.adminPermissions === 'object') {
       try {
-        // Upsert current permissions
         await saveAllAdminPermissionsToDB(config.adminPermissions as Record<string, Record<string, boolean>>);
-        
-        // Clean up permissions for removed admins
+
         const dbPerms = await getAllAdminPermissionsFromDB();
         const configEmails = new Set(Object.keys(config.adminPermissions).map(e => e.toLowerCase()));
         for (const dbEmail of Object.keys(dbPerms)) {
@@ -199,22 +246,20 @@ async function POSTHandler(req: NextRequest) {
         }
       } catch (e) {
         console.error('[config] Failed to sync admin permissions to DB:', e);
-        // Don't fail the whole save - config JSON is the primary source
       }
     }
-    
+
     // Log config change
     const userAgent = req.headers.get('user-agent') || undefined;
-    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
                      req.headers.get('x-real-ip') || undefined;
-    
-    // Detect what changed
+
     const changes: string[] = [];
     if (config.isOpen !== undefined) changes.push(config.isOpen ? 'เปิดร้าน' : 'ปิดร้าน');
     if (config.products?.length) changes.push(`สินค้า ${config.products.length} รายการ`);
     if (config.announcement?.enabled) changes.push('ประกาศ');
     if (config.bankAccount?.accountNumber) changes.push('บัญชีธนาคาร');
-    
+
     const configDetails = `แก้ไขการตั้งค่าร้าน${changes.length ? ': ' + changes.join(', ') : ''}`;
     await saveUserLogServer({
       email: authResult.email,
@@ -247,9 +292,10 @@ async function POSTHandler(req: NextRequest) {
       },
       request: req,
     });
-    
+
+    const responseConfig = sanitizeConfigForAdmin(sanitizedConfig);
     return await secureJsonResponse(
-      { status: 'success', data: sanitizedConfig },
+      { status: 'success', data: responseConfig },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {

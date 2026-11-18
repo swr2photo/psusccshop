@@ -169,7 +169,7 @@ export default function Footer() {
     },
     {
       kind: 'logo',
-      src: '/trust/slipok.svg',
+      src: '/trust/slip2go.svg',
       label: t.footer.trustSlipOk,
       alt: t.footer.trustSlipOk,
     },

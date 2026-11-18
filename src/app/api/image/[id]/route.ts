@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { smartDecryptUrl } from '@/lib/image-crypto';
+import { resolveImageToken } from '@/lib/image-crypto';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import crypto from 'crypto';
-import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import zlib from 'zlib';
+import { secureJsonResponse } from '@/lib/payload-crypto';
 
 // Ensure Node runtime for fetch
 export const runtime = 'nodejs';
@@ -33,25 +34,106 @@ function getCacheKey(url: string): string {
   return `image-cache/${hash.substring(0, 2)}/${hash}`;
 }
 
+function getBlurredCacheKey(url: string): string {
+  const hash = crypto.createHash('sha256').update(`blur-v1:${url}`).digest('hex');
+  return `image-blur-cache/${hash.substring(0, 2)}/${hash}.webp`;
+}
+
+/** Deterministic fallback frosted neutral PNG (never leaks clear pixels if image processing fails). */
+function createFallbackBlurredPng(): Buffer {
+  const width = 32;
+  const height = 32;
+  const rows = Buffer.alloc(height * (1 + width * 4));
+  for (let y = 0; y < height; y++) {
+    const rowStart = y * (1 + width * 4);
+    rows[rowStart] = 0; // PNG filter: none
+    for (let x = 0; x < width; x++) {
+      const px = rowStart + 1 + x * 4;
+      const shade = Math.round(168 + ((x + y) / (width + height)) * 32);
+      rows[px] = shade;
+      rows[px + 1] = shade + 4;
+      rows[px + 2] = shade + 10;
+      rows[px + 3] = 255;
+    }
+  }
+  const crc32 = (buf: Buffer): number => {
+    let crc = 0xffffffff;
+    for (let i = 0; i < buf.length; i++) {
+      crc ^= buf[i];
+      for (let j = 0; j < 8; j++) {
+        crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+      }
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type: string, data: Buffer): Buffer => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length, 0);
+    const typeBuf = Buffer.from(type, 'ascii');
+    const crcBuf = Buffer.alloc(4);
+    crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
+    return Buffer.concat([len, typeBuf, data, crcBuf]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // RGBA
+  const compressed = zlib.deflateSync(rows);
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', compressed),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+/**
+ * Heavily downsample + double-blur image on the server for unreleased product previews.
+ * Original high-resolution pixels never leave the server.
+ */
+async function createBlurredPreviewBuffer(imageBuffer: Buffer): Promise<{ buffer: Buffer; contentType: string }> {
+  try {
+    const sharpMod = await import('sharp').catch(() => null);
+    const sharpFn = sharpMod?.default;
+    if (typeof sharpFn === 'function') {
+      const tiny = await sharpFn(imageBuffer)
+        .rotate()
+        .resize(48, 48, { fit: 'inside', withoutEnlargement: true })
+        .blur(8)
+        .toBuffer();
+      const blurred = await sharpFn(tiny)
+        .resize(240, 240, { fit: 'inside' })
+        .blur(10)
+        .webp({ quality: 52 })
+        .toBuffer();
+      return { buffer: blurred, contentType: 'image/webp' };
+    }
+  } catch (err) {
+    console.warn('[Image Proxy] Server blur fallback triggered:', err instanceof Error ? err.message : err);
+  }
+  return { buffer: createFallbackBlurredPng(), contentType: 'image/png' };
+}
+
 /**
  * Check if image exists in cache
  */
 async function getFromCache(cacheKey: string): Promise<{ buffer: Buffer; contentType: string } | null> {
   if (!bucket) return null;
-  
+
   try {
     const response = await s3Client.send(new GetObjectCommand({
       Bucket: bucket,
       Key: cacheKey,
     }));
-    
+
     if (!response.Body) return null;
-    
+
     const chunks: Buffer[] = [];
     for await (const chunk of response.Body as Readable) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
-    
+
     return {
       buffer: Buffer.concat(chunks),
       contentType: response.ContentType || 'image/jpeg',
@@ -67,7 +149,7 @@ async function getFromCache(cacheKey: string): Promise<{ buffer: Buffer; content
  */
 async function saveToCache(cacheKey: string, buffer: Buffer, contentType: string): Promise<void> {
   if (!bucket) return;
-  
+
   try {
     await s3Client.send(new PutObjectCommand({
       Bucket: bucket,
@@ -107,44 +189,34 @@ const ALLOWED_ORIGINS = [
  * Validate that the request comes from within the app (not direct URL access).
  *
  * Uses the browser-standard Sec-Fetch-* headers:
- *  - Sec-Fetch-Dest: "image" → loaded via <img>/<picture>/CSS  ✅
- *  - Sec-Fetch-Dest: "document" → user pasted URL in address bar  ❌
- *  - Sec-Fetch-Site: "same-origin" / "same-site"  ✅
- *  - Sec-Fetch-Site: "none" → address-bar navigation  ❌
+ *  - Sec-Fetch-Dest: "image" → loaded via <img>/<picture>/CSS
+ *  - Sec-Fetch-Dest: "document" → user pasted URL in address bar
+ *  - Sec-Fetch-Site: "same-origin" / "same-site"
+ *  - Sec-Fetch-Site: "none" → address-bar navigation
  *
  * Falls back to Referer check for browsers that don't send Sec-Fetch.
  */
 function isAllowedImageRequest(req: NextRequest): boolean {
   const secFetchDest = req.headers.get('sec-fetch-dest');
   const secFetchSite = req.headers.get('sec-fetch-site');
-  const _secFetchMode = req.headers.get('sec-fetch-mode');
   const referer = req.headers.get('referer');
   const host = req.headers.get('host') || '';
 
-  // 1. If we have Sec-Fetch-Dest, trust it (all modern browsers send this)
   if (secFetchDest) {
-    // Allow normal <img> / CSS background / <picture> loads
     if (secFetchDest === 'image') return true;
-    // Allow <video>/<audio> poster attribute
     if (secFetchDest === 'video' || secFetchDest === 'audio') return true;
-    // Block direct navigation (user pasted URL), iframe, object, etc.
     return false;
   }
 
-  // 2. If we have Sec-Fetch-Site but no Dest (rare), check origin
   if (secFetchSite) {
     if (secFetchSite === 'same-origin' || secFetchSite === 'same-site') return true;
-    // cross-site or none without image dest → block
     return false;
   }
 
-  // 3. Fallback for older browsers (Safari < 16.4, etc.): check Referer
   if (referer) {
     try {
       const refUrl = new URL(referer);
-      // Same host → same-origin context
       if (refUrl.host === host) return true;
-      // Known allowed origins
       if (ALLOWED_ORIGINS.some(o => refUrl.host.includes(o))) return true;
     } catch {
       // invalid referer
@@ -152,17 +224,13 @@ function isAllowedImageRequest(req: NextRequest): boolean {
     return false;
   }
 
-  // 4. No Sec-Fetch, no Referer → likely cURL/wget/bot/direct → block
   return false;
 }
 
 /**
- * Return an "Access Denied" image (PNG with text) instead of the real image.
- * This is displayed when someone directly navigates to the URL.
+ * Return an "Access Denied" JSON when someone directly navigates to the URL.
  */
 async function accessDeniedResponse(): Promise<NextResponse> {
-  // 1×1 red pixel PNG as a simple visual indicator
-  // In production, returning 403 JSON is cleaner + cheaper
   return await secureJsonResponse(
     {
       error: 'Access Denied',
@@ -182,23 +250,16 @@ async function accessDeniedResponse(): Promise<NextResponse> {
 
 // ==================== ALLOWED DOMAINS ====================
 
-/**
- * Whitelist of allowed image domains
- * Note: For debugging, we're allowing all domains temporarily
- */
 const ALLOWED_DOMAINS = [
   'ipfs.filebase.io',
   's3.filebase.com',
   'lh3.googleusercontent.com',
   'ui-avatars.com',
-  // Supabase storage
   'supabase.co',
   'supabase.com',
   'supabase.net',
-  // Common CDNs
   'cloudflare.com',
   'cdn.jsdelivr.net',
-  // Local development / emulation
   'localhost',
   '127.0.0.1',
 ];
@@ -206,7 +267,7 @@ const ALLOWED_DOMAINS = [
 function isAllowedUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    const isAllowed = ALLOWED_DOMAINS.some(domain => 
+    const isAllowed = ALLOWED_DOMAINS.some(domain =>
       parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`)
     );
     if (!isAllowed) {
@@ -214,7 +275,7 @@ function isAllowedUrl(url: string): boolean {
       return false;
     }
     return true;
-  } catch (_e) {
+  } catch {
     console.warn('[Image Proxy] Invalid URL:', url);
     return false;
   }
@@ -228,29 +289,29 @@ export async function HEAD(
 ) {
   try {
     const { id } = await params;
-    
+
     if (!id) {
       return new NextResponse(null, { status: 400 });
     }
 
-    // Block direct access on HEAD too
     if (!isAllowedImageRequest(req)) {
       return new NextResponse(null, { status: 403 });
     }
 
-    const imageUrl = smartDecryptUrl(id);
-    if (!imageUrl || !isAllowedUrl(imageUrl)) {
+    const resolved = resolveImageToken(id);
+    if (!resolved || !isAllowedUrl(resolved.url)) {
       return new NextResponse(null, { status: 400 });
     }
 
-    const cacheKey = getCacheKey(imageUrl);
+    const isBlurredPreview = resolved.previewMode === 'blur';
+    const cacheKey = isBlurredPreview ? getBlurredCacheKey(resolved.url) : getCacheKey(resolved.url);
     const cached = await getFromCache(cacheKey);
-    
+
     return new NextResponse(null, {
       status: 200,
       headers: {
-        'Content-Type': cached?.contentType || 'image/jpeg',
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Type': cached?.contentType || (isBlurredPreview ? 'image/webp' : 'image/jpeg'),
+        'Cache-Control': isBlurredPreview ? 'public, max-age=3600' : 'public, max-age=31536000, immutable',
         'X-Cache': cached ? 'HIT' : 'MISS',
       },
     });
@@ -267,23 +328,20 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
+
     if (!id) {
       return await secureJsonResponse({ error: 'Missing image ID' }, { status: 400 });
     }
 
-    // ==================== ACCESS CONTROL ====================
     // Block direct URL access — only allow <img> loads from the app
     if (!isAllowedImageRequest(req)) {
       return accessDeniedResponse();
     }
 
-    // Decrypt the image URL using smart decryption (AES or legacy XOR)
-    const imageUrl = smartDecryptUrl(id);
-    
-    if (!imageUrl) {
-      // Return a 1x1 transparent PNG placeholder instead of error
-      // This prevents broken image icons while maintaining security
+    // Decrypt token & inspect whether this is a locked blur-only preview token
+    const resolved = resolveImageToken(id);
+
+    if (!resolved) {
       console.warn('[Image Proxy] Could not decrypt image token, returning placeholder');
       const transparentPng = Buffer.from(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
@@ -299,17 +357,85 @@ export async function GET(
       });
     }
 
+    const imageUrl = resolved.url;
+    const isBlurredPreview = resolved.previewMode === 'blur';
+
     // Validate URL is from allowed domains
     if (!isAllowedUrl(imageUrl)) {
       console.warn('[Image Proxy] Blocked URL:', imageUrl);
       return await secureJsonResponse({ error: 'URL not allowed' }, { status: 403 });
     }
 
-    // Generate cache key
-    const cacheKey = getCacheKey(imageUrl);
-    
-    //  Check cache first - permanent storage
-    const cached = await getFromCache(cacheKey);
+    const realCacheKey = getCacheKey(imageUrl);
+    const blurCacheKey = getBlurredCacheKey(imageUrl);
+
+    if (isBlurredPreview) {
+      const cachedBlurred = await getFromCache(blurCacheKey);
+      if (cachedBlurred) {
+        return new NextResponse(new Uint8Array(cachedBlurred.buffer), {
+          status: 200,
+          headers: {
+            'Content-Type': cachedBlurred.contentType,
+            'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+            'CDN-Cache-Control': 'public, max-age=3600',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Image-Preview': 'blur',
+            'X-Cache': 'HIT',
+            'Vary': 'Accept, Sec-Fetch-Dest',
+          },
+        });
+      }
+
+      // Fetch clear bytes only on the server; never send unblurred pixels over the wire
+      let sourceBuffer: Buffer | null = null;
+      const cachedOriginal = await getFromCache(realCacheKey);
+      if (cachedOriginal) {
+        sourceBuffer = cachedOriginal.buffer;
+      } else {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        try {
+          const response = await fetch(imageUrl, {
+            signal: controller.signal,
+            headers: {
+              'Accept': 'image/*',
+              'User-Agent': 'PSUSCCSHOP-ImageProxy/2.0',
+            },
+          });
+          if (response.ok) {
+            const ct = response.headers.get('content-type') || 'image/jpeg';
+            if (ct.startsWith('image/')) {
+              sourceBuffer = Buffer.from(await response.arrayBuffer());
+              saveToCache(realCacheKey, sourceBuffer, ct).catch(() => {});
+            }
+          }
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
+
+      const blurredResult = sourceBuffer
+        ? await createBlurredPreviewBuffer(sourceBuffer)
+        : { buffer: createFallbackBlurredPng(), contentType: 'image/png' };
+
+      saveToCache(blurCacheKey, blurredResult.buffer, blurredResult.contentType).catch(() => {});
+
+      return new NextResponse(new Uint8Array(blurredResult.buffer), {
+        status: 200,
+        headers: {
+          'Content-Type': blurredResult.contentType,
+          'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+          'CDN-Cache-Control': 'public, max-age=3600',
+          'X-Content-Type-Options': 'nosniff',
+          'X-Image-Preview': 'blur',
+          'X-Cache': 'MISS',
+          'Vary': 'Accept, Sec-Fetch-Dest',
+        },
+      });
+    }
+
+    // Check cache first for normal open-product images
+    const cached = await getFromCache(realCacheKey);
     if (cached) {
       return new NextResponse(new Uint8Array(cached.buffer), {
         status: 200,
@@ -341,7 +467,7 @@ export async function GET(
 
     if (!response.ok) {
       return await secureJsonResponse(
-        { error: 'Failed to fetch image' }, 
+        { error: 'Failed to fetch image' },
         { status: response.status }
       );
     }
@@ -352,12 +478,10 @@ export async function GET(
       return await secureJsonResponse({ error: 'Invalid content type' }, { status: 400 });
     }
 
-    // Fetch image data as ArrayBuffer to avoid fragile Node/Web stream compatibility issues
     const arrayBuffer = await response.arrayBuffer();
     const imageBuffer = Buffer.from(arrayBuffer);
 
-    // Save to cache in the background (fire-and-forget, non-blocking)
-    saveToCache(cacheKey, imageBuffer, contentType).catch(() => {});
+    saveToCache(realCacheKey, imageBuffer, contentType).catch(() => {});
 
     return new NextResponse(new Uint8Array(imageBuffer), {
       status: 200,
@@ -371,16 +495,15 @@ export async function GET(
         'Vary': 'Accept, Sec-Fetch-Dest',
       },
     });
-
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Image Proxy] Error:', error?.message || error);
-    
+
     if (error?.name === 'AbortError') {
       return await secureJsonResponse({ error: 'Request timeout' }, { status: 504 });
     }
-    
+
     return await secureJsonResponse(
-      { error: 'Internal server error' }, 
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

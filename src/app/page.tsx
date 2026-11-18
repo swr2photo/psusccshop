@@ -503,7 +503,7 @@ type OrderHistory = {
 
 type Interval = ReturnType<typeof setInterval>;
 
-type LeanProduct = Pick<Product, 'id' | 'name' | 'description' | 'type' | 'images' | 'basePrice' | 'sizePricing' | 'isActive' | 'startDate' | 'endDate' | 'showStartDate'>;
+type LeanProduct = Pick<Product, 'id' | 'name' | 'description' | 'type' | 'images' | 'basePrice' | 'sizePricing' | 'isActive' | 'startDate' | 'endDate' | 'showStartDate' | 'isLockedPreview'>;
 type LeanConfig = {
   isOpen: boolean;
   closeDate?: string;
@@ -523,7 +523,16 @@ function readCachedShopConfig(): LeanConfig | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.timestamp || Date.now() - parsed.timestamp > CONFIG_CACHE_TTL) return null;
-    return parsed.config as LeanConfig;
+    const cfg = parsed.config as LeanConfig;
+    const now = new Date();
+    const shopOpenDue = !cfg.openDate || !isValidDate(cfg.openDate) || now >= parseThailandDateTime(cfg.openDate, false);
+    const hasExpiredLock = (cfg.products || []).some((p) => {
+      if (!p.isLockedPreview) return false;
+      const productOpenDue = !p.startDate || !isValidDate(p.startDate) || now >= parseThailandDateTime(p.startDate, false);
+      return shopOpenDue && productOpenDue;
+    });
+    if (hasExpiredLock) return null;
+    return cfg;
   } catch (error) {
     console.error('Failed to read cached config', error);
     return null;
@@ -560,6 +569,7 @@ function sanitizeShopConfig(cfg: ShopConfig): LeanConfig {
       startDate: p.startDate,
       endDate: p.endDate,
       showStartDate: p.showStartDate,
+      isLockedPreview: p.isLockedPreview,
     })),
   };
 }
@@ -1288,6 +1298,46 @@ export default function HomePage() {
     };
   }, [refreshConfig, refreshShippingConfig]);
 
+  // Unlock redacted coming-soon products immediately when server clock crosses startDate/openDate
+  const unlockedProductRefreshRef = useRef<string>('');
+  const unlockedCatalogRefreshRef = useRef<string>('');
+  useEffect(() => {
+    const mainShopOpenDue = !config?.openDate || !isValidDate(config.openDate) || now >= parseThailandDateTime(config.openDate, false);
+    if (mainShopOpenDue && config?.products?.length) {
+      const dueMainIds = config.products
+        .filter((p) => p.isLockedPreview && isProductCurrentlyOpen(p, now))
+        .map((p) => p.id)
+        .sort()
+        .join(',');
+      if (dueMainIds && unlockedProductRefreshRef.current !== dueMainIds) {
+        unlockedProductRefreshRef.current = dueMainIds;
+        void refreshConfig(true);
+      }
+    }
+
+    if (subShopCatalog.length > 0) {
+      const dueSubIds = subShopCatalog
+        .flatMap((shop) => {
+          const shopOpenDue = !shop.openDate || !isValidDate(shop.openDate) || now >= parseThailandDateTime(shop.openDate, false);
+          if (!shopOpenDue) return [];
+          return (shop.products || [])
+            .filter((p) => p.isLockedPreview && isProductCurrentlyOpen(p, now))
+            .map((p) => `${shop.id}:${p.id}`);
+        })
+        .sort()
+        .join(',');
+      if (dueSubIds && unlockedCatalogRefreshRef.current !== dueSubIds) {
+        unlockedCatalogRefreshRef.current = dueSubIds;
+        apiFetch(`/api/shops/catalog?v=${Date.now()}`, { cache: 'no-store' })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data) mutate(PAGE_CACHE_KEYS.CATALOG, data, false);
+          })
+          .catch(() => {});
+      }
+    }
+  }, [config?.openDate, config?.products, subShopCatalog, now, refreshConfig]);
+
   // Auto-open product from URL query param (?p=id or legacy ?product=slug-or-id)
   useEffect(() => {
     if (!config?.products?.length) return;
@@ -1300,7 +1350,7 @@ export default function HomePage() {
       p.slug === decoded ||
       generateSlug(p.name, p.id) === decoded
     );
-    if (found && isProductCurrentlyOpen(found, now)) {
+    if (found && !found.isLockedPreview && isProductCurrentlyOpen(found, now)) {
       handleSelectProduct(found);
       // Clean URL without reload
       window.history.replaceState({}, '', window.location.pathname);
@@ -1614,6 +1664,7 @@ export default function HomePage() {
   // Unified product select handler — batches all state into one render
   const handleSelectProduct = useCallback((product: Product, shopContext?: { shopId?: string; shopSlug?: string; isOpen?: boolean }) => {
     const status = getProductStatus(product, now);
+    const effectiveStatus = product.isLockedPreview && status === 'OPEN' ? 'COMING_SOON' : status;
     const outOfStock = isProductOutOfStock(product);
     
     const shopIsOpen = shopContext && shopContext.isOpen !== undefined ? shopContext.isOpen : isShopOpen;
@@ -1623,9 +1674,9 @@ export default function HomePage() {
       return;
     }
     
-    if (status !== 'OPEN' || outOfStock) {
+    if (effectiveStatus !== 'OPEN' || outOfStock || product.isLockedPreview) {
       const toast = getProductUnavailableToast({
-        status,
+        status: effectiveStatus,
         outOfStock,
         productName: getProductName(product, lang),
         labels: {
@@ -4721,8 +4772,10 @@ export default function HomePage() {
                     {items.map((product, productIdx) => {
                       const productStatus = getProductStatus(product, now);
                       const outOfStock = isProductOutOfStock(product);
-                      const isProductUnavailable = productStatus !== 'OPEN' || outOfStock || !catalogContext.isOpen;
-                      const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen;
+                      const isLockedPreview = Boolean(product.isLockedPreview);
+                      const isComingSoon = productStatus === 'COMING_SOON' || isLockedPreview;
+                      const isProductUnavailable = productStatus !== 'OPEN' || outOfStock || !catalogContext.isOpen || isLockedPreview;
+                      const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen && !isLockedPreview;
                       const isProductClosed = isProductUnavailable;
                       const eventDiscount = getEventDiscount(product.id, catalogContext.events, now);
                       const quickAdd = canQuickAddToCart(product);
@@ -4743,7 +4796,8 @@ export default function HomePage() {
                               showToast('warning', t.checkout.shopClosedWarning);
                               return;
                             }
-                            if (productStatus !== 'OPEN') {
+                            if (productStatus !== 'OPEN' || isLockedPreview) {
+                              const effectiveStatus = isLockedPreview && productStatus === 'OPEN' ? 'COMING_SOON' : productStatus;
                               const statusLabelsMap: Record<ShopStatusType, string> = {
                                 OPEN: t.shopStatus.open,
                                 COMING_SOON: t.shopStatus.comingSoon,
@@ -4751,7 +4805,7 @@ export default function HomePage() {
                                 TEMPORARILY_CLOSED: t.shopStatus.closed,
                                 WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
                               };
-                              showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[productStatus]}`);
+                              showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[effectiveStatus]}`);
                               return;
                             }
                             if (outOfStock) {
@@ -4805,7 +4859,8 @@ export default function HomePage() {
                               style={{
                                 position: 'absolute',
                                 inset: 0,
-                                filter: 'none',
+                                filter: isComingSoon ? 'blur(14px)' : 'none',
+                                transform: isComingSoon ? 'scale(1.16)' : undefined,
                                 transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                               }}
                               className={!isProductClosed ? 'product-image-zoom' : ''}
@@ -4820,6 +4875,7 @@ export default function HomePage() {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 background: 'rgba(0,0,0,0.45)',
+                                backdropFilter: isComingSoon ? 'blur(8px)' : 'none',
                               }}>
                                 <Box
                                   sx={{
@@ -4834,8 +4890,10 @@ export default function HomePage() {
                                     letterSpacing: '0.02em',
                                   }}
                                 >
-                                  {outOfStock && productStatus === 'OPEN'
+                                  {outOfStock && productStatus === 'OPEN' && !isLockedPreview
                                     ? t.product.soldOut
+                                    : isComingSoon
+                                    ? t.shopStatus.comingSoon
                                     : ({
                                     OPEN: t.shopStatus.open,
                                     COMING_SOON: t.shopStatus.comingSoon,
@@ -5022,7 +5080,7 @@ export default function HomePage() {
                               {getProductName(product, lang)}
                             </Typography>
                             
-                            {/* Description — reserved 1 line */}
+                            {/* Description — reserved 1 line (hidden while coming soon) */}
                             <Typography sx={{ 
                               fontSize: '0.72rem', 
                               color: 'var(--text-muted)',
@@ -5032,9 +5090,9 @@ export default function HomePage() {
                               lineHeight: 1.4,
                               mb: 0.8,
                               minHeight: '1.05em',
-                              opacity: getProductDescription(product, lang) ? 1 : 0,
+                              opacity: !isComingSoon && getProductDescription(product, lang) ? 1 : 0,
                             }}>
-                              {getProductDescription(product, lang) || '\u00A0'}
+                              {(!isComingSoon && getProductDescription(product, lang)) || '\u00A0'}
                             </Typography>
 
                             {/* Tags — reserved row so heights stay even */}
@@ -5047,6 +5105,7 @@ export default function HomePage() {
                               overflow: 'hidden',
                             }}>
                               {(() => {
+                                if (isComingSoon) return null;
                                 const tags = product.customTags && product.customTags.length > 0 
                                   ? product.customTags 
                                   : [

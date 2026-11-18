@@ -205,6 +205,8 @@ export interface Product {
   endDate?: string;
   /** แสดงวันเปิดขายบนหน้าร้านเมื่อยังไม่ถึงเวลาเปิดขาย (ค่าเริ่มต้น: true) */
   showStartDate?: boolean;
+  /** True เมื่อเซิร์ฟเวอร์ซ่อนข้อมูลและเบลอรูปสินค้าก่อนถึงวันเปิดขาย */
+  isLockedPreview?: boolean;
   isActive?: boolean;
   options?: {
     hasCustomName: boolean;
@@ -441,6 +443,14 @@ export function getProductShirtNameConfig(
   };
 }
 
+export interface SlipVerifyConfig {
+  provider?: 'slip2go';
+  apiUrl?: string;
+  secretKey?: string;
+  hasSecretKey?: boolean;
+  secretKeyMasked?: string;
+}
+
 export interface ShopConfig {
   isOpen: boolean;
   closeDate: string;
@@ -454,6 +464,8 @@ export interface ShopConfig {
   paymentEnabled?: boolean;
   /** ข้อความแสดงเมื่อปิดระบบชำระเงิน */
   paymentDisabledMessage?: string;
+  /** ตั้งค่าการเชื่อมต่อตรวจสลิป (Slip2Go API Connect) */
+  slipVerifyConfig?: SlipVerifyConfig;
   /** ตั้งค่าการตรวจสอบชื่อ */
   nameValidation?: NameValidationConfig;
   /** ตั้งค่าชื่อบนเสื้อ */

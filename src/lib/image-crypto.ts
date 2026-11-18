@@ -41,6 +41,13 @@ interface EncryptedPayload {
 // ==================== STABLE HMAC-BASED TOKEN (V2) ====================
 // Cache for HMAC tokens - same URL always produces same token
 const hmacTokenCache = new Map<string, string>();
+const blurTokenCache = new Map<string, string>();
+
+export interface ResolvedImageToken {
+  url: string;
+  previewMode?: 'blur';
+  releaseAtMs?: number;
+}
 
 /**
  * Generate a STABLE HMAC-signed image token (V2)
@@ -105,6 +112,74 @@ export function encryptImageUrl(url: string, expiryHours: number = 0): string {
 }
 
 /**
+ * Encrypt an image URL into a server-blurred preview token (/api/image/...).
+ * /api/image/[id] only ever serves heavily blurred raster bytes for blur-preview tokens,
+ * and the underlying URL remains hidden inside AES-256-GCM.
+ */
+export function encryptBlurredPreviewUrl(url: string, releaseAtMs?: number): string {
+  if (!url) return '';
+
+  // Unwrap an existing /api/image/<token> into its real URL first — fail closed if unreadable.
+  let targetUrl = url;
+  if (targetUrl.startsWith('/api/image/')) {
+    const existingToken = targetUrl.slice('/api/image/'.length).split('?')[0];
+    const resolved = resolveImageToken(existingToken);
+    if (!resolved?.url) return '';
+    targetUrl = resolved.url;
+  }
+
+  // Never expose raw data URLs for locked preview
+  if (targetUrl.startsWith('data:')) return '';
+  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) return '';
+
+  const roundedReleaseMs =
+    typeof releaseAtMs === 'number' && Number.isFinite(releaseAtMs) && releaseAtMs > 0
+      ? Math.floor(releaseAtMs)
+      : undefined;
+  const cacheKey = `${targetUrl}|${roundedReleaseMs ?? 0}`;
+  const cached = blurTokenCache.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const key = deriveKey();
+    const iv = crypto
+      .createHmac('sha256', key)
+      .update(`iv:blur:${cacheKey}`)
+      .digest()
+      .subarray(0, 12);
+
+    const plaintext = JSON.stringify({
+      url: targetUrl,
+      previewMode: 'blur',
+      ...(roundedReleaseMs ? { releaseAtMs: roundedReleaseMs } : {}),
+    });
+
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    let encrypted = cipher.update(plaintext, 'utf8');
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    const combined = Buffer.concat([iv, authTag, encrypted]);
+
+    const base64 = combined
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+
+    const result = `/api/image/${base64}`;
+    if (blurTokenCache.size > 5000) {
+      const firstKey = blurTokenCache.keys().next().value;
+      if (firstKey) blurTokenCache.delete(firstKey);
+    }
+    blurTokenCache.set(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('[image-crypto] Blur preview encryption error:', error);
+    return '';
+  }
+}
+
+/**
  * Legacy AES-256-GCM encryption with random nonce (V1)
  * Kept for backward compatibility with existing tokens
  */
@@ -140,6 +215,72 @@ export function encryptImageUrlLegacy(url: string): string {
     console.error('[image-crypto] Legacy encryption error:', error);
     return url;
   }
+}
+
+/**
+ * Resolve an AES-256-GCM or legacy XOR token including preview metadata (e.g. blur-only).
+ */
+export function resolveImageToken(token: string, maxAgeHours: number = 0): ResolvedImageToken | null {
+  if (!token) return null;
+
+  try {
+    const key = deriveKey();
+    let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = (4 - (base64.length % 4)) % 4;
+    base64 += '='.repeat(padding);
+    const combined = Buffer.from(base64, 'base64');
+
+    if (combined.length >= 29) {
+      const iv = combined.subarray(0, 12);
+      const authTag = combined.subarray(12, 28);
+      const ciphertext = combined.subarray(28);
+
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(authTag);
+
+      let decrypted = decipher.update(ciphertext);
+      decrypted = Buffer.concat([decrypted, decipher.final()]);
+      const decryptedStr = decrypted.toString('utf8');
+
+      if (decryptedStr.startsWith('http://') || decryptedStr.startsWith('https://')) {
+        return { url: decryptedStr };
+      }
+
+      const payload = JSON.parse(decryptedStr) as {
+        url?: string;
+        timestamp?: number;
+        previewMode?: string;
+        releaseAtMs?: number;
+      };
+      if (!payload?.url || (!payload.url.startsWith('http://') && !payload.url.startsWith('https://'))) {
+        return null;
+      }
+
+      if (payload.previewMode !== 'blur' && maxAgeHours > 0 && typeof payload.timestamp === 'number') {
+        const ageMs = Date.now() - payload.timestamp;
+        const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
+        if (ageMs > maxAgeMs) {
+          console.warn('[image-crypto] Token expired');
+          return null;
+        }
+      }
+
+      return {
+        url: payload.url,
+        ...(payload.previewMode === 'blur' ? { previewMode: 'blur' as const } : {}),
+        ...(typeof payload.releaseAtMs === 'number' ? { releaseAtMs: payload.releaseAtMs } : {}),
+      };
+    }
+  } catch {
+    // Fallback to legacy XOR below if AES parsing failed
+  }
+
+  const legacyUrl = decryptLegacyUrl(token);
+  if (legacyUrl) {
+    console.log('[image-crypto] Used legacy decryption for token');
+    return { url: legacyUrl };
+  }
+  return null;
 }
 
 /**
@@ -185,9 +326,13 @@ export function decryptImageUrl(token: string, maxAgeHours: number = 0): string 
       return decryptedStr;
     }
     
-    // V1 format: JSON payload with url, timestamp, nonce
+    // V1 / metadata format: JSON payload with url, timestamp, nonce
     try {
-      const payload: EncryptedPayload = JSON.parse(decryptedStr);
+      const payload: EncryptedPayload & { previewMode?: string } = JSON.parse(decryptedStr);
+      // Blur-only tokens must only be resolved through resolveImageToken()
+      if (payload.previewMode === 'blur') {
+        return null;
+      }
       
       // Check expiry if maxAgeHours is set
       if (maxAgeHours > 0) {

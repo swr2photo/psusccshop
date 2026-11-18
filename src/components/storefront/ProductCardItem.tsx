@@ -40,13 +40,16 @@ export function ProductCardItem({
 
   const productStatus = getProductStatus(product, now);
   const outOfStock = product.stock !== undefined && product.stock !== null && product.stock <= 0;
-  const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen;
+  const isLockedPreview = Boolean(product.isLockedPreview);
+  const isComingSoon = productStatus === 'COMING_SOON' || isLockedPreview;
+  const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen && !isLockedPreview;
   const handleClick = () => {
     if (!catalogContext.isOpen) {
       onShowToast('warning', t.checkout.shopClosedWarning);
       return;
     }
-    if (productStatus !== 'OPEN') {
+    if (productStatus !== 'OPEN' || isLockedPreview) {
+      const effectiveStatus = isLockedPreview && productStatus === 'OPEN' ? 'COMING_SOON' : productStatus;
       const statusLabelsMap: Record<ShopStatusType, string> = {
         OPEN: t.shopStatus.open,
         COMING_SOON: t.shopStatus.comingSoon,
@@ -54,7 +57,7 @@ export function ProductCardItem({
         TEMPORARILY_CLOSED: t.shopStatus.closed,
         WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
       };
-      onShowToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[productStatus]}`);
+      onShowToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[effectiveStatus]}`);
       return;
     }
     if (outOfStock) {
@@ -101,7 +104,11 @@ export function ProductCardItem({
           width="100%"
           height="100%"
           objectFit="cover"
-          style={{ position: 'absolute', inset: 0 }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            ...(isComingSoon ? { filter: 'blur(14px)', transform: 'scale(1.16)' } : {}),
+          }}
         />
 
         {/* Overlay if unavailable */}
@@ -111,6 +118,7 @@ export function ProductCardItem({
               position: 'absolute',
               inset: 0,
               bgcolor: 'rgba(0,0,0,0.5)',
+              backdropFilter: isComingSoon ? 'blur(8px)' : 'none',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -125,6 +133,8 @@ export function ProductCardItem({
                   ? t.shopStatus.closed
                   : outOfStock
                   ? t.product.soldOut
+                  : isComingSoon
+                  ? t.shopStatus.comingSoon
                   : SHOP_STATUS_CONFIG[productStatus]?.label || t.shopStatus.closed
               }
               sx={{
@@ -188,24 +198,30 @@ export function ProductCardItem({
             {getProductName(product, lang)}
           </Typography>
 
-          <Typography
-            sx={{
-              fontSize: '0.8rem',
-              color: 'var(--text-muted)',
-              lineClamp: 2,
-              display: '-webkit-box',
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
-          >
-            {getProductDescription(product, lang)}
-          </Typography>
+          {!isComingSoon && (
+            <Typography
+              sx={{
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+                lineClamp: 2,
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {getProductDescription(product, lang)}
+            </Typography>
+          )}
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)' }}>
-            ฿{(product.basePrice || 0)?.toLocaleString()}
-          </Typography>
+          {!isComingSoon ? (
+            <Typography sx={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)' }}>
+              ฿{(product.basePrice || 0)?.toLocaleString()}
+            </Typography>
+          ) : (
+            <Box />
+          )}
 
           {isProductAvailable && onQuickAddToCart && (
             <IconButton

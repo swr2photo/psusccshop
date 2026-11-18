@@ -126,7 +126,7 @@ export interface PaymentTransaction {
   /** Payment verified */
   verified: boolean;
   /** Verification method */
-  verificationMethod?: 'slipok' | 'manual' | 'gateway';
+  verificationMethod?: 'slip2go' | 'slipok' | 'manual' | 'gateway';
   /** Verification timestamp */
   verifiedAt?: string;
   /** Verified by (admin email) */

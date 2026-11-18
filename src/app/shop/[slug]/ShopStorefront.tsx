@@ -238,6 +238,17 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     [shopOpenFields, now],
   );
   const isShopOpen = shopStatusType === 'OPEN';
+  const unlockedShopRefRef = useRef<string>('');
+  useEffect(() => {
+    const dueIds = products
+      .filter((p) => p.isLockedPreview && getProductStatus(p, now) === 'OPEN' && isShopOpen)
+      .map((p) => p.id)
+      .sort()
+      .join(',');
+    if (!dueIds || unlockedShopRefRef.current === dueIds) return;
+    unlockedShopRefRef.current = dueIds;
+    queryClient.invalidateQueries({ queryKey: [...queryKeys.shop.all, 'public', initialShop.id] });
+  }, [products, now, isShopOpen, queryClient, initialShop.id]);
   const announcements: any[] = (shop as any)?.announcements || [];
   const announcementHistory: any[] = (shop as any)?.announcementHistory || [];
   const events: ShopEvent[] = (shop as any)?.events || [];
@@ -1256,12 +1267,13 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   const handleSelectProduct = useCallback((product: Product) => {
     const status = getProductStatus(product, now);
+    const effectiveStatus = product.isLockedPreview && status === 'OPEN' ? 'COMING_SOON' : status;
     const outOfStock =
       (product.stock !== null && product.stock !== undefined && product.stock <= 0) ||
       (product.variants && product.variants.length > 0 && product.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0));
-    if (status !== 'OPEN' || outOfStock) {
+    if (effectiveStatus !== 'OPEN' || outOfStock || product.isLockedPreview) {
       const toast = getProductUnavailableToast({
-        status,
+        status: effectiveStatus,
         outOfStock: Boolean(outOfStock),
         productName: getProductName(product, lang),
         labels: {
@@ -1860,8 +1872,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                 }}>
                   {items.map((product, productIdx) => {
                     const productStatus = getProductStatus(product, now);
-                    const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
-                    const isProductClosed = productStatus !== 'OPEN' || !isShopOpen;
+                    const isLockedPreview = Boolean(product.isLockedPreview);
+                    const isComingSoon = productStatus === 'COMING_SOON' || isLockedPreview;
+                    const isProductAvailable = productStatus === 'OPEN' && isShopOpen && !isLockedPreview;
+                    const isProductClosed = productStatus !== 'OPEN' || !isShopOpen || isLockedPreview;
                     const eventDiscount = getEventDiscount(product.id, events);
 
                     return (
@@ -1880,7 +1894,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               showToast('warning', t.checkout.shopClosedWarning);
                               return;
                             }
-                            if (productStatus !== 'OPEN') {
+                            if (productStatus !== 'OPEN' || isLockedPreview) {
+                              const effectiveStatus = isLockedPreview && productStatus === 'OPEN' ? 'COMING_SOON' : productStatus;
                               const statusLabelsMap: Record<ShopStatusType, string> = {
                                 OPEN: t.shopStatus.open,
                                 COMING_SOON: t.shopStatus.comingSoon,
@@ -1888,7 +1903,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 TEMPORARILY_CLOSED: t.shopStatus.closed,
                                 WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
                               };
-                              showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[productStatus]}`);
+                              showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[effectiveStatus]}`);
                               return;
                             }
                             handleSelectProduct(product);
@@ -1939,6 +1954,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 position: 'absolute',
                                 inset: 0,
                                 transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                                ...(isComingSoon ? { filter: 'blur(14px)', transform: 'scale(1.16)' } : {}),
                               }}
                               className={!isProductClosed ? 'product-image-zoom' : ''}
                             />
@@ -1950,6 +1966,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 display: 'flex', flexDirection: 'column',
                                 alignItems: 'center', justifyContent: 'center',
                                 background: 'rgba(0,0,0,0.45)',
+                                backdropFilter: isComingSoon ? 'blur(8px)' : 'none',
                               }}>
                                 <Box sx={{
                                   px: 1.5, py: 0.6, borderRadius: '999px',
@@ -1958,13 +1975,15 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                   color: 'rgba(255,255,255,0.85)',
                                   fontSize: '0.72rem', fontWeight: 700,
                                 }}>
-                                  {({
-                                    OPEN: t.shopStatus.open,
-                                    COMING_SOON: t.shopStatus.comingSoon,
-                                    ORDER_ENDED: t.shopStatus.closedEnded,
-                                    TEMPORARILY_CLOSED: t.shopStatus.closed,
-                                    WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
-                                  } as Record<ShopStatusType, string>)[productStatus]}
+                                  {isComingSoon
+                                    ? t.shopStatus.comingSoon
+                                    : ({
+                                        OPEN: t.shopStatus.open,
+                                        COMING_SOON: t.shopStatus.comingSoon,
+                                        ORDER_ENDED: t.shopStatus.closedEnded,
+                                        TEMPORARILY_CLOSED: t.shopStatus.closed,
+                                        WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+                                      } as Record<ShopStatusType, string>)[productStatus]}
                                 </Box>
                                 {product.startDate && product.showStartDate !== false && productStatus === 'COMING_SOON' && (
                                   <Typography
@@ -2010,7 +2029,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               </Box>
                             )}
 
-                            {/* Price badge */}
+                            {/* Price badge — hidden for coming soon previews */}
+                            {!isComingSoon && (
                             <Box sx={{
                               position: 'absolute', bottom: 8, right: 8,
                               px: 1.2, py: 0.5, borderRadius: '10px',
@@ -2039,6 +2059,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 </Typography>
                               )}
                             </Box>
+                            )}
 
                             {/* Event discount badge */}
                             {eventDiscount && !isProductClosed && (
@@ -2111,15 +2132,17 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               {getProductName(product, lang)}
                             </Typography>
 
-                            <Typography sx={{
-                              fontSize: '0.75rem', color: 'var(--text-muted)',
-                              overflow: 'hidden', textOverflow: 'ellipsis',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                              lineHeight: 1.4, mb: 1,
-                            }}>
-                              {getProductDescription(product, lang) || product.type || ''}
-                            </Typography>
+                            {!isComingSoon && (
+                              <Typography sx={{
+                                fontSize: '0.75rem', color: 'var(--text-muted)',
+                                overflow: 'hidden', textOverflow: 'ellipsis',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                                lineHeight: 1.4, mb: 1,
+                              }}>
+                                {getProductDescription(product, lang) || product.type || ''}
+                              </Typography>
+                            )}
 
                             {/* Tags */}
                             {(() => {

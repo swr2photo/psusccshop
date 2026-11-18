@@ -103,7 +103,7 @@ export function toPublicShopData(shop: Shop) {
     contactEmail: shop.contactEmail,
     contactPhone: shop.contactPhone,
     socialLinks: shop.socialLinks,
-    products: sanitizePublicProducts(shop.products),
+    products: sanitizePublicProducts(shop.products, new Date(), shop.settings?.openDate),
     announcements: shop.config?.announcements || [],
     announcementHistory: shop.config?.announcementHistory || [],
     announcement: shop.config?.announcement,
@@ -148,13 +148,15 @@ export function toPublicShopCatalogEntry(shop: Shop) {
     logoUrl: shop.logoUrl,
     isOpen: shop.settings?.isOpen ?? true,
     openDate: shop.settings?.openDate,
+    showOpenDate: shop.settings?.showOpenDate,
     closeDate: shop.settings?.closeDate,
     settings: shop.settings ? { 
       isOpen: shop.settings.isOpen ?? true,
       openDate: shop.settings.openDate,
+      showOpenDate: shop.settings.showOpenDate,
       closeDate: shop.settings.closeDate
     } : undefined,
-    products: sanitizePublicProducts(shop.products),
+    products: sanitizePublicProducts(shop.products, new Date(), shop.settings?.openDate),
     events: shop.config?.events || [],
     shirtNameConfig: shop.config?.shirtNameConfig,
     nameValidation: shop.config?.nameValidation,
@@ -313,6 +315,7 @@ export const PUBLIC_SHOP_CATALOG_CACHE_KEY = 'shops:public-catalog-v2';
 
 export function invalidatePublicShopCatalogCache() {
   invalidateCacheKey(PUBLIC_SHOP_CATALOG_CACHE_KEY);
+  invalidateCacheKey('shops:public-catalog-v4');
 }
 
 export async function listActivePublicShopCatalog() {

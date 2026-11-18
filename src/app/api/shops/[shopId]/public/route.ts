@@ -1,8 +1,9 @@
 // /api/shops/[shopId]/public — Public shop data (no auth required)
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getShopById, toPublicShopData } from '@/lib/shops';
 import { API_CACHE } from '@/lib/api-helpers';
-import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { secureJsonResponse } from '@/lib/payload-crypto';
+import { getReleaseAwareSmaxAge } from '@/lib/sanitize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,13 +24,21 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     );
   }
 
+  const now = new Date();
   const publicShop = toPublicShopData(shop);
+  const maxAge = getReleaseAwareSmaxAge(publicShop.products, publicShop.openDate, 120, now);
+  const cacheControl =
+    maxAge <= 2
+      ? 'no-store'
+      : maxAge < 120
+      ? `public, max-age=0, s-maxage=${maxAge}`
+      : API_CACHE.medium;
 
   return await secureJsonResponse(
     { status: 'success', shop: publicShop },
     {
       headers: {
-        'Cache-Control': API_CACHE.medium,
+        'Cache-Control': cacheControl,
       },
     }
   );

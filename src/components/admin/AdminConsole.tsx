@@ -1356,11 +1356,23 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
     
     // Capture previous config for rollback in case of error
     const previousConfig = config;
-    
-    // 1. Optimistic Update: Save to local state/cache immediately for instant UI feedback
-    setConfig(newConfig);
+    const redactConfigSecrets = (cfg: ShopConfig): ShopConfig => {
+      if (!cfg.slipVerifyConfig?.secretKey) return cfg;
+      return {
+        ...cfg,
+        slipVerifyConfig: {
+          ...cfg.slipVerifyConfig,
+          secretKey: undefined,
+          hasSecretKey: true,
+        },
+      };
+    };
+    const safeOptimisticConfig = redactConfigSecrets(newConfig);
+
+    // 1. Optimistic Update: Save to local state/cache immediately without persisting raw secret keys
+    setConfig(safeOptimisticConfig);
     setLastSavedTime(new Date());
-    saveAdminCache({ config: newConfig, orders, logs });
+    saveAdminCache({ config: safeOptimisticConfig, orders, logs });
     
     setSaving(true);
     
@@ -1405,9 +1417,10 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         configWithUrls = { ...configWithUrls, announcementHistory };
       }
       
-      // Update local state/cache with final configuration containing uploaded image URLs
-      setConfig(configWithUrls);
-      saveAdminCache({ config: configWithUrls, orders, logs });
+      // Update local state/cache with final configuration containing uploaded image URLs (never persist raw secret key)
+      const safeFinalConfig = redactConfigSecrets(configWithUrls);
+      setConfig(safeFinalConfig);
+      saveAdminCache({ config: safeFinalConfig, orders, logs });
 
       // Save to server — shop-specific or global
       if (isShopMode && selectedShopId) {
@@ -1415,13 +1428,13 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         const res = await apiFetch(`/api/shops/${selectedShopId}/config`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(configWithUrls),
+          body: JSON.stringify(safeFinalConfig),
         });
         const data = await res.json();
         if (data.status !== 'success') {
           throw new Error(data.message || 'บันทึกร้านค้าย่อยไม่สำเร็จ');
         }
-        addLog('SAVE_SHOP_CONFIG', `บันทึกการตั้งค่าร้านค้า (${myShops.find(s => s.id === selectedShopId)?.name || selectedShopId})`, { config: configWithUrls });
+        addLog('SAVE_SHOP_CONFIG', `บันทึกการตั้งค่าร้านค้า (${myShops.find(s => s.id === selectedShopId)?.name || selectedShopId})`, { config: safeFinalConfig });
       } else {
         // Save to global config
         const res = await saveShopConfig(configWithUrls, session?.user?.email || '', {
@@ -1430,7 +1443,13 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         if (res.status !== 'success') {
           throw new Error((res as any).message || 'บันทึกไม่สำเร็จ');
         }
-        addLog('SAVE_CONFIG', 'บันทึกการตั้งค่า', { config: configWithUrls });
+        const sanitizedSaved = (res as any).data as ShopConfig | undefined;
+        if (sanitizedSaved) {
+          setConfig(sanitizedSaved);
+          setSettingsLocalConfig(sanitizedSaved);
+          saveAdminCache({ config: sanitizedSaved, orders, logs });
+        }
+        addLog('SAVE_CONFIG', 'บันทึกการตั้งค่า', { config: safeFinalConfig });
       }
       return true;
     } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
@@ -4434,6 +4453,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                 userEmail={session?.user?.email}
                 sheetSyncing={sheetSyncing}
                 isSuperAdminUser={isSuperAdminUser}
+                isGlobalSettings={!isShopMode}
                 onConfigChange={handleSettingsConfigChange}
                 onSave={handleSettingsSave}
                 onReset={handleSettingsReset}
