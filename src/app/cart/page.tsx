@@ -249,7 +249,7 @@ export default function StandaloneCartPage() {
           </Box>
           <Button
             component={Link}
-            href="/shop"
+            href="/"
             startIcon={<ArrowLeft size={18} />}
             sx={{ textTransform: 'none', fontWeight: 600, color: 'var(--navy, #1e3a5f)' }}
           >
@@ -282,7 +282,7 @@ export default function StandaloneCartPage() {
             </Typography>
             <Button
               component={Link}
-              href="/shop"
+              href="/"
               variant="contained"
               size="large"
               startIcon={<ShoppingBag size={20} />}

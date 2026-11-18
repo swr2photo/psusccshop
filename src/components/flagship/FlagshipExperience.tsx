@@ -2,17 +2,19 @@
 
 import { useCallback, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft, Check } from 'lucide-react';
 import type { Product, ShopConfig, ShirtNameConfig } from '@/lib/config';
 import { getProductName } from '@/lib/config';
-import type { CartItem } from '@/lib/shop-constants';
+import { ensureUniqueCartLineIds, type CartItem } from '@/lib/shop-constants';
 import {
   buildFrameUrls,
   type FlagshipProductConfig,
 } from '@/lib/flagship/config';
 import { queueFlagshipCartItems } from '@/lib/flagship/cart-bridge';
 import { getCart, saveCart as saveCartApi } from '@/lib/api-client';
+import { useCartStore } from '@/store/cartStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import ScrollytellingHero from '@/components/flagship/ScrollytellingHero';
 import FlagshipBuyBar from '@/components/flagship/FlagshipBuyBar';
@@ -49,6 +51,7 @@ export default function FlagshipExperience({
   shirtNameConfig,
   shopOpen = true,
 }: Props) {
+  const router = useRouter();
   const { t, lang } = useTranslation();
   const { data: session } = useSession();
   const [buyStage, setBuyStage] = useState(false);
@@ -79,11 +82,17 @@ export default function FlagshipExperience({
   }, []);
 
   const handleAddToCart = useCallback(
-    async (item: CartItem) => {
+    async (item: CartItem, options?: { buyNow?: boolean }) => {
       if (!shopOpen) {
         showToast(t.checkout.shopClosedWarning);
         return;
       }
+
+      // Immediately update shared client Zustand cart store so /cart and /checkout have the item right away
+      const localCart = useCartStore.getState().cart;
+      const nextLocalCart = ensureUniqueCartLineIds([...(localCart as unknown as CartItem[]), item]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      useCartStore.getState().setCart(nextLocalCart as any);
 
       const email = session?.user?.email;
       if (email) {
@@ -94,22 +103,28 @@ export default function FlagshipExperience({
             (res as { cart?: CartItem[] }).cart ||
             [];
           const existing = Array.isArray(serverCart) ? serverCart : [];
-          await saveCartApi(email, [...existing, item]);
+          const mergedServer = ensureUniqueCartLineIds([...existing, item]);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          useCartStore.getState().setCart(mergedServer as any);
+          await saveCartApi(email, mergedServer);
         } catch (err) {
           console.error('Flagship saveCart failed', err);
-          // Fall back to session queue so home can still pick it up
           queueFlagshipCartItems([item]);
         }
       } else {
-        // Guest cart lives on the home page — queue until they return
         queueFlagshipCartItems([item]);
+      }
+
+      if (options?.buyNow) {
+        router.push('/checkout');
+        return;
       }
 
       setAdded(true);
       showToast(t.cart.addedToCart);
       window.setTimeout(() => setAdded(false), 2000);
     },
-    [session?.user?.email, shopOpen, showToast, t.cart.addedToCart, t.checkout.shopClosedWarning],
+    [router, session?.user?.email, shopOpen, showToast, t.cart.addedToCart, t.checkout.shopClosedWarning],
   );
 
   if (!product) {

@@ -31,7 +31,7 @@ type Props = {
   shirtNameConfig?: ShirtNameConfig;
   highlighted?: boolean;
   disabled?: boolean;
-  onAddToCart: (item: CartItem) => void;
+  onAddToCart: (item: CartItem, options?: { buyNow?: boolean }) => void;
 };
 
 export default function FlagshipBuyBar({
@@ -71,7 +71,7 @@ export default function FlagshipBuyBar({
     window.setTimeout(() => setShake(false), 500);
   };
 
-  const handleAdd = () => {
+  const handleAdd = (buyNow = false) => {
     if (disabled) return;
 
     if (needsSize && !size) {
@@ -116,7 +116,7 @@ export default function FlagshipBuyBar({
     };
 
     setError('');
-    onAddToCart(item);
+    onAddToCart(item, { buyNow });
   };
 
   return (
@@ -251,8 +251,8 @@ export default function FlagshipBuyBar({
               })}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ textAlign: 'right' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ textAlign: 'right', marginRight: 2 }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.product.totalPrice}</div>
               <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--foreground)' }}>
                 ฿{unitPrice?.toLocaleString()}
@@ -260,7 +260,27 @@ export default function FlagshipBuyBar({
             </div>
             <button
               type="button"
-              onClick={handleAdd}
+              onClick={() => handleAdd(false)}
+              disabled={disabled}
+              style={{
+                height: 44,
+                padding: '0 16px',
+                borderRadius: 'var(--btn-radius)',
+                border: '1.5px solid var(--primary)',
+                background: 'transparent',
+                color: disabled ? 'var(--text-muted)' : 'var(--primary)',
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                animation: shake ? 'flagship-shake 0.45s ease' : undefined,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t.product.addToCart}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAdd(true)}
               disabled={disabled}
               style={{
                 height: 44,
@@ -276,7 +296,7 @@ export default function FlagshipBuyBar({
                 whiteSpace: 'nowrap',
               }}
             >
-              {t.product.addToCart}
+              {t.product.buyNow}
             </button>
           </div>
         </div>

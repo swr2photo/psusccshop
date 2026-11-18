@@ -158,6 +158,16 @@ async function POSTHandler(req: NextRequest) {
         config.adminPermissions = currentConfig.adminPermissions;
       }
     }
+
+    // Preserve flagshipConfig / flagshipConfigs if omitted by another settings tab
+    if (currentConfig) {
+      if (config.flagshipConfig === undefined && currentConfig.flagshipConfig !== undefined) {
+        config.flagshipConfig = currentConfig.flagshipConfig;
+      }
+      if (config.flagshipConfigs === undefined && currentConfig.flagshipConfigs !== undefined) {
+        config.flagshipConfigs = currentConfig.flagshipConfigs;
+      }
+    }
     
     // Sanitize UTF-8 input ก่อนบันทึก
     const sanitizedConfig = sanitizeObjectUtf8(config);

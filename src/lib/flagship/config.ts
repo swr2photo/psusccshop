@@ -26,6 +26,27 @@ export type FlagshipLocalizedStages = {
   en: FlagshipStageCopy[];
 };
 
+export type FlagshipHeroCopy = {
+  /** Top-right tag on the hero rule (e.g. "ของชุมนุม / 2026") */
+  topRightLabel?: string;
+  /** Eyebrow above product name (e.g. "No. 01 — ของใหม่ประจำปี") */
+  eyebrow?: string;
+  /** Custom hero title override (defaults to linked product name or "เสื้อกีฬา SCC 2026") */
+  title?: string;
+  /** Hero description/subtitle (e.g. "พร้อมจองเสื้อกีฬา SCC 2026 — เลือกไซส์ ใส่ชื่อ และชำระง่าย") */
+  subtitle?: string;
+  /** Caption right label under the hero photo (e.g. "NEW JERSEY 2026") */
+  captionRight?: string;
+  /** Custom image URL override for the hero plate (optional; defaults to product coverImage) */
+  heroImage?: string;
+  /** Primary button label override when open (e.g. "สั่งจองเสื้อ") */
+  ctaBuyLabel?: string;
+  /** Secondary 360 link label override (e.g. "หมุนดูแบบ 360°") */
+  cta360Label?: string;
+  /** 4 numbered trust strip items under the hero (01 - 04) */
+  highlights?: string[];
+};
+
 export type FlagshipProductConfig = {
   /** Whether the flagship page and its storefront links are active (default: true) */
   enabled?: boolean;
@@ -60,6 +81,11 @@ export type FlagshipProductConfig = {
   /** Cap mobile frames to this count. Default 30 */
   mobileMaxFrames?: number;
   brandLabel?: { th: string; en: string };
+  /** Custom details and copy for the Home page Flagship Hero & Trust Strip */
+  heroCopy?: {
+    th: FlagshipHeroCopy;
+    en: FlagshipHeroCopy;
+  };
   stages: FlagshipLocalizedStages;
 };
 
@@ -81,6 +107,40 @@ export const FLAGSHIP_PRODUCTS: Record<string, FlagshipProductConfig> = {
     brandLabel: {
       th: 'SCC Flagship',
       en: 'SCC Flagship',
+    },
+    heroCopy: {
+      th: {
+        topRightLabel: 'ของชุมนุม / 2026',
+        eyebrow: 'No. 01 — ของใหม่ประจำปี',
+        title: '',
+        subtitle: 'พร้อมจองเสื้อกีฬา SCC 2026 — เลือกไซส์ ใส่ชื่อ และชำระง่าย',
+        captionRight: 'NEW JERSEY 2026',
+        heroImage: '',
+        ctaBuyLabel: 'สั่งจองเสื้อ',
+        cta360Label: 'หมุนดูแบบ 360°',
+        highlights: [
+          'เลือกไซส์ ใส่ชื่อได้',
+          'จ่ายด้วย PromptPay + SlipOK',
+          'รับที่ตึกคอมฯ',
+          '500+ ออเดอร์',
+        ],
+      },
+      en: {
+        topRightLabel: 'Merch / 2026',
+        eyebrow: 'No. 01 — New this season',
+        title: '',
+        subtitle: 'Pre-order the SCC 2026 jersey — pick a size, add your name, pay in a minute.',
+        captionRight: 'NEW JERSEY 2026',
+        heroImage: '',
+        ctaBuyLabel: 'Order jersey',
+        cta360Label: 'Spin it 360°',
+        highlights: [
+          'Pick a size, add your name',
+          'Pay with PromptPay + SlipOK',
+          'Pick up at CS dept.',
+          '500+ orders',
+        ],
+      },
     },
     stages: {
       th: [
@@ -170,6 +230,24 @@ export function getMergedFlagshipConfig(
     brandLabel: {
       th: dynamicCfg.brandLabel?.th || base.brandLabel?.th || 'SCC Flagship',
       en: dynamicCfg.brandLabel?.en || base.brandLabel?.en || 'SCC Flagship',
+    },
+    heroCopy: {
+      th: {
+        ...(base.heroCopy?.th || {}),
+        ...(dynamicCfg.heroCopy?.th || {}),
+        highlights:
+          dynamicCfg.heroCopy?.th?.highlights && dynamicCfg.heroCopy.th.highlights.length > 0
+            ? dynamicCfg.heroCopy.th.highlights
+            : (base.heroCopy?.th?.highlights || []),
+      },
+      en: {
+        ...(base.heroCopy?.en || {}),
+        ...(dynamicCfg.heroCopy?.en || {}),
+        highlights:
+          dynamicCfg.heroCopy?.en?.highlights && dynamicCfg.heroCopy.en.highlights.length > 0
+            ? dynamicCfg.heroCopy.en.highlights
+            : (base.heroCopy?.en?.highlights || []),
+      },
     },
     stages: {
       th: dynamicCfg.stages?.th && dynamicCfg.stages.th.length > 0 ? dynamicCfg.stages.th : base.stages.th,

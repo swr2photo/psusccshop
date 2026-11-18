@@ -26,6 +26,7 @@ import type { Product } from '@/lib/config';
 import {
   FLAGSHIP_PRODUCTS,
   listFlagshipSlugs,
+  type FlagshipHeroCopy,
   type FlagshipProductConfig,
   type FlagshipSide,
   type FlagshipStageCopy,
@@ -73,6 +74,23 @@ function normalize(cfg: FlagshipProductConfig): FlagshipProductConfig {
   return { ...cfg, stages: { th, en } };
 }
 
+function normalizeHeroCopy(saved?: FlagshipHeroCopy, base?: FlagshipHeroCopy): FlagshipHeroCopy {
+  const baseHighlights = base?.highlights || ['', '', '', ''];
+  const rawHighlights = saved?.highlights && saved.highlights.length > 0 ? saved.highlights : baseHighlights;
+  const highlights = [0, 1, 2, 3].map((i) => rawHighlights[i] ?? baseHighlights[i] ?? '');
+  return {
+    topRightLabel: saved?.topRightLabel ?? base?.topRightLabel ?? '',
+    eyebrow: saved?.eyebrow ?? base?.eyebrow ?? '',
+    title: saved?.title ?? base?.title ?? '',
+    subtitle: saved?.subtitle ?? base?.subtitle ?? '',
+    captionRight: saved?.captionRight ?? base?.captionRight ?? '',
+    heroImage: saved?.heroImage ?? base?.heroImage ?? '',
+    ctaBuyLabel: saved?.ctaBuyLabel ?? base?.ctaBuyLabel ?? '',
+    cta360Label: saved?.cta360Label ?? base?.cta360Label ?? '',
+    highlights,
+  };
+}
+
 function initialConfig(currentConfig?: { flagshipConfig?: Partial<FlagshipProductConfig> }): FlagshipProductConfig {
   const saved = currentConfig?.flagshipConfig;
   const slug = saved?.slug && FLAGSHIP_PRODUCTS[saved.slug] ? saved.slug : DEFAULT_SLUG;
@@ -83,6 +101,10 @@ function initialConfig(currentConfig?: { flagshipConfig?: Partial<FlagshipProduc
     enabled: saved?.enabled ?? base.enabled ?? true,
     slug,
     brandLabel: { th: saved?.brandLabel?.th || base.brandLabel?.th || '', en: saved?.brandLabel?.en || base.brandLabel?.en || '' },
+    heroCopy: {
+      th: normalizeHeroCopy(saved?.heroCopy?.th, base.heroCopy?.th),
+      en: normalizeHeroCopy(saved?.heroCopy?.en, base.heroCopy?.en),
+    },
     stages: {
       th: saved?.stages?.th?.length ? saved.stages.th : base.stages.th,
       en: saved?.stages?.en?.length ? saved.stages.en : base.stages.en,
@@ -279,6 +301,43 @@ export default function FlagshipSettings({ products, currentConfig, onSaveSucces
 
   const patch = (p: Partial<FlagshipProductConfig>) => { setStatus(null); setConfig((c) => ({ ...c, ...p })); };
 
+  const patchHeroCopy = (lang: Lang, p: Partial<FlagshipHeroCopy>) => {
+    setStatus(null);
+    setConfig((c) => {
+      const currentHero = c.heroCopy || { th: normalizeHeroCopy(), en: normalizeHeroCopy() };
+      return {
+        ...c,
+        heroCopy: {
+          ...currentHero,
+          [lang]: {
+            ...(currentHero[lang] || {}),
+            ...p,
+          },
+        },
+      };
+    });
+  };
+
+  const patchHeroHighlight = (lang: Lang, idx: number, value: string) => {
+    setStatus(null);
+    setConfig((c) => {
+      const currentHero = c.heroCopy || { th: normalizeHeroCopy(), en: normalizeHeroCopy() };
+      const list = [...(currentHero[lang]?.highlights || ['', '', '', ''])];
+      while (list.length < 4) list.push('');
+      list[idx] = value;
+      return {
+        ...c,
+        heroCopy: {
+          ...currentHero,
+          [lang]: {
+            ...(currentHero[lang] || {}),
+            highlights: list,
+          },
+        },
+      };
+    });
+  };
+
   const updateStage = (lang: Lang, i: number, field: keyof FlagshipStageCopy, value: string) => {
     setStatus(null);
     setConfig((c) => {
@@ -366,6 +425,39 @@ export default function FlagshipSettings({ products, currentConfig, onSaveSucces
     }
   };
 
+  const handleToggleEnabled = async (nextEnabled: boolean) => {
+    const updatedConfig: FlagshipProductConfig = {
+      ...config,
+      enabled: nextEnabled,
+      frameCount: clampInt(config.frameCount, 1, 600, 60),
+      mobileMaxFrames: clampInt(config.mobileMaxFrames, 1, 600, 28),
+    };
+    setConfig(updatedConfig);
+    setSaving(true);
+    setStatus(null);
+    try {
+      const res = await apiFetch('/api/admin/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...currentConfig, flagshipConfig: updatedConfig }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.status !== 'success') throw new Error(data.message || 'ไม่สามารถบันทึกสถานะได้');
+      setSavedJson(JSON.stringify(updatedConfig));
+      setStatus({
+        type: 'success',
+        text: nextEnabled
+          ? 'เปิดใช้งานหน้า Flagship และแสดงบนหน้าแรกเรียบร้อยแล้ว'
+          : 'ปิดหน้า Flagship และซ่อนจากหน้าแรกเรียบร้อยแล้ว',
+      });
+      onSaveSuccess?.();
+    } catch (err) {
+      setStatus({ type: 'error', text: (err as Error).message || 'เกิดข้อผิดพลาดในการบันทึกสถานะ' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const resetChanges = () => {
     setConfig(JSON.parse(savedJson));
     setStatus(null);
@@ -394,8 +486,8 @@ export default function FlagshipSettings({ products, currentConfig, onSaveSucces
           </div>
           <p className="mt-1 text-[0.82rem] text-muted-foreground">
             {isEnabled
-              ? 'หน้าแนะนำสินค้าแบบเลื่อนดู 360° และปุ่มลิงก์บนหน้าร้านเปิดให้ลูกค้าเข้าชมตามปกติ'
-              : 'เมื่อปิดใช้งาน ระบบจะซ่อนปุ่ม Flagship บนหน้าร้านและปิดการเข้าถึงหน้า /flagship ชั่วคราว'}
+              ? 'แสดงแบนเนอร์ Flagship บนหน้าแรก ปุ่มเมนูบนแถบนำทาง และหน้าแนะนำสินค้า 360° ตามปกติ'
+              : 'ซ่อนแบนเนอร์ Flagship บนหน้าแรก ซ่อนปุ่มเมนู Flagship และปิดการเข้าถึงหน้า /flagship ชั่วคราว'}
           </p>
           <p className="mt-1 truncate font-mono text-[0.78rem] text-foreground">/flagship/{config.slug}</p>
         </div>
@@ -405,9 +497,10 @@ export default function FlagshipSettings({ products, currentConfig, onSaveSucces
             type="button"
             role="switch"
             aria-checked={isEnabled}
-            onClick={() => patch({ enabled: !isEnabled })}
+            disabled={saving}
+            onClick={() => { void handleToggleEnabled(!isEnabled); }}
             className={cn(
-              'inline-flex h-9 items-center gap-2.5 rounded-xl border px-3.5 text-[0.82rem] font-semibold transition-colors',
+              'inline-flex h-9 items-center gap-2.5 rounded-xl border px-3.5 text-[0.82rem] font-semibold transition-colors disabled:opacity-60',
               isEnabled
                 ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300'
                 : 'border-border bg-muted text-muted-foreground hover:text-foreground',
@@ -467,6 +560,143 @@ export default function FlagshipSettings({ products, currentConfig, onSaveSucces
                 <Input id="fs-brand-en" value={config.brandLabel?.en || ''} maxLength={60} onChange={(e) => patch({ brandLabel: { th: config.brandLabel?.th || '', en: e.target.value } })} placeholder="SCC Flagship 2026" />
               </Field>
             </div>
+          </Section>
+
+          <Section
+            icon={<Package />}
+            title="รายละเอียดและการแสดงผลบนหน้าแรก (Home Hero & จุดเด่น 4 ข้อ)"
+            description="ปรับแต่งชื่อหัวข้อ คำอธิบาย ป้ายกำกับ รูปภาพปก ปุ่มสั่งซื้อ และแถบจุดเด่น 01–04 บนแบนเนอร์หน้าแรก"
+            action={
+              <div className="inline-flex rounded-lg border border-border bg-muted p-0.5 text-[0.72rem] font-semibold">
+                {(['th', 'en'] as Lang[]).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setPreviewLang(l)}
+                    className={cn('rounded-md px-2.5 py-1', previewLang === l ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground')}
+                  >
+                    {l === 'th' ? 'ภาษาไทย' : 'English'}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            {(() => {
+              const hc = config.heroCopy?.[previewLang] || normalizeHeroCopy();
+              const isEn = previewLang === 'en';
+              return (
+                <div className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field
+                      label={isEn ? 'หัวข้อหลัก (Hero Title - EN)' : 'หัวข้อหลัก (Hero Title - ไทย)'}
+                      hint="เว้นว่างไว้เพื่อใช้ชื่อจากสินค้าที่เชื่อมโยงอัตโนมัติ (เช่น เสื้อกีฬา SCC 2026)"
+                    >
+                      <Input
+                        value={hc.title || ''}
+                        maxLength={80}
+                        onChange={(e) => patchHeroCopy(previewLang, { title: e.target.value })}
+                        placeholder={isEn ? (linkedProduct?.nameEn || linkedProduct?.name || 'SCC Jersey 2026') : (linkedProduct?.name || 'เสื้อกีฬา SCC 2026')}
+                      />
+                    </Field>
+                    <Field
+                      label={isEn ? 'ป้ายกำกับเหนือหัวข้อ (Eyebrow - EN)' : 'ป้ายกำกับเหนือหัวข้อ (Eyebrow - ไทย)'}
+                    >
+                      <Input
+                        value={hc.eyebrow || ''}
+                        maxLength={60}
+                        onChange={(e) => patchHeroCopy(previewLang, { eyebrow: e.target.value })}
+                        placeholder={isEn ? 'No. 01 — New this season' : 'No. 01 — ของใหม่ประจำปี'}
+                      />
+                    </Field>
+                    <Field
+                      label={isEn ? 'คำอธิบาย / รายละเอียด (Subtitle - EN)' : 'คำอธิบาย / รายละเอียด (Subtitle - ไทย)'}
+                      className="sm:col-span-2"
+                    >
+                      <Textarea
+                        value={hc.subtitle || ''}
+                        maxLength={240}
+                        rows={2}
+                        onChange={(e) => patchHeroCopy(previewLang, { subtitle: e.target.value })}
+                        placeholder={
+                          isEn
+                            ? 'Pre-order the SCC 2026 jersey — pick a size, add your name, pay in a minute.'
+                            : 'พร้อมจองเสื้อกีฬา SCC 2026 — เลือกไซส์ ใส่ชื่อ และชำระง่าย'
+                        }
+                      />
+                    </Field>
+                    <Field label={isEn ? 'ป้ายมุมขวาบน (Top Right Label - EN)' : 'ป้ายมุมขวาบน (Top Right Label - ไทย)'}>
+                      <Input
+                        value={hc.topRightLabel || ''}
+                        maxLength={40}
+                        onChange={(e) => patchHeroCopy(previewLang, { topRightLabel: e.target.value })}
+                        placeholder={isEn ? 'Merch / 2026' : 'ของชุมนุม / 2026'}
+                      />
+                    </Field>
+                    <Field label={isEn ? 'ข้อความใต้ภาพมุมขวา (Image Caption - EN)' : 'ข้อความใต้ภาพมุมขวา (Image Caption - ไทย)'}>
+                      <Input
+                        value={hc.captionRight || ''}
+                        maxLength={50}
+                        onChange={(e) => patchHeroCopy(previewLang, { captionRight: e.target.value })}
+                        placeholder="NEW JERSEY 2026"
+                      />
+                    </Field>
+                    <Field label={isEn ? 'ข้อความปุ่มสั่งซื้อหลัก (Primary CTA - EN)' : 'ข้อความปุ่มสั่งซื้อหลัก (Primary CTA - ไทย)'}>
+                      <Input
+                        value={hc.ctaBuyLabel || ''}
+                        maxLength={40}
+                        onChange={(e) => patchHeroCopy(previewLang, { ctaBuyLabel: e.target.value })}
+                        placeholder={isEn ? 'Order jersey' : 'สั่งจองเสื้อ'}
+                      />
+                    </Field>
+                    <Field label={isEn ? 'ข้อความปุ่มลิงก์ 360° (360° Link - EN)' : 'ข้อความปุ่มลิงก์ 360° (360° Link - ไทย)'}>
+                      <Input
+                        value={hc.cta360Label || ''}
+                        maxLength={40}
+                        onChange={(e) => patchHeroCopy(previewLang, { cta360Label: e.target.value })}
+                        placeholder={isEn ? 'Spin it 360°' : 'หมุนดูแบบ 360°'}
+                      />
+                    </Field>
+                    <Field
+                      label="ลิงก์รูปภาพปกบนหน้าแรก (Hero Image URL)"
+                      hint="เว้นว่างไว้เพื่อใช้รูปปกของสินค้าที่เชื่อมโยงอัตโนมัติ"
+                      className="sm:col-span-2"
+                    >
+                      <Input
+                        value={hc.heroImage || ''}
+                        onChange={(e) => {
+                          patchHeroCopy('th', { heroImage: e.target.value });
+                          patchHeroCopy('en', { heroImage: e.target.value });
+                        }}
+                        placeholder={linkedProduct?.coverImage || 'https://...'}
+                        className="font-mono text-[0.82rem]"
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-muted/30 p-3.5">
+                    <p className="mb-2.5 text-[0.8rem] font-bold text-foreground">
+                      แถบจุดเด่น 4 ข้อใต้แบนเนอร์ (01 – 04 Highlights · {isEn ? 'English' : 'ภาษาไทย'})
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {[0, 1, 2, 3].map((idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="shrink-0 rounded-md bg-primary/10 px-2 py-1 font-mono text-[0.72rem] font-bold text-primary">
+                            {String(idx + 1).padStart(2, '0')}
+                          </span>
+                          <Input
+                            value={hc.highlights?.[idx] ?? ''}
+                            maxLength={60}
+                            onChange={(e) => patchHeroHighlight(previewLang, idx, e.target.value)}
+                            placeholder={`จุดเด่นข้อที่ ${idx + 1}`}
+                            className="h-8 text-[0.82rem]"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </Section>
 
           <Section icon={<Film />} title="ภาพหมุน 360°" description="ภาพแต่ละเฟรมเรียงกันเป็นแอนิเมชันตอนเลื่อนหน้าจอ">

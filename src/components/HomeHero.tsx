@@ -7,7 +7,7 @@ import ProductImage from '@/components/storefront/ProductImage';
 import type { Product } from '@/lib/config';
 import { getProductName } from '@/lib/config';
 import { getBasePrice } from '@/lib/shop-constants';
-import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct } from '@/lib/flagship/config';
+import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct, type FlagshipHeroCopy } from '@/lib/flagship/config';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const DEFAULT_FLAGSHIP_SLUG = 'scc-jersey-2026';
@@ -23,6 +23,11 @@ export type HomeHeroProps = {
   flagshipEnabled?: boolean;
   /** Configured flagship slug override */
   flagshipSlug?: string;
+  /** Custom hero details configured in Admin Flagship settings */
+  heroCopy?: {
+    th?: FlagshipHeroCopy;
+    en?: FlagshipHeroCopy;
+  };
 };
 
 function formatDeadline(iso: string | null | undefined, lang: 'th' | 'en'): string | null {
@@ -44,16 +49,38 @@ export default function HomeHero({
   closeDate,
   flagshipEnabled = true,
   flagshipSlug: flagshipSlugProp,
+  heroCopy,
 }: HomeHeroProps) {
   const { t, lang } = useTranslation();
+  if (!flagshipEnabled) return null;
+
   const en = lang === 'en';
+  const copy = (en ? heroCopy?.en : heroCopy?.th) || heroCopy?.th;
   const flagshipSlug =
     flagshipSlugProp ||
     (product && getFlagshipSlugForProduct(product)) ||
     FLAGSHIP_PRODUCTS[DEFAULT_FLAGSHIP_SLUG]?.slug ||
     DEFAULT_FLAGSHIP_SLUG;
   const flagshipHref = `/flagship/${flagshipSlug}`;
-  const productLabel = product ? getProductName(product, lang) : t.home.heroFallbackName;
+  const productLabel =
+    copy?.title?.trim() ||
+    (product ? getProductName(product, lang) : t.home.heroFallbackName);
+  const subtitleText =
+    copy?.subtitle?.trim() ||
+    (product ? (en ? product.descriptionEn || product.description : product.description) : '') ||
+    t.home.heroSlogan;
+  const eyebrowText =
+    copy?.eyebrow?.trim() ||
+    (en ? 'No. 01 — New this season' : 'No. 01 — ของใหม่ประจำปี');
+  const topRightText =
+    copy?.topRightLabel?.trim() ||
+    (en ? 'Merch / 2026' : 'ของชุมนุม / 2026');
+  const captionRightText =
+    copy?.captionRight?.trim() ||
+    t.home.heroHeadline;
+  const primaryImageSrc = copy?.heroImage?.trim() || product?.coverImage;
+  const ctaBuyText = copy?.ctaBuyLabel?.trim() || t.home.heroCtaBuy;
+  const cta360Text = copy?.cta360Label?.trim() || (en ? 'Spin it 360°' : 'หมุนดูแบบ 360°');
 
   const price = product ? getBasePrice(product) : null;
   const hasPriceRange = Object.keys(product?.sizePricing || {}).length > 1;
@@ -107,7 +134,7 @@ export default function HomeHero({
         >
           <span>SCC Shop — {en ? 'PSU Science Computer Club' : 'ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.'}</span>
           <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, color: 'var(--text-muted)' }}>
-            {en ? 'Merch / 2026' : 'ของชุมนุม / 2026'}
+            {topRightText}
           </Box>
         </Box>
 
@@ -135,7 +162,7 @@ export default function HomeHero({
               className="store-mono"
               sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mb: 1, textTransform: 'uppercase' }}
             >
-              {en ? 'No. 01 — New this season' : 'No. 01 — ของใหม่ประจำปี'}
+              {eyebrowText}
             </Typography>
             <Box>
             <Typography
@@ -153,8 +180,8 @@ export default function HomeHero({
             >
               {productLabel}
             </Typography>
-            <Typography sx={{ fontFamily: 'inherit', fontSize: { xs: '0.95rem', md: '1rem' }, color: 'var(--text-muted)', maxWidth: 440, lineHeight: 1.6, mb: 3 }}>
-              {t.home.heroSlogan}
+            <Typography sx={{ fontFamily: 'inherit', fontSize: { xs: '0.95rem', md: '1rem' }, color: 'var(--text-muted)', maxWidth: 440, lineHeight: 1.6, mb: 3, whiteSpace: 'pre-line' }}>
+              {subtitleText}
             </Typography>
 
             {/* Price + deadline, set like a price list */}
@@ -210,7 +237,7 @@ export default function HomeHero({
                   '&:hover': { bgcolor: 'color-mix(in srgb, var(--primary) 88%, black)', boxShadow: 'none' },
                 }}
               >
-                {canBuy ? t.home.heroCtaBuy : t.home.heroCtaDetails}
+                {canBuy ? ctaBuyText : t.home.heroCtaDetails}
               </Button>
               {flagshipEnabled && (
                 <Button
@@ -232,7 +259,7 @@ export default function HomeHero({
                     '&:hover': { bgcolor: 'transparent', textDecorationColor: 'currentColor' },
                   }}
                 >
-                  {en ? 'Spin it 360°' : 'หมุนดูแบบ 360°'}
+                  {cta360Text}
                 </Button>
               )}
             </Box>
@@ -254,7 +281,7 @@ export default function HomeHero({
               }}
             >
               <ProductImage
-                src={product?.coverImage}
+                src={primaryImageSrc}
                 fallbackSrcs={product?.images}
                 alt={productLabel}
                 width="100%"
@@ -282,7 +309,7 @@ export default function HomeHero({
               <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {en ? 'Fig. 01' : 'ภาพ 01'} — {productLabel}
               </Box>
-              <span>{t.home.heroHeadline}</span>
+              <span>{captionRightText}</span>
             </Box>
           </Box>
         </Box>

@@ -3,20 +3,28 @@
 import { Box } from '@mui/material';
 import { useTranslation } from '@/hooks/useTranslation';
 
+export type HomeTrustStripProps = {
+  enabled?: boolean;
+  highlights?: string[];
+};
+
 /**
  * Plain "how it works" line under the hero — set as a numbered list in mono,
  * the way a printed order sheet would put it. No icons, no blur.
  */
-export default function HomeTrustStrip() {
+export default function HomeTrustStrip({ enabled = true, highlights }: HomeTrustStripProps = {}) {
   const { t, lang } = useTranslation();
+  if (!enabled) return null;
   const en = lang === 'en';
 
-  const items = [
+  const defaultItems = [
     en ? 'Pick a size, add your name' : 'เลือกไซส์ ใส่ชื่อได้',
     `${en ? 'Pay with' : 'จ่ายด้วย'} ${t.home.trustPayment}`,
     t.home.trustPickup,
     t.home.trustOrders,
   ];
+  const customItems = (highlights || []).map((s) => s?.trim()).filter(Boolean) as string[];
+  const items = customItems.length > 0 ? customItems : defaultItems;
 
   return (
     <Box

@@ -2334,8 +2334,10 @@ export default function HomePage() {
 
     if (options?.goCheckout) {
       setShowCart(false);
-      setShowOrderDialog(true);
       setActiveTab('cart');
+      if (requireProfileBeforeCheckout(newCart)) {
+        setShowOrderDialog(true);
+      }
     }
   };
 
@@ -2348,7 +2350,6 @@ export default function HomePage() {
   const handleBuyNow = () => {
     const newItem = buildCartItem();
     if (!newItem) return;
-    if (!requireProfileBeforeCheckout()) return;
     commitCartItem(newItem, { goCheckout: true });
   };
 
@@ -2761,9 +2762,14 @@ export default function HomePage() {
     return isThaiText(orderData.name) && !!orderData.phone && !!orderData.instagram;
   }, [orderData]);
 
-  const requireProfileBeforeCheckout = () => {
+  const requireProfileBeforeCheckout = (targetCart?: CartItem[]) => {
+    const activeCart = targetCart ?? cart;
+    const slug = activeCart[0]?.shopSlug;
+    const isTargetShopOpen = slug
+      ? (subShopCatalog.find((s) => s.slug === slug)?.isOpen ?? subShopCatalog.find((s) => s.slug === slug)?.settings?.isOpen ?? true)
+      : isShopOpen;
     // Block checkout if shop is closed
-    if (!cartCheckoutOpen) {
+    if (!isTargetShopOpen) {
       showToast('warning', t.checkout.shopClosedWarning);
       return false;
     }
@@ -3897,18 +3903,26 @@ export default function HomePage() {
         customMessage={config?.closedMessage}
       />
 
-      {/* Hero → Trust strip (first impression) */}
-      <HomeHero
-        product={flagshipHeroProduct}
-        isOpen={isShopOpen}
-        closeDate={config?.closeDate}
-        flagshipEnabled={isFlagshipEnabled}
-        flagshipSlug={mergedFlagshipConfig.slug}
-        onBuy={(product) => {
-          handleSelectProduct(product);
-        }}
-      />
-      <HomeTrustStrip />
+      {/* Hero → Trust strip (shown only when Flagship is enabled) */}
+      {isFlagshipEnabled && (
+        <>
+          <HomeHero
+            product={flagshipHeroProduct}
+            isOpen={isShopOpen}
+            closeDate={config?.closeDate}
+            flagshipEnabled={isFlagshipEnabled}
+            flagshipSlug={mergedFlagshipConfig.slug}
+            heroCopy={mergedFlagshipConfig.heroCopy}
+            onBuy={(product) => {
+              handleSelectProduct(product);
+            }}
+          />
+          <HomeTrustStrip
+            enabled={isFlagshipEnabled}
+            highlights={mergedFlagshipConfig.heroCopy?.[lang === 'en' ? 'en' : 'th']?.highlights}
+          />
+        </>
+      )}
 
       {/* Event / Promotion Banners */}
       <EventBanner

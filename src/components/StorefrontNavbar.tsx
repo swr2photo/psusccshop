@@ -35,6 +35,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSession } from 'next-auth/react';
 import { useCartStore } from '@/store/cartStore';
+import { getPublicConfig } from '@/lib/api-client';
 import ThemeToggle from '@/components/ThemeToggle';
 import LanguageToggle from '@/components/LanguageToggle';
 
@@ -214,7 +215,7 @@ export default function StorefrontNavbar({
   onOpenLive,
   onShopClick,
   onFlagshipClick,
-  showFlagship = true,
+  showFlagship: showFlagshipProp,
 }: StorefrontNavbarProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -223,6 +224,24 @@ export default function StorefrontNavbar({
   const storeCart = useCartStore((s) => s.cart);
 
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [remoteFlagshipEnabled, setRemoteFlagshipEnabled] = useState(true);
+
+  useEffect(() => {
+    if (showFlagshipProp !== undefined) return;
+    let active = true;
+    void getPublicConfig().then((res) => {
+      if (!active || res.status !== 'success') return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cfg = (res.data as any) ?? (res as any).config;
+      const enabled = cfg?.flagshipConfig?.enabled ?? cfg?.flagshipConfigs?.['scc-jersey-2026']?.enabled ?? true;
+      setRemoteFlagshipEnabled(enabled !== false);
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [showFlagshipProp]);
+
+  const showFlagship = showFlagshipProp !== undefined ? showFlagshipProp : remoteFlagshipEnabled;
 
   // Auto-detect auth status & avatar
   const isAuth = isAuthenticated !== undefined ? isAuthenticated : !!session?.user;

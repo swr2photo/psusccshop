@@ -1435,9 +1435,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     );
     resetProductDialog();
     if (options?.goCheckout) {
-      setCheckoutOpen(true);
+      if (requireProfileBeforeCheckout()) {
+        setCheckoutOpen(true);
+      }
     }
-  }, [addToCart, showToast, t.cart.addedGoCheckout, t.cart.addedToCart, resetProductDialog, selectedProduct, lang, cart]);
+  }, [addToCart, showToast, t.cart.addedGoCheckout, t.cart.addedToCart, resetProductDialog, selectedProduct, lang, cart, requireProfileBeforeCheckout]);
 
   const handleAddToCart = useCallback(() => {
     const item = buildCartItem();
@@ -1448,9 +1450,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const handleBuyNow = useCallback(() => {
     const item = buildCartItem();
     if (!item) return;
-    if (!requireProfileBeforeCheckout()) return;
     commitCartItem(item, { goCheckout: true });
-  }, [buildCartItem, commitCartItem, requireProfileBeforeCheckout]);
+  }, [buildCartItem, commitCartItem]);
 
   const handleShareProduct = useCallback(async (product: Product) => {
     const url = `${window.location.origin}/shop/${shopSlug}`;

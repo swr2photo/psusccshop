@@ -441,37 +441,53 @@ export default function FormFillPage() {
 
             {answered && !editing && (
               <div className={cn('mb-4 rounded-2xl border p-4 sm:p-5', justSubmitted ? 'border-success/40 bg-success/10' : 'border-border bg-card')}>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <CheckCircle2 size={20} className="shrink-0 text-success" />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold">{justSubmitted ? 'ส่งคำตอบเรียบร้อย ขอบคุณที่ร่วมตอบ!' : 'คุณตอบแบบฟอร์มนี้แล้ว'}</p>
-                    {data.myResponse?.updatedAt && <p className="text-[0.8rem] text-muted-foreground">เมื่อ {formatDate(data.myResponse.updatedAt)}</p>}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-2.5 sm:items-center">
+                    <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-success sm:mt-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[0.95rem] font-bold leading-snug text-foreground">
+                        {justSubmitted ? 'ส่งคำตอบเรียบร้อย ขอบคุณที่ร่วมตอบ!' : 'คุณตอบแบบฟอร์มนี้แล้ว'}
+                      </p>
+                      {data.myResponse?.updatedAt && (
+                        <p className="mt-0.5 text-[0.78rem] text-muted-foreground">
+                          เมื่อ {formatDate(data.myResponse.updatedAt)}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {canEdit && (
-                      <Button variant="outline" size="sm" className="rounded-xl" onClick={() => { setEditing(true); setJustSubmitted(false); }}>
-                        <Pencil size={14} /> แก้ไขคำตอบ
-                      </Button>
-                    )}
-                    {pdpa.enabled && pdpa.allowWithdrawConsent && !confirmWithdraw && (
-                      <Button variant="ghost" size="sm" className="rounded-xl text-muted-foreground hover:text-destructive" onClick={() => setConfirmWithdraw(true)}>
-                        <Trash2 size={14} /> ถอนความยินยอมและลบคำตอบ
-                      </Button>
-                    )}
-                  </div>
+                  {(canEdit || (pdpa.enabled && pdpa.allowWithdrawConsent && !confirmWithdraw)) && (
+                    <div className="flex flex-wrap items-center gap-2 pl-7 sm:pl-0 sm:shrink-0">
+                      {canEdit && (
+                        <Button variant="outline" size="sm" className="h-8 rounded-xl text-[0.78rem]" onClick={() => { setEditing(true); setJustSubmitted(false); }}>
+                          <Pencil size={13} /> แก้ไขคำตอบ
+                        </Button>
+                      )}
+                      {pdpa.enabled && pdpa.allowWithdrawConsent && !confirmWithdraw && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 rounded-xl border-border/70 bg-background/60 px-2.5 text-[0.76rem] text-muted-foreground hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setConfirmWithdraw(true)}
+                        >
+                          <Trash2 size={13} className="shrink-0" />
+                          <span>ถอนความยินยอมและลบคำตอบ</span>
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {data.myResponse?.pdpaConsent?.accepted && (
-                  <p className="mt-2.5 border-t border-border/60 pt-2.5 text-[0.75rem] text-muted-foreground">
+                  <p className="mt-3 border-t border-border/60 pt-2.5 text-[0.74rem] leading-relaxed text-muted-foreground">
                     บันทึกความยินยอม PDPA (v{data.myResponse.pdpaConsent.policyVersion}) เมื่อ {formatDate(data.myResponse.pdpaConsent.acceptedAt)}
                     {data.myResponse.pdpaConsent.expiresAt ? ` · เก็บรักษาถึง ${formatDate(data.myResponse.pdpaConsent.expiresAt)}` : ''}
                   </p>
                 )}
 
                 {confirmWithdraw && (
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-[0.82rem]">
-                    <span className="text-foreground">ยืนยันการถอนความยินยอม PDPA และลบคำตอบของท่านออกจากระบบ?</span>
-                    <div className="flex gap-2">
+                  <div className="mt-3 flex flex-col gap-2.5 rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-[0.82rem] sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-medium leading-snug text-foreground">ยืนยันการถอนความยินยอม PDPA และลบคำตอบของท่านออกจากระบบ?</span>
+                    <div className="flex items-center justify-end gap-2 shrink-0">
                       <Button size="sm" variant="ghost" onClick={() => setConfirmWithdraw(false)} disabled={withdrawing}>ยกเลิก</Button>
                       <Button size="sm" variant="destructive" onClick={() => void withdrawConsent()} disabled={withdrawing}>
                         {withdrawing ? <Loader2 size={14} className="animate-spin" /> : null} ยืนยันลบคำตอบ

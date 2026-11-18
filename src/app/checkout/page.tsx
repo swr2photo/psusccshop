@@ -40,7 +40,9 @@ import TurnstileWidget from '@/components/TurnstileWidget';
 import { useCartStore } from '@/store/cartStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSession } from 'next-auth/react';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, getCart, getProfile, saveCart as saveCartApi } from '@/lib/api-client';
+import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
+import { ensureUniqueCartLineIds } from '@/lib/shop-constants';
 import { ShippingConfig, ShippingOption } from '@/lib/shipping';
 import { usePageShipping, usePagePaymentConfig } from '@/hooks/usePageData';
 import { useHydrated } from '@/hooks/useHydrated';
@@ -49,19 +51,89 @@ import { formatFriendlyError } from '@/utils/error';
 export default function StandaloneCheckoutPage() {
   const router = useRouter();
   const { t, lang } = useTranslation();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const cart = useCartStore((s) => s.cart);
+  const setCart = useCartStore((s) => s.setCart);
   const clearCart = useCartStore((s) => s.clearCart);
   const shouldLoadCheckoutData = cart.length > 0;
 
   // Wait for Zustand persist hydration from localStorage
   const mounted = useHydrated();
+  const [syncingServerCart, setSyncingServerCart] = useState(true);
 
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [studentId, setStudentId] = useState('');
+
+  // Flush any queued items added from the Flagship 360° page into the cart store
+  useEffect(() => {
+    if (!mounted) return;
+    const queued = flushFlagshipCartQueue(true);
+    if (queued.length > 0) {
+      const current = useCartStore.getState().cart;
+      const merged = ensureUniqueCartLineIds([...current, ...(queued as any)]);
+      setCart(merged as any);
+      if (session?.user?.email) {
+        void saveCartApi(session.user.email, merged as any);
+      }
+    }
+  }, [mounted, session?.user?.email, setCart]);
+
+  // Sync server cart & saved profile for logged-in user
+  useEffect(() => {
+    if (!mounted) return;
+    if (sessionStatus === 'loading') return;
+    const email = session?.user?.email;
+    if (!email) {
+      setSyncingServerCart(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSyncingServerCart(true);
+    void Promise.allSettled([getCart(email), getProfile(email)]).then(([cartRes, profRes]) => {
+      if (cancelled) return;
+      if (cartRes.status === 'fulfilled') {
+        const res = cartRes.value;
+        const serverCart = (res.data as { cart?: any[] } | undefined)?.cart ?? (res as any).cart;
+        if (Array.isArray(serverCart) && serverCart.length > 0) {
+          const localCart = useCartStore.getState().cart;
+          if (localCart.length === 0) {
+            setCart(ensureUniqueCartLineIds(serverCart) as any);
+          } else {
+            const localIds = new Set(localCart.map((c: any) => c.id));
+            const missingFromLocal = serverCart.filter((s: any) => s?.id && !localIds.has(s.id));
+            if (missingFromLocal.length > 0) {
+              setCart(ensureUniqueCartLineIds([...localCart, ...missingFromLocal]) as any);
+            }
+          }
+        } else if (Array.isArray(serverCart) && serverCart.length === 0) {
+          const localCart = useCartStore.getState().cart;
+          if (localCart.length > 0) {
+            void saveCartApi(email, localCart as any);
+          }
+        }
+      }
+      if (profRes.status === 'fulfilled') {
+        const pRes = profRes.value;
+        const prof = (pRes.data as any)?.profile ?? (pRes.data as any) ?? (pRes as any).profile;
+        if (prof && typeof prof === 'object') {
+          if (prof.name) setCustomerName((prev) => prev || String(prof.name));
+          if (prof.phone) setPhone((prev) => prev || String(prof.phone));
+          if (prof.address) setAddress((prev) => prev || String(prof.address));
+          if (prof.studentId) setStudentId((prev) => prev || String(prof.studentId));
+        }
+      }
+    }).finally(() => {
+      if (!cancelled) setSyncingServerCart(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted, session?.user?.email, sessionStatus, setCart]);
 
   // Dynamic Shipping & Payment Config from API
   const { shippingConfig: swrShippingConfig, isLoading: shipLoading } = usePageShipping(shouldLoadCheckoutData);
@@ -296,6 +368,9 @@ export default function StandaloneCheckoutPage() {
         } catch { /* ignore */ }
 
         clearCart();
+        if (session?.user?.email) {
+          void saveCartApi(session.user.email, []);
+        }
         router.push(`/payment/${encodeURIComponent(orderRef)}`);
       } else {
         throw new Error(t.checkout.orderError);
@@ -309,7 +384,7 @@ export default function StandaloneCheckoutPage() {
     }
   };
 
-  if (!mounted) {
+  if (!mounted || (cart.length === 0 && syncingServerCart)) {
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background, #f8fafc)', pb: 10 }}>
         <StorefrontNavbar />
@@ -330,8 +405,8 @@ export default function StandaloneCheckoutPage() {
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
             {lang === 'en' ? 'Your cart is empty' : 'ไม่มีสินค้าในตะกร้า'}
           </Typography>
-          <Button component={Link} href="/shop" variant="contained" sx={{ bgcolor: 'var(--navy, #1e3a5f)', borderRadius: 3 }}>
-            {lang === 'en' ? 'Back to Shop' : 'กลับไปยังหน้าร้านค้า'}
+          <Button component={Link} href="/" variant="contained" sx={{ bgcolor: 'var(--navy, #1e3a5f)', borderRadius: 3 }}>
+            {lang === 'en' ? 'Back to Home' : 'กลับไปยังหน้าร้านค้า'}
           </Button>
         </Container>
         <MobileBottomNav />
