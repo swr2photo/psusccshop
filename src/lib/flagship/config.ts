@@ -27,6 +27,8 @@ export type FlagshipLocalizedStages = {
 };
 
 export type FlagshipProductConfig = {
+  /** Whether the flagship page and its storefront links are active (default: true) */
+  enabled?: boolean;
   /** URL segment: /flagship/[slug] */
   slug: string;
   /** Preferred: exact product id from shop config */
@@ -63,6 +65,7 @@ export type FlagshipProductConfig = {
 
 export const FLAGSHIP_PRODUCTS: Record<string, FlagshipProductConfig> = {
   'scc-jersey-2026': {
+    enabled: true,
     slug: 'scc-jersey-2026',
     productId: 'dev-jersey-1',
     match: {
@@ -163,6 +166,7 @@ export function getMergedFlagshipConfig(
   return {
     ...base,
     ...dynamicCfg,
+    enabled: dynamicCfg.enabled ?? base.enabled ?? true,
     brandLabel: {
       th: dynamicCfg.brandLabel?.th || base.brandLabel?.th || 'SCC Flagship',
       en: dynamicCfg.brandLabel?.en || base.brandLabel?.en || 'SCC Flagship',

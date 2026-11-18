@@ -80,6 +80,7 @@ function initialConfig(currentConfig?: { flagshipConfig?: Partial<FlagshipProduc
   return normalize({
     ...base,
     ...(saved || {}),
+    enabled: saved?.enabled ?? base.enabled ?? true,
     slug,
     brandLabel: { th: saved?.brandLabel?.th || base.brandLabel?.th || '', en: saved?.brandLabel?.en || base.brandLabel?.en || '' },
     stages: {
@@ -370,21 +371,70 @@ export default function FlagshipSettings({ products, currentConfig, onSaveSucces
     setStatus(null);
   };
 
+  const isEnabled = config.enabled !== false;
+
   return (
     <div className="mx-auto w-full max-w-[1200px]">
-      {/* Intro + page link */}
-      <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-[0.85rem] text-muted-foreground">
-            หน้าแนะนำสินค้าแบบเลื่อนดู — ภาพหมุน 360° พร้อมข้อความจุดเด่นที่โผล่ตามจังหวะการเลื่อน
+      {/* Intro + Enable/Disable Toggle + page link */}
+      <div className="mb-5 flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-[0.95rem] font-bold text-foreground">สถานะหน้าสินค้า Flagship</h2>
+            <span
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.72rem] font-bold',
+                isEnabled
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+              )}
+            >
+              <span className={cn('size-1.5 rounded-full', isEnabled ? 'bg-emerald-500' : 'bg-amber-500')} />
+              {isEnabled ? 'เปิดใช้งานอยู่' : 'ปิดใช้งานชั่วคราว'}
+            </span>
+          </div>
+          <p className="mt-1 text-[0.82rem] text-muted-foreground">
+            {isEnabled
+              ? 'หน้าแนะนำสินค้าแบบเลื่อนดู 360° และปุ่มลิงก์บนหน้าร้านเปิดให้ลูกค้าเข้าชมตามปกติ'
+              : 'เมื่อปิดใช้งาน ระบบจะซ่อนปุ่ม Flagship บนหน้าร้านและปิดการเข้าถึงหน้า /flagship ชั่วคราว'}
           </p>
-          <p className="mt-1 truncate font-mono text-[0.8rem] text-foreground">/flagship/{config.slug}</p>
+          <p className="mt-1 truncate font-mono text-[0.78rem] text-foreground">/flagship/{config.slug}</p>
         </div>
-        <Button asChild variant="outline" className="shrink-0">
-          <a href={`/flagship/${config.slug}`} target="_blank" rel="noreferrer">
-            <ExternalLink className="size-4" /> เปิดหน้าจริง
-          </a>
-        </Button>
+
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isEnabled}
+            onClick={() => patch({ enabled: !isEnabled })}
+            className={cn(
+              'inline-flex h-9 items-center gap-2.5 rounded-xl border px-3.5 text-[0.82rem] font-semibold transition-colors',
+              isEnabled
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300'
+                : 'border-border bg-muted text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <span
+              className={cn(
+                'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
+                isEnabled ? 'bg-emerald-500' : 'bg-muted-foreground/35',
+              )}
+            >
+              <span
+                className={cn(
+                  'inline-block size-3.5 rounded-full bg-white shadow-sm transition-transform',
+                  isEnabled ? 'translate-x-4' : 'translate-x-1',
+                )}
+              />
+            </span>
+            {isEnabled ? 'เปิดใช้งานหน้า Flagship' : 'ปิดหน้า Flagship'}
+          </button>
+
+          <Button asChild variant="outline" className="shrink-0">
+            <a href={`/flagship/${config.slug}`} target="_blank" rel="noreferrer">
+              <ExternalLink className="size-4" /> เปิดหน้าจริง
+            </a>
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">

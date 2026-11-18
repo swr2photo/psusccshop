@@ -231,6 +231,8 @@ interface PublicShopConfig {
     description?: string;
     createdAt: string;
   }>;
+  flagshipConfig?: Record<string, any>;
+  flagshipConfigs?: Record<string, Record<string, any>>;
 }
 
 /**
@@ -374,6 +376,14 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
       createdAt: p.createdAt,
       // SECURITY: createdBy removed - admin email hidden
     }));
+  }
+
+  // Flagship product page config (public display & enabled flag)
+  if (config.flagshipConfig && typeof config.flagshipConfig === 'object') {
+    sanitized.flagshipConfig = config.flagshipConfig;
+  }
+  if (config.flagshipConfigs && typeof config.flagshipConfigs === 'object') {
+    sanitized.flagshipConfigs = config.flagshipConfigs;
   }
   
   return sanitized;

@@ -62,6 +62,7 @@ export type StorefrontNavbarProps = {
   onOpenLive?: () => void;
   onShopClick?: () => void;
   onFlagshipClick?: () => void;
+  showFlagship?: boolean;
 };
 
 function NavBadge({
@@ -213,6 +214,7 @@ export default function StorefrontNavbar({
   onOpenLive,
   onShopClick,
   onFlagshipClick,
+  showFlagship = true,
 }: StorefrontNavbarProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -512,11 +514,13 @@ export default function StorefrontNavbar({
               {t.nav.shop}
             </Button>
 
-            <Button variant="text" onClick={handleFlagship} sx={desktopLinkSx(false)}>
-              <NavLabel badge={<NavBadge label={t.nav.badgeNew} color="#06b6d4" />}>
-                {t.nav.flagship}
-              </NavLabel>
-            </Button>
+            {showFlagship && (
+              <Button variant="text" onClick={handleFlagship} sx={desktopLinkSx(false)}>
+                <NavLabel badge={<NavBadge label={t.nav.badgeNew} color="#06b6d4" />}>
+                  {t.nav.flagship}
+                </NavLabel>
+              </Button>
+            )}
 
             <Button
               variant="text"
@@ -649,12 +653,14 @@ export default function StorefrontNavbar({
             </ListItemButton>
           </ListItem>
 
-          <ListItem disablePadding>
-            <ListItemButton onClick={handleFlagship}>
-              <ListItemIcon sx={{ minWidth: 36, color: '#06b6d4' }}><Sparkles size={20} /></ListItemIcon>
-              <ListItemText primary={t.nav.flagship} primaryTypographyProps={{ fontWeight: 700 }} />
-            </ListItemButton>
-          </ListItem>
+          {showFlagship && (
+            <ListItem disablePadding>
+              <ListItemButton onClick={handleFlagship}>
+                <ListItemIcon sx={{ minWidth: 36, color: '#06b6d4' }}><Sparkles size={20} /></ListItemIcon>
+                <ListItemText primary={t.nav.flagship} primaryTypographyProps={{ fontWeight: 700 }} />
+              </ListItemButton>
+            </ListItem>
+          )}
 
           <ListItem disablePadding>
             <ListItemButton onClick={() => handleTab('cart')} selected={currentTab === 'cart'}>

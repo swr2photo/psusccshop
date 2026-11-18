@@ -659,6 +659,9 @@ export interface ShopConfig {
     /** อัปเดตล่าสุด */
     updatedAt?: string;
   };
+  /** การตั้งค่าหน้าสินค้า Flagship (360° Scrollytelling) */
+  flagshipConfig?: Record<string, any>;
+  flagshipConfigs?: Record<string, Record<string, any>>;
 }
 
 export interface Order {

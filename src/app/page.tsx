@@ -121,7 +121,7 @@ import Footer from '@/components/Footer';
 import HomeHero from '@/components/HomeHero';
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import HomeTrustStrip from '@/components/HomeTrustStrip';
-import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct } from '@/lib/flagship/config';
+import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct, getMergedFlagshipConfig } from '@/lib/flagship/config';
 import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
 import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, getProductUnavailableToast, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
@@ -3334,17 +3334,24 @@ export default function HomePage() {
     return { shop, events, isSearch: false };
   }, [displayGroupedProducts, productSearch]);
 
+  const mergedFlagshipConfig = useMemo(() => {
+    const slug = (config as any)?.flagshipConfig?.slug || 'scc-jersey-2026';
+    return getMergedFlagshipConfig(slug, config as any);
+  }, [config]);
+
+  const isFlagshipEnabled = mergedFlagshipConfig.enabled !== false;
+
   const flagshipHeroProduct = useMemo(() => {
     const catalog = isDev
       ? [...devTestProducts, ...(config?.products || [])]
       : (config?.products || []);
-    const cfg = FLAGSHIP_PRODUCTS['scc-jersey-2026'];
+    const cfg = mergedFlagshipConfig || FLAGSHIP_PRODUCTS['scc-jersey-2026'];
     if (cfg?.productId) {
       const byId = catalog.find((p) => p.id === cfg.productId);
       if (byId) return byId;
     }
     return catalog.find((p) => getFlagshipSlugForProduct(p)) || null;
-  }, [config?.products, isDev, devTestProducts]);
+  }, [config?.products, isDev, devTestProducts, mergedFlagshipConfig]);
 
   const filteredProductCount = useMemo(
     () => Object.values(filteredGroupedProducts).reduce((acc, items) => acc + items.length, 0),
@@ -3522,9 +3529,14 @@ export default function HomePage() {
           setActiveTab('home');
           document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
         }}
-        onFlagshipClick={() => {
-          window.location.href = '/flagship/scc-jersey-2026';
-        }}
+        showFlagship={isFlagshipEnabled}
+        onFlagshipClick={
+          isFlagshipEnabled
+            ? () => {
+                window.location.href = `/flagship/${mergedFlagshipConfig.slug || 'scc-jersey-2026'}`;
+              }
+            : undefined
+        }
         searchPanel={showSearchBar ? (
           <Box sx={{ px: { xs: 1.25, md: 3 }, pb: 2, pt: 0.5, position: 'relative', zIndex: 2 }}>
             <Box sx={{
@@ -3869,6 +3881,8 @@ export default function HomePage() {
         product={flagshipHeroProduct}
         isOpen={isShopOpen}
         closeDate={config?.closeDate}
+        flagshipEnabled={isFlagshipEnabled}
+        flagshipSlug={mergedFlagshipConfig.slug}
         onBuy={(product) => {
           handleSelectProduct(product);
         }}

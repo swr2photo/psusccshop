@@ -19,6 +19,10 @@ export type HomeHeroProps = {
   isOpen?: boolean;
   /** Order deadline shown under the price */
   closeDate?: string | null;
+  /** Whether the 360° Flagship page is enabled in admin settings */
+  flagshipEnabled?: boolean;
+  /** Configured flagship slug override */
+  flagshipSlug?: string;
 };
 
 function formatDeadline(iso: string | null | undefined, lang: 'th' | 'en'): string | null {
@@ -33,10 +37,18 @@ function formatDeadline(iso: string | null | undefined, lang: 'th' | 'en'): stri
  * club line, the actual product name, price + deadline, one action, a framed photo.
  * No gradients, glows or entrance animation.
  */
-export default function HomeHero({ product, onBuy, isOpen = true, closeDate }: HomeHeroProps) {
+export default function HomeHero({
+  product,
+  onBuy,
+  isOpen = true,
+  closeDate,
+  flagshipEnabled = true,
+  flagshipSlug: flagshipSlugProp,
+}: HomeHeroProps) {
   const { t, lang } = useTranslation();
   const en = lang === 'en';
   const flagshipSlug =
+    flagshipSlugProp ||
     (product && getFlagshipSlugForProduct(product)) ||
     FLAGSHIP_PRODUCTS[DEFAULT_FLAGSHIP_SLUG]?.slug ||
     DEFAULT_FLAGSHIP_SLUG;
@@ -49,11 +61,17 @@ export default function HomeHero({ product, onBuy, isOpen = true, closeDate }: H
   const canBuy = Boolean(product && isOpen);
 
   const handlePrimary = () => {
-    if (product && onBuy && canBuy) {
+    if (product && onBuy && (canBuy || !flagshipEnabled)) {
       onBuy(product);
       return;
     }
-    if (typeof window !== 'undefined') window.location.href = flagshipHref;
+    if (flagshipEnabled && typeof window !== 'undefined') {
+      window.location.href = flagshipHref;
+      return;
+    }
+    if (typeof document !== 'undefined') {
+      document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   return (
@@ -194,27 +212,29 @@ export default function HomeHero({ product, onBuy, isOpen = true, closeDate }: H
               >
                 {canBuy ? t.home.heroCtaBuy : t.home.heroCtaDetails}
               </Button>
-              <Button
-                component={Link}
-                href={flagshipHref}
-                endIcon={<ArrowUpRight size={16} />}
-                sx={{
-                  fontFamily: 'inherit',
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  fontSize: '0.95rem',
-                  px: 1.5,
-                  py: 1.1,
-                  borderRadius: '6px',
-                  color: 'var(--foreground)',
-                  textDecoration: 'underline',
-                  textUnderlineOffset: '4px',
-                  textDecorationColor: 'var(--border)',
-                  '&:hover': { bgcolor: 'transparent', textDecorationColor: 'currentColor' },
-                }}
-              >
-                {en ? 'Spin it 360°' : 'หมุนดูแบบ 360°'}
-              </Button>
+              {flagshipEnabled && (
+                <Button
+                  component={Link}
+                  href={flagshipHref}
+                  endIcon={<ArrowUpRight size={16} />}
+                  sx={{
+                    fontFamily: 'inherit',
+                    textTransform: 'none',
+                    fontWeight: 500,
+                    fontSize: '0.95rem',
+                    px: 1.5,
+                    py: 1.1,
+                    borderRadius: '6px',
+                    color: 'var(--foreground)',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '4px',
+                    textDecorationColor: 'var(--border)',
+                    '&:hover': { bgcolor: 'transparent', textDecorationColor: 'currentColor' },
+                  }}
+                >
+                  {en ? 'Spin it 360°' : 'หมุนดูแบบ 360°'}
+                </Button>
+              )}
             </Box>
             </Box>
           </Box>

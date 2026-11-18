@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { getFlagshipConfig, getMergedFlagshipConfig } from '@/lib/flagship/config';
+import Link from 'next/link';
+import { getMergedFlagshipConfig } from '@/lib/flagship/config';
 import FlagshipExperience, {
   resolveFlagshipProduct,
 } from '@/components/flagship/FlagshipExperience';
@@ -21,7 +22,7 @@ export default function FlagshipExperienceClient({ slug }: Props) {
   const [loading, setLoading] = useState(true);
 
   const config = useMemo(() => {
-    return getMergedFlagshipConfig(slug, shop as any);
+    return getMergedFlagshipConfig(slug, shop);
   }, [slug, shop]);
 
   useEffect(() => {
@@ -95,6 +96,53 @@ export default function FlagshipExperienceClient({ slug }: Props) {
   }, [config, shop]);
 
   if (!config) return null;
+
+  if (!loading && config.enabled === false) {
+    return (
+      <div
+        style={{
+          minHeight: '100dvh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+          padding: 24,
+          textAlign: 'center',
+          background: 'var(--background)',
+          color: 'var(--foreground)',
+        }}
+      >
+        <p style={{ fontSize: 12, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--text-muted)', margin: 0 }}>
+          SCC Shop · Flagship
+        </p>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
+          หน้าแสดงสินค้า Flagship ปิดให้บริการชั่วคราว
+        </h1>
+        <p style={{ fontSize: 14, color: 'var(--text-muted)', maxWidth: 420, margin: 0, lineHeight: 1.6 }}>
+          คุณยังสามารถเลือกชมและสั่งซื้อสินค้าทั้งหมดได้ที่หน้าร้านหลัก
+        </p>
+        <Link
+          href="/"
+          style={{
+            marginTop: 8,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '10px 20px',
+            borderRadius: 10,
+            background: 'var(--primary)',
+            color: 'var(--primary-foreground)',
+            fontWeight: 600,
+            fontSize: 14,
+            textDecoration: 'none',
+          }}
+        >
+          กลับสู่หน้าร้านหลัก
+        </Link>
+      </div>
+    );
+  }
 
   if (loading && !product) {
     return (
