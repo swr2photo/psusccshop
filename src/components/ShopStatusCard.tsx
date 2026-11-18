@@ -360,7 +360,7 @@ export default function ShopStatusCard({
 
 // ==================== PRODUCT STATUS BADGE COMPONENT ====================
 interface ProductStatusBadgeProps {
-  product: { isActive?: boolean; startDate?: string; endDate?: string };
+  product: { isActive?: boolean; startDate?: string; endDate?: string; showStartDate?: boolean };
 }
 
 export function ProductStatusBadge({ product }: ProductStatusBadgeProps) {
@@ -422,9 +422,9 @@ export function ProductStatusBadge({ product }: ProductStatusBadgeProps) {
       >
         {label}
       </Typography>
-      {product.startDate && status === 'COMING_SOON' && (
+      {product.startDate && product.showStartDate !== false && status === 'COMING_SOON' && (
         <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
-          {t.shopStatus.opensOn} {new Date(product.startDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
+          {t.shopStatus.opensOn} {parseThailandDateTime(product.startDate, false).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
         </Typography>
       )}
     </Box>
@@ -436,10 +436,11 @@ interface ShopStatusBannerProps {
   isOpen: boolean;
   closeDate?: string;
   openDate?: string;
+  showOpenDate?: boolean;
   customMessage?: string;
 }
 
-export function ShopStatusBanner({ isOpen, closeDate, openDate, customMessage }: ShopStatusBannerProps) {
+export function ShopStatusBanner({ isOpen, closeDate, openDate, showOpenDate = true, customMessage }: ShopStatusBannerProps) {
   const now = useCurrentTime(5000);
   const status = getShopStatus(isOpen, closeDate, openDate, now);
   
@@ -447,8 +448,8 @@ export function ShopStatusBanner({ isOpen, closeDate, openDate, customMessage }:
   if (status === 'OPEN') return null;
   
   // Determine countdown date based on status
-  const countdownDate = status === 'WAITING_TO_OPEN' || status === 'COMING_SOON' 
-    ? openDate 
+  const countdownDate = (status === 'WAITING_TO_OPEN' || status === 'COMING_SOON')
+    ? (showOpenDate !== false ? openDate : undefined)
     : closeDate;
   
   return (

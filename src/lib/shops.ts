@@ -40,6 +40,7 @@ export interface ShopSettings {
   isOpen: boolean;
   closeDate?: string;
   openDate?: string;
+  showOpenDate?: boolean;
   closedMessage?: string;
   paymentEnabled?: boolean;
   paymentDisabledMessage?: string;
@@ -94,6 +95,7 @@ export function toPublicShopData(shop: Shop) {
     isOpen: shop.settings?.isOpen ?? true,
     closeDate: shop.settings?.closeDate || '',
     openDate: shop.settings?.openDate,
+    showOpenDate: shop.settings?.showOpenDate,
     closedMessage: shop.settings?.closedMessage,
     paymentEnabled: shop.settings?.paymentEnabled ?? true,
     paymentDisabledMessage: shop.settings?.paymentDisabledMessage,

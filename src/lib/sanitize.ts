@@ -141,6 +141,7 @@ interface PublicShopConfig {
   isOpen: boolean;
   closeDate: string;
   openDate?: string;
+  showOpenDate?: boolean;
   closedMessage?: string;
   paymentEnabled?: boolean;
   paymentDisabledMessage?: string;
@@ -262,6 +263,7 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
     isOpen: config.isOpen,
     closeDate: config.closeDate,
     openDate: config.openDate,
+    showOpenDate: config.showOpenDate,
     closedMessage: config.closedMessage,
     paymentEnabled: config.paymentEnabled,
     paymentDisabledMessage: config.paymentDisabledMessage,

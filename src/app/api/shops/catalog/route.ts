@@ -18,6 +18,7 @@ type ShopCatalogRow = {
   settings: {
     isOpen?: boolean;
     openDate?: string;
+    showOpenDate?: boolean;
     closeDate?: string;
   } | null;
   products: Product[] | null;
@@ -59,10 +60,12 @@ async function GETHandler() {
           logoUrl: shop.logo_url,
           isOpen: shop.settings?.isOpen ?? true,
           openDate: shop.settings?.openDate,
+          showOpenDate: shop.settings?.showOpenDate,
           closeDate: shop.settings?.closeDate,
           settings: shop.settings ? { 
             isOpen: shop.settings.isOpen ?? true,
             openDate: shop.settings.openDate,
+            showOpenDate: shop.settings.showOpenDate,
             closeDate: shop.settings.closeDate
           } : undefined,
           products,

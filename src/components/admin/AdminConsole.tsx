@@ -1070,6 +1070,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
             isOpen: data.config.isOpen ?? true,
             closeDate: data.config.closeDate || '',
             openDate: data.config.openDate,
+            showOpenDate: data.config.showOpenDate,
             closedMessage: data.config.closedMessage,
             paymentEnabled: data.config.paymentEnabled,
             paymentDisabledMessage: data.config.paymentDisabledMessage,

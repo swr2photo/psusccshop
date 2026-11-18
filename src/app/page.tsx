@@ -503,11 +503,12 @@ type OrderHistory = {
 
 type Interval = ReturnType<typeof setInterval>;
 
-type LeanProduct = Pick<Product, 'id' | 'name' | 'description' | 'type' | 'images' | 'basePrice' | 'sizePricing' | 'isActive' | 'startDate' | 'endDate'>;
+type LeanProduct = Pick<Product, 'id' | 'name' | 'description' | 'type' | 'images' | 'basePrice' | 'sizePricing' | 'isActive' | 'startDate' | 'endDate' | 'showStartDate'>;
 type LeanConfig = {
   isOpen: boolean;
   closeDate?: string;
   openDate?: string;
+  showOpenDate?: boolean;
   announcements: ShopConfig['announcements'];
   products: LeanProduct[];
 };
@@ -543,6 +544,7 @@ function sanitizeShopConfig(cfg: ShopConfig): LeanConfig {
     isOpen: cfg.isOpen,
     closeDate: cfg.closeDate,
     openDate: cfg.openDate,
+    showOpenDate: cfg.showOpenDate,
     announcements: cfg.announcements || [],
     // announcementHistory omitted from warm cache — not needed for first paint / skeleton skip
     products: (cfg.products || []).map((p) => ({
@@ -557,6 +559,7 @@ function sanitizeShopConfig(cfg: ShopConfig): LeanConfig {
       isActive: p.isActive,
       startDate: p.startDate,
       endDate: p.endDate,
+      showStartDate: p.showStartDate,
     })),
   };
 }
@@ -3911,6 +3914,7 @@ export default function HomePage() {
         isOpen={isShopOpen}
         closeDate={config?.closeDate}
         openDate={config?.openDate}
+        showOpenDate={config?.showOpenDate}
         customMessage={config?.closedMessage}
       />
 
@@ -4841,9 +4845,20 @@ export default function HomePage() {
                                   } as Record<ShopStatusType, string>)[productStatus]}
                                 </Box>
                                 {/* Show date info */}
-                                {product.startDate && productStatus === 'COMING_SOON' && (
-                                  <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.7)', mt: 1 }}>
-                                    {t.product.opensOn} {new Date(product.startDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
+                                {product.startDate && product.showStartDate !== false && productStatus === 'COMING_SOON' && (
+                                  <Typography
+                                    sx={{
+                                      fontSize: '0.66rem',
+                                      fontWeight: 600,
+                                      px: 1.1,
+                                      py: 0.25,
+                                      borderRadius: '999px',
+                                      bgcolor: 'rgba(24,24,27,0.78)',
+                                      color: 'rgba(255,255,255,0.92)',
+                                      mt: 1,
+                                    }}
+                                  >
+                                    {t.product.opensOn} {parseThailandDateTime(product.startDate, false).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
                                   </Typography>
                                 )}
                               </Box>

@@ -203,6 +203,8 @@ export interface Product {
   maxPerOrder?: number;
   startDate?: string;
   endDate?: string;
+  /** แสดงวันเปิดขายบนหน้าร้านเมื่อยังไม่ถึงเวลาเปิดขาย (ค่าเริ่มต้น: true) */
+  showStartDate?: boolean;
   isActive?: boolean;
   options?: {
     hasCustomName: boolean;
@@ -444,6 +446,8 @@ export interface ShopConfig {
   closeDate: string;
   /** วันที่เปิดร้าน (สำหรับแสดง "รอเปิด" หรือ "เร็วๆ นี้") */
   openDate?: string;
+  /** แสดงวันเปิดร้านอีกครั้งบนแบนเนอร์หน้าร้าน (ค่าเริ่มต้น: true) */
+  showOpenDate?: boolean;
   /** ข้อความแสดงเมื่อร้านปิด */
   closedMessage?: string;
   /** ระบบชำระเงินเปิด/ปิด */

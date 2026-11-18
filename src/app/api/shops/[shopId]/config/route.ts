@@ -40,6 +40,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     isOpen: shop.settings.isOpen ?? true,
     closeDate: shop.settings.closeDate || '',
     openDate: shop.settings.openDate,
+    showOpenDate: shop.settings.showOpenDate,
     closedMessage: shop.settings.closedMessage,
     paymentEnabled: shop.settings.paymentEnabled,
     paymentDisabledMessage: shop.settings.paymentDisabledMessage,
@@ -95,13 +96,14 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
     // Extract settings fields
     if (body.isOpen !== undefined || body.closeDate !== undefined || body.closedMessage !== undefined || 
-        body.paymentEnabled !== undefined || body.openDate !== undefined) {
+        body.paymentEnabled !== undefined || body.openDate !== undefined || body.showOpenDate !== undefined) {
       const shop = await getShopById(shopId);
       updates.settings = {
         ...(shop?.settings || {}),
         ...(body.isOpen !== undefined ? { isOpen: body.isOpen } : {}),
         ...(body.closeDate !== undefined ? { closeDate: body.closeDate } : {}),
         ...(body.openDate !== undefined ? { openDate: body.openDate } : {}),
+        ...(body.showOpenDate !== undefined ? { showOpenDate: body.showOpenDate } : {}),
         ...(body.closedMessage !== undefined ? { closedMessage: body.closedMessage } : {}),
         ...(body.paymentEnabled !== undefined ? { paymentEnabled: body.paymentEnabled } : {}),
         ...(body.paymentDisabledMessage !== undefined ? { paymentDisabledMessage: body.paymentDisabledMessage } : {}),

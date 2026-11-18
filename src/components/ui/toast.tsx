@@ -172,31 +172,19 @@ function ToastClose({
 function ToastIcon({ type }: { type: string | undefined }) {
   const tone = (type as NotificationTone) || "info"
   const palette = getNotificationPalette(tone)
-  const iconNode =
-    type === "success" ? (
-      <CircleCheckIcon className="size-[18px]" style={{ color: palette.accent }} />
-    ) : type === "warning" ? (
-      <TriangleAlertIcon className="size-[18px]" style={{ color: palette.accent }} />
-    ) : type === "error" ? (
-      <CircleAlertIcon className="size-[18px]" style={{ color: palette.accent }} />
-    ) : type === "loading" ? (
-      <Loader2Icon className="size-[18px] animate-spin" style={{ color: palette.accent }} />
-    ) : (
-      <InfoIcon className="size-[18px]" style={{ color: palette.accent }} />
-    )
-
-  return (
-    <span
-      aria-hidden
-      className="grid size-8.5 shrink-0 place-items-center rounded-xl"
-      style={{
-        background: palette.accentSoft,
-        border: `1px solid ${palette.ring}`,
-      }}
-    >
-      {iconNode}
-    </span>
-  )
+  if (type === "success") {
+    return <CircleCheckIcon className="size-[18px] shrink-0" style={{ color: palette.accent }} />
+  }
+  if (type === "warning") {
+    return <TriangleAlertIcon className="size-[18px] shrink-0" style={{ color: palette.accent }} />
+  }
+  if (type === "error") {
+    return <CircleAlertIcon className="size-[18px] shrink-0" style={{ color: palette.accent }} />
+  }
+  if (type === "loading") {
+    return <Loader2Icon className="size-[18px] shrink-0 animate-spin" style={{ color: palette.accent }} />
+  }
+  return <InfoIcon className="size-[18px] shrink-0" style={{ color: palette.accent }} />
 }
 
 function ToastList() {
@@ -204,15 +192,9 @@ function ToastList() {
 
   return toasts.map((toastItem) => {
     const tone = (toastItem.type as NotificationTone) || "info"
-    const palette = getNotificationPalette(tone)
     return (
       <Toast key={toastItem.id} toast={toastItem} tone={tone}>
         <ToastContent>
-          <span
-            aria-hidden
-            className="absolute left-0 top-2 bottom-2 w-[3.5px] rounded-r-full"
-            style={{ background: palette.accent }}
-          />
           <ToastIcon type={toastItem.type} />
           <div className="grid min-w-0 flex-1 gap-0.5">
             {toastItem.title ? <ToastTitle>{toastItem.title}</ToastTitle> : null}

@@ -78,6 +78,7 @@ export type ShopOpenFields = {
   isOpen: boolean;
   closeDate?: string;
   openDate?: string;
+  showOpenDate?: boolean;
   closedMessage?: string;
 };
 
@@ -86,21 +87,24 @@ export function resolveShopOpenFields(shop: {
   isOpen?: boolean;
   closeDate?: string;
   openDate?: string;
+  showOpenDate?: boolean;
   closedMessage?: string;
   settings?: {
     isOpen?: boolean;
     closeDate?: string;
     openDate?: string;
+    showOpenDate?: boolean;
     closedMessage?: string;
   };
 } | null | undefined): ShopOpenFields {
   if (!shop) {
-    return { isOpen: true, closeDate: '', openDate: undefined, closedMessage: undefined };
+    return { isOpen: true, closeDate: '', openDate: undefined, showOpenDate: undefined, closedMessage: undefined };
   }
   return {
     isOpen: shop.isOpen ?? shop.settings?.isOpen ?? true,
     closeDate: shop.closeDate ?? shop.settings?.closeDate,
     openDate: shop.openDate ?? shop.settings?.openDate,
+    showOpenDate: shop.showOpenDate ?? shop.settings?.showOpenDate,
     closedMessage: shop.closedMessage ?? shop.settings?.closedMessage,
   };
 }
@@ -113,6 +117,7 @@ export function applyRealtimeShopRow(prevShop: Record<string, any>, row: Record<
     ...(settings.isOpen !== undefined ? { isOpen: settings.isOpen } : {}),
     ...(settings.closeDate !== undefined ? { closeDate: settings.closeDate } : {}),
     ...(settings.openDate !== undefined ? { openDate: settings.openDate } : {}),
+    ...(settings.showOpenDate !== undefined ? { showOpenDate: settings.showOpenDate } : {}),
     ...(settings.closedMessage !== undefined ? { closedMessage: settings.closedMessage } : {}),
     ...(settings.paymentEnabled !== undefined ? { paymentEnabled: settings.paymentEnabled } : {}),
     ...(settings.paymentDisabledMessage !== undefined ? { paymentDisabledMessage: settings.paymentDisabledMessage } : {}),
@@ -134,6 +139,7 @@ export function applyRealtimeShopRow(prevShop: Record<string, any>, row: Record<
     isOpen,
     closeDate: settings.closeDate ?? prevShop.closeDate ?? prevShop.settings?.closeDate ?? '',
     openDate: settings.openDate ?? prevShop.openDate ?? prevShop.settings?.openDate,
+    showOpenDate: settings.showOpenDate ?? prevShop.showOpenDate ?? prevShop.settings?.showOpenDate,
     closedMessage: settings.closedMessage ?? prevShop.closedMessage ?? prevShop.settings?.closedMessage,
     paymentEnabled: settings.paymentEnabled ?? prevShop.paymentEnabled ?? prevShop.settings?.paymentEnabled,
     paymentDisabledMessage: settings.paymentDisabledMessage ?? prevShop.paymentDisabledMessage ?? prevShop.settings?.paymentDisabledMessage,

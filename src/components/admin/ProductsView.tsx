@@ -747,7 +747,13 @@ const ProductEditDialog = ({
 
   const { status: scheduleStatus } = isProductOpen(product);
   const scheduleInfo: Record<string, { icon: React.ReactNode; text: string; color: string }> = {
-    upcoming: { icon: <AccessTime size={16} />, text: 'สินค้าจะเปิดขายเมื่อถึงเวลาที่กำหนด', color: '#f59e0b' },
+    upcoming: {
+      icon: <AccessTime size={16} />,
+      text: product.showStartDate === false
+        ? 'สินค้าจะเปิดขายเมื่อถึงเวลาที่กำหนด (ไม่แสดงวันเปิดขายบนหน้าร้าน)'
+        : 'สินค้าจะเปิดขายเมื่อถึงเวลาที่กำหนด (แสดงวันเปิดขายบนหน้าร้าน)',
+      color: '#f59e0b',
+    },
     active: { icon: <FiberManualRecord size={12} className="text-success" />, text: 'สินค้ากำลังเปิดขายอยู่', color: '#10b981' },
     ended: { icon: <FiberManualRecord size={12} className="text-destructive" />, text: 'หมดเวลาขายแล้ว', color: '#ef4444' },
     always: { icon: <DateRange size={16} />, text: 'ไม่มีกำหนดเวลา (เปิดตลอด)', color: 'var(--text-muted)' },
@@ -1371,6 +1377,23 @@ const ProductEditDialog = ({
                       </Button>
                     )}
                   </div>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-3.5 py-2.5">
+                  <div className="min-w-0">
+                    <Label htmlFor="product-show-start-date" className="cursor-pointer text-sm font-medium text-foreground">
+                      แสดงวันเปิดขายบนหน้าร้าน
+                    </Label>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {product.showStartDate !== false
+                        ? 'แสดงวันเปิดขาย (เช่น เปิด 31/12/2569) ใต้ป้ายเปิดขายเร็วๆ นี้'
+                        : 'ไม่แสดงวันเปิดขาย — แสดงเฉพาะข้อความ เปิดขายเร็วๆ นี้'}
+                    </p>
+                  </div>
+                  <Switch
+                    id="product-show-start-date"
+                    checked={product.showStartDate !== false}
+                    onCheckedChange={(checked) => onChange({ ...product, showStartDate: checked })}
+                  />
                 </div>
                 <div
                   className="flex items-center gap-3 rounded-lg p-3"
@@ -2014,6 +2037,7 @@ export function ProductsView({
       patterns: [],
       startDate: '',
       endDate: '',
+      showStartDate: true,
       isActive: true,
       options: { hasCustomName: false, hasCustomNumber: false, hasLongSleeve: false, longSleevePrice: 50 },
       customTags: [],

@@ -437,7 +437,7 @@ export const SettingsView = React.memo(function SettingsView({
               </SettingRow>
             ) : (
               <>
-                <SettingRow label="วันเปิดร้านอีกครั้ง" description="แสดงให้ลูกค้าเห็น (ไม่บังคับ)">
+                <SettingRow label="วันเปิดร้านอีกครั้ง" description="กำหนดเวลาที่จะให้ร้านกลับมาเปิดอัตโนมัติ (ไม่บังคับ)">
                   <ClearableDateTime
                     id="st-open-date"
                     value={localConfig.openDate}
@@ -445,6 +445,20 @@ export const SettingsView = React.memo(function SettingsView({
                     placeholder="ไม่กำหนด"
                   />
                 </SettingRow>
+                {localConfig.openDate && (
+                  <SettingRow
+                    label="แสดงวันเปิดร้านบนหน้าร้าน"
+                    description={localConfig.showOpenDate !== false ? 'แสดงเวลานับถอยหลังวันเปิดร้านให้ลูกค้าเห็น' : 'ไม่แสดงวัน/เวลานับถอยหลังเปิดร้านบนแบนเนอร์'}
+                    htmlFor="st-show-open-date"
+                    inline
+                  >
+                    <Switch
+                      id="st-show-open-date"
+                      checked={localConfig.showOpenDate !== false}
+                      onCheckedChange={(checked) => set({ showOpenDate: checked })}
+                    />
+                  </SettingRow>
+                )}
                 <SettingRow label="ข้อความแจ้งลูกค้า" description="แสดงบนหน้าร้านขณะปิด (ไม่บังคับ)" htmlFor="st-closed-msg" stacked>
                   <Textarea
                     id="st-closed-msg"

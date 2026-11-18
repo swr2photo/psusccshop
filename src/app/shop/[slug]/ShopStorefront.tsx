@@ -96,6 +96,7 @@ interface ShopInfo {
     isOpen?: boolean;
     closeDate?: string;
     openDate?: string;
+    showOpenDate?: boolean;
     closedMessage?: string;
   };
   paymentInfo?: {
@@ -1589,6 +1590,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         isOpen={shopOpenFields.isOpen}
         closeDate={shopOpenFields.closeDate}
         openDate={shopOpenFields.openDate}
+        showOpenDate={shopOpenFields.showOpenDate}
         customMessage={shopOpenFields.closedMessage}
       />
 
@@ -1964,9 +1966,20 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                     WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
                                   } as Record<ShopStatusType, string>)[productStatus]}
                                 </Box>
-                                {product.startDate && productStatus === 'COMING_SOON' && (
-                                  <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.7)', mt: 1 }}>
-                                    {t.product.opensOn} {new Date(product.startDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
+                                {product.startDate && product.showStartDate !== false && productStatus === 'COMING_SOON' && (
+                                  <Typography
+                                    sx={{
+                                      fontSize: '0.66rem',
+                                      fontWeight: 600,
+                                      px: 1.1,
+                                      py: 0.25,
+                                      borderRadius: '999px',
+                                      bgcolor: 'rgba(24,24,27,0.78)',
+                                      color: 'rgba(255,255,255,0.92)',
+                                      mt: 1,
+                                    }}
+                                  >
+                                    {t.product.opensOn} {parseThailandDateTime(product.startDate, false).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
                                   </Typography>
                                 )}
                               </Box>

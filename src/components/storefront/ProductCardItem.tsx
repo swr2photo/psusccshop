@@ -5,6 +5,7 @@ import { Box, Typography, IconButton, Chip } from '@mui/material';
 import { Heart, ShoppingCart } from 'lucide-react';
 import { Product, getProductName, getProductDescription } from '@/lib/config';
 import { getProductStatus, ShopStatusType, SHOP_STATUS_CONFIG } from '@/components/ShopStatusCard';
+import { parseThailandDateTime } from '@/lib/shop-constants';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import ProductImage from './ProductImage';
@@ -111,8 +112,10 @@ export function ProductCardItem({
               inset: 0,
               bgcolor: 'rgba(0,0,0,0.5)',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: 0.75,
               zIndex: 2,
             }}
           >
@@ -131,6 +134,21 @@ export function ProductCardItem({
                 fontSize: '0.8rem',
               }}
             />
+            {product.startDate && product.showStartDate !== false && productStatus === 'COMING_SOON' && catalogContext.isOpen && (
+              <Typography
+                sx={{
+                  px: 1.1,
+                  py: 0.25,
+                  borderRadius: '999px',
+                  bgcolor: 'rgba(24,24,27,0.78)',
+                  color: 'rgba(255,255,255,0.9)',
+                  fontSize: '0.68rem',
+                  fontWeight: 600,
+                }}
+              >
+                {t.product.opensOn} {parseThailandDateTime(product.startDate, false).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
+              </Typography>
+            )}
           </Box>
         )}
 
