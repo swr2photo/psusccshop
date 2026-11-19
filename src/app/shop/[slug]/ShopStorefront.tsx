@@ -1874,6 +1874,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                     const productStatus = getProductStatus(product, now);
                     const isLockedPreview = Boolean(product.isLockedPreview);
                     const isComingSoon = productStatus !== 'OPEN' || !isShopOpen || isLockedPreview;
+                    const isUpcomingCard =
+                      isShopOpen &&
+                      (productStatus === 'COMING_SOON' || productStatus === 'WAITING_TO_OPEN' || (isLockedPreview && productStatus === 'OPEN'));
+                    const isWishlisted = wishlistStore.isInWishlist(product.id);
                     const isProductAvailable = productStatus === 'OPEN' && isShopOpen && !isLockedPreview;
                     const isProductClosed = productStatus !== 'OPEN' || !isShopOpen || isLockedPreview;
                     const eventDiscount = getEventDiscount(product.id, events);
@@ -1919,12 +1923,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                             bgcolor: 'var(--surface)',
                             boxShadow: 'var(--card-shadow, none)',
                             border: isProductClosed
-                              ? '1px solid rgba(255,255,255,0.06)'
+                              ? '1px solid var(--border)'
                               : '1px solid transparent',
-                            transition: 'opacity 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease',
+                            transition: 'box-shadow 0.25s ease, border-color 0.2s ease',
                             position: 'relative',
-                            opacity: isProductClosed ? 0.6 : 1,
-                            filter: isProductClosed ? 'grayscale(1)' : 'none',
                             '&:hover': isProductAvailable ? {
                               boxShadow: (theme: any) => theme.palette.mode === 'dark'
                                 ? '0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,113,227,0.15)'
@@ -1954,27 +1956,35 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 position: 'absolute',
                                 inset: 0,
                                 transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                                ...(isComingSoon ? { filter: 'blur(8px)', transform: 'scale(1.12)' } : {}),
+                                ...(isComingSoon
+                                  ? { filter: 'blur(4px) grayscale(0.25)', transform: 'scale(1.1)' }
+                                  : isProductClosed
+                                  ? { filter: 'grayscale(0.65)' }
+                                  : {}),
                               }}
                               className={!isProductClosed ? 'product-image-zoom' : ''}
                             />
 
-                            {/* Status Overlay for closed products */}
+                            {/* Status Overlay for closed products — single clear status badge */}
                             {isProductClosed && (
                               <Box sx={{
                                 position: 'absolute', inset: 0,
                                 display: 'flex', flexDirection: 'column',
                                 alignItems: 'center', justifyContent: 'center',
-                                background: 'rgba(0,0,0,0.45)',
-                                backdropFilter: isComingSoon ? 'blur(6px)' : 'none',
+                                background: 'rgba(15, 23, 42, 0.3)',
+                                backdropFilter: isComingSoon ? 'blur(3px)' : 'none',
+                                px: 1.5,
                               }}>
                                 <Box sx={{
                                   px: 1.5, py: 0.6, borderRadius: '999px',
-                                  bgcolor: 'rgba(24,24,27,0.85)',
-                                  border: '1px solid rgba(255,255,255,0.12)',
-                                  color: 'rgba(255,255,255,0.85)',
+                                  bgcolor: 'rgba(24,24,27,0.84)',
+                                  border: '1px solid rgba(255,255,255,0.16)',
+                                  color: '#ffffff',
                                   fontSize: '0.72rem', fontWeight: 700,
+                                  display: 'inline-flex', alignItems: 'center', gap: 0.6,
+                                  boxShadow: '0 4px 14px rgba(0,0,0,0.22)',
                                 }}>
+                                  {isUpcomingCard && <Clock size={12} />}
                                   {!isShopOpen
                                     ? t.shopStatus.closed
                                     : ({
@@ -2093,28 +2103,31 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               >
                                 <Share2 size={14} />
                               </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const wasInWishlist = wishlistStore.items.includes(product.id);
-                                  wishlistStore.toggleItem(product.id);
-                                  showToast(
-                                    wasInWishlist ? 'info' : 'success',
-                                    wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
-                                  );
-                                }}
-                                sx={{
-                                  bgcolor: 'rgba(0,0,0,0.5)',
-                                  backdropFilter: 'blur(8px)',
-                                  color: wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'white',
-                                  width: 30, height: 30,
-                                  '&:hover': { bgcolor: 'rgba(255,69,58,0.7)' },
-                                  transition: 'all 0.2s ease',
-                                }}
-                              >
-                                <Heart size={14} fill={wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'none'} />
-                              </IconButton>
+                              {!isUpcomingCard && (
+                                <IconButton
+                                  size="small"
+                                  aria-label={t.wishlist.title}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const wasInWishlist = wishlistStore.items.includes(product.id);
+                                    wishlistStore.toggleItem(product.id);
+                                    showToast(
+                                      wasInWishlist ? 'info' : 'success',
+                                      wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
+                                    );
+                                  }}
+                                  sx={{
+                                    bgcolor: 'rgba(0,0,0,0.5)',
+                                    backdropFilter: 'blur(8px)',
+                                    color: isWishlisted ? '#ff453a' : 'white',
+                                    width: 30, height: 30,
+                                    '&:hover': { bgcolor: 'rgba(255,69,58,0.7)' },
+                                    transition: 'all 0.2s ease',
+                                  }}
+                                >
+                                  <Heart size={14} fill={isWishlisted ? '#ff453a' : 'none'} />
+                                </IconButton>
+                              )}
                             </Box>
                           </Box>
 
@@ -2122,8 +2135,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                           <Box sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
                             <Typography sx={{
                               fontSize: '0.95rem', fontWeight: 700,
-                              color: isProductClosed ? 'var(--text-muted)' : 'var(--foreground)',
-                              mb: 0.5,
+                              color: isProductClosed && !isUpcomingCard ? 'var(--text-muted)' : 'var(--foreground)',
+                              mb: 0.75,
                               overflow: 'hidden', textOverflow: 'ellipsis',
                               display: '-webkit-box',
                               WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
@@ -2144,8 +2157,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               </Typography>
                             )}
 
-                            {/* Tags */}
-                            {(() => {
+                            {/* Tags — omitted for locked/coming-soon previews */}
+                            {!isComingSoon && (() => {
                               const tags = product.customTags && product.customTags.length > 0
                                 ? product.customTags
                                 : [
@@ -2218,31 +2231,39 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 >
                                   {isShopOpen ? t.product.quickAdd : t.product.shopClosedTemp}
                                 </Button>
-                              ) : (
-                                <Box sx={{
-                                  py: 0.8, px: 1.5, borderRadius: '10px',
-                                  background: SHOP_STATUS_CONFIG[productStatus].bgGradient,
-                                  border: `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}`,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.75,
-                                }}>
-                                  {(() => {
-                                    const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
-                                    return <IconComponent size={14} color={SHOP_STATUS_CONFIG[productStatus].color} />;
-                                  })()}
-                                  <Typography sx={{
-                                    fontSize: '0.75rem', fontWeight: 700,
-                                    color: SHOP_STATUS_CONFIG[productStatus].color,
-                                  }}>
-                                    {({
-                                      OPEN: t.shopStatus.open,
-                                      COMING_SOON: t.shopStatus.comingSoon,
-                                      ORDER_ENDED: t.shopStatus.closedEnded,
-                                      TEMPORARILY_CLOSED: t.shopStatus.closed,
-                                      WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
-                                    } as Record<ShopStatusType, string>)[productStatus]}
-                                  </Typography>
-                                </Box>
-                              )}
+                              ) : isUpcomingCard ? (
+                                <Button
+                                  fullWidth
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const wasInWishlist = wishlistStore.items.includes(product.id);
+                                    wishlistStore.toggleItem(product.id);
+                                    showToast(
+                                      wasInWishlist ? 'info' : 'success',
+                                      wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
+                                    );
+                                  }}
+                                  startIcon={<Heart size={13} fill={isWishlisted ? '#ff453a' : 'none'} />}
+                                  sx={{
+                                    py: 0.7, px: 1.5, borderRadius: '10px',
+                                    textTransform: 'none',
+                                    fontSize: '0.73rem', fontWeight: 600,
+                                    bgcolor: isWishlisted ? 'rgba(255,69,58,0.08)' : 'var(--surface-2)',
+                                    color: isWishlisted ? '#ff453a' : 'var(--foreground)',
+                                    border: `1px solid ${isWishlisted ? 'rgba(255,69,58,0.32)' : 'var(--border)'}`,
+                                    boxShadow: 'none',
+                                    '&:hover': {
+                                      bgcolor: isWishlisted ? 'rgba(255,69,58,0.14)' : 'var(--surface-3)',
+                                      boxShadow: 'none',
+                                    },
+                                  }}
+                                >
+                                  {isWishlisted
+                                    ? (lang === 'en' ? 'Saved in wishlist' : 'บันทึกในรายการสนใจแล้ว')
+                                    : (lang === 'en' ? 'Save to wishlist' : 'บันทึกในรายการสนใจ')}
+                                </Button>
+                              ) : null}
                             </Box>
                           </Box>
                         </Box>

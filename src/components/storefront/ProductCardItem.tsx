@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography, IconButton, Chip } from '@mui/material';
-import { Heart, ShoppingCart } from 'lucide-react';
+import { Box, Typography, IconButton, Chip, Button } from '@mui/material';
+import { Heart, ShoppingCart, Clock } from 'lucide-react';
 import { Product, getProductName, getProductDescription } from '@/lib/config';
 import { getProductStatus, ShopStatusType, SHOP_STATUS_CONFIG } from '@/components/ShopStatusCard';
 import { parseThailandDateTime } from '@/lib/shop-constants';
@@ -42,6 +42,9 @@ export function ProductCardItem({
   const outOfStock = product.stock !== undefined && product.stock !== null && product.stock <= 0;
   const isLockedPreview = Boolean(product.isLockedPreview);
   const isComingSoon = productStatus !== 'OPEN' || !catalogContext.isOpen || isLockedPreview;
+  const isUpcomingCard =
+    catalogContext.isOpen &&
+    (productStatus === 'COMING_SOON' || productStatus === 'WAITING_TO_OPEN' || (isLockedPreview && productStatus === 'OPEN'));
   const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen && !isLockedPreview;
   const handleClick = () => {
     if (!catalogContext.isOpen) {
@@ -92,7 +95,6 @@ export function ProductCardItem({
         cursor: isProductAvailable ? 'pointer' : 'default',
         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         position: 'relative',
-        opacity: isProductAvailable ? 1 : 0.75,
       }}
     >
       {/* Product Image Box */}
@@ -107,7 +109,11 @@ export function ProductCardItem({
           style={{
             position: 'absolute',
             inset: 0,
-            ...(isComingSoon ? { filter: 'blur(8px)', transform: 'scale(1.12)' } : {}),
+            ...(isComingSoon
+              ? { filter: 'blur(4px) grayscale(0.25)', transform: 'scale(1.1)' }
+              : !isProductAvailable
+              ? { filter: 'grayscale(0.65)' }
+              : {}),
           }}
         />
 
@@ -117,8 +123,8 @@ export function ProductCardItem({
             sx={{
               position: 'absolute',
               inset: 0,
-              bgcolor: 'rgba(0,0,0,0.5)',
-              backdropFilter: isComingSoon ? 'blur(6px)' : 'none',
+              bgcolor: 'rgba(15, 23, 42, 0.3)',
+              backdropFilter: isComingSoon ? 'blur(3px)' : 'none',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -128,6 +134,7 @@ export function ProductCardItem({
             }}
           >
             <Chip
+              icon={isUpcomingCard ? <Clock size={12} color="#fff" /> : undefined}
               label={
                 !catalogContext.isOpen
                   ? t.shopStatus.closed
@@ -138,10 +145,11 @@ export function ProductCardItem({
                   : SHOP_STATUS_CONFIG[productStatus]?.label || t.shopStatus.closed
               }
               sx={{
-                bgcolor: 'rgba(0, 0, 0, 0.75)',
+                bgcolor: 'rgba(24, 24, 27, 0.84)',
+                border: '1px solid rgba(255,255,255,0.16)',
                 color: '#fff',
                 fontWeight: 700,
-                fontSize: '0.8rem',
+                fontSize: '0.74rem',
               }}
             />
             {product.startDate && product.showStartDate !== false && productStatus === 'COMING_SOON' && catalogContext.isOpen && (
@@ -162,22 +170,25 @@ export function ProductCardItem({
           </Box>
         )}
 
-        {/* Wishlist Button */}
-        <IconButton
-          onClick={handleToggleWishlist}
-          sx={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            bgcolor: 'rgba(0,0,0,0.4)',
-            backdropFilter: 'blur(4px)',
-            color: isWishlisted ? '#ef4444' : '#fff',
-            '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' },
-            zIndex: 3,
-          }}
-        >
-          <Heart size={18} fill={isWishlisted ? '#ef4444' : 'none'} />
-        </IconButton>
+        {/* Wishlist Button (hidden for upcoming cards which expose a clear full-width CTA below) */}
+        {!isUpcomingCard && (
+          <IconButton
+            aria-label={t.wishlist.title}
+            onClick={handleToggleWishlist}
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              bgcolor: 'rgba(0,0,0,0.4)',
+              backdropFilter: 'blur(4px)',
+              color: isWishlisted ? '#ef4444' : '#fff',
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' },
+              zIndex: 3,
+            }}
+          >
+            <Heart size={18} fill={isWishlisted ? '#ef4444' : 'none'} />
+          </IconButton>
+        )}
       </Box>
 
       {/* Content */}
@@ -214,35 +225,61 @@ export function ProductCardItem({
           )}
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2 }}>
-          {!isComingSoon ? (
-            <Typography sx={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)' }}>
-              ฿{(product.basePrice || 0)?.toLocaleString()}
-            </Typography>
-          ) : (
-            <Box />
-          )}
+        {(!isComingSoon || isUpcomingCard) && (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2 }}>
+            {!isComingSoon ? (
+              <Typography sx={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)' }}>
+                ฿{(product.basePrice || 0)?.toLocaleString()}
+              </Typography>
+            ) : isUpcomingCard ? (
+              <Button
+                fullWidth
+                size="small"
+                onClick={handleToggleWishlist}
+                startIcon={<Heart size={14} fill={isWishlisted ? '#ef4444' : 'none'} />}
+                sx={{
+                  py: 0.7,
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  bgcolor: isWishlisted ? 'rgba(239,68,68,0.08)' : 'var(--surface-2)',
+                  color: isWishlisted ? '#ef4444' : 'var(--foreground)',
+                  border: `1px solid ${isWishlisted ? 'rgba(239,68,68,0.32)' : 'var(--border)'}`,
+                  boxShadow: 'none',
+                  '&:hover': {
+                    bgcolor: isWishlisted ? 'rgba(239,68,68,0.14)' : 'var(--surface-3)',
+                    boxShadow: 'none',
+                  },
+                }}
+              >
+                {isWishlisted
+                  ? (lang === 'en' ? 'Saved in wishlist' : 'บันทึกในรายการสนใจแล้ว')
+                  : (lang === 'en' ? 'Save to wishlist' : 'บันทึกในรายการสนใจ')}
+              </Button>
+            ) : null}
 
-          {isProductAvailable && onQuickAddToCart && (
-            <IconButton
-              onClick={(e) => {
-                e.stopPropagation();
-                onQuickAddToCart(product, {
-                  shopId: catalogContext.shopId,
-                  shopSlug: catalogContext.shopSlug,
-                  isOpen: catalogContext.isOpen,
-                });
-              }}
-              sx={{
-                bgcolor: 'var(--primary)',
-                color: '#fff',
-                '&:hover': { bgcolor: 'var(--primary-hover)' },
-              }}
-            >
-              <ShoppingCart size={18} />
-            </IconButton>
-          )}
-        </Box>
+            {isProductAvailable && onQuickAddToCart && (
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onQuickAddToCart(product, {
+                    shopId: catalogContext.shopId,
+                    shopSlug: catalogContext.shopSlug,
+                    isOpen: catalogContext.isOpen,
+                  });
+                }}
+                sx={{
+                  bgcolor: 'var(--primary)',
+                  color: '#fff',
+                  '&:hover': { bgcolor: 'var(--primary-hover)' },
+                }}
+              >
+                <ShoppingCart size={18} />
+              </IconButton>
+            )}
+          </Box>
+        )}
       </Box>
     </Box>
   );

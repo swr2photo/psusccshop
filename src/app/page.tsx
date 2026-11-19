@@ -4682,6 +4682,23 @@ export default function HomePage() {
                   .filter(([c]) => c !== '__HDR_SHOP__' && c !== '__HDR_EVENTS__').length;
                 if (category === '__HDR_SHOP__' || category === '__HDR_EVENTS__') {
                   const isEvents = category === '__HDR_EVENTS__';
+                  const shopSectionProducts = isEvents ? [] : storefrontSections.shop.flatMap(([, list]) => list);
+                  const hasOpenShopProduct = !isEvents && catalogContext.isOpen && shopSectionProducts.some(
+                    (p) => getProductStatus(p, now) === 'OPEN' && !isProductOutOfStock(p) && !p.isLockedPreview
+                  );
+                  const hasUpcomingShopProduct = !isEvents && catalogContext.isOpen && shopSectionProducts.some(
+                    (p) => {
+                      const st = getProductStatus(p, now);
+                      return st === 'COMING_SOON' || st === 'WAITING_TO_OPEN' || Boolean(p.isLockedPreview);
+                    }
+                  );
+                  const shopSubtitle = !catalogContext.isOpen
+                    ? (lang === 'en' ? 'Store temporarily closed' : 'ร้านปิดรับคำสั่งซื้อชั่วคราว')
+                    : hasOpenShopProduct
+                    ? t.home.shopSectionSubtitle
+                    : hasUpcomingShopProduct
+                    ? (lang === 'en' ? 'Upcoming releases — save items you like to your wishlist' : 'เตรียมเปิดจำหน่ายเร็วๆ นี้ — บันทึกสินค้าที่สนใจไว้ก่อนได้')
+                    : t.home.shopSectionSubtitle;
                   return (
                     <Box
                       key={category}
@@ -4714,7 +4731,7 @@ export default function HomePage() {
                         {isEvents ? t.home.eventsSectionTitle : t.home.shopSectionTitle}
                       </Typography>
                       <Typography sx={{ fontFamily: 'inherit', fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: 420 }}>
-                        {isEvents ? t.home.eventsSectionSubtitle : t.home.shopSectionSubtitle}
+                        {isEvents ? t.home.eventsSectionSubtitle : shopSubtitle}
                       </Typography>
                     </Box>
                   );
@@ -4805,6 +4822,10 @@ export default function HomePage() {
                       const outOfStock = isProductOutOfStock(product);
                       const isLockedPreview = Boolean(product.isLockedPreview);
                       const isComingSoon = productStatus !== 'OPEN' || !catalogContext.isOpen || isLockedPreview;
+                      const isUpcomingCard =
+                        catalogContext.isOpen &&
+                        (productStatus === 'COMING_SOON' || productStatus === 'WAITING_TO_OPEN' || (isLockedPreview && productStatus === 'OPEN'));
+                      const isWishlisted = wishlistStore.isInWishlist(product.id);
                       const isProductUnavailable = productStatus !== 'OPEN' || outOfStock || !catalogContext.isOpen || isLockedPreview;
                       const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen && !isLockedPreview;
                       const isProductClosed = isProductUnavailable;
@@ -4861,9 +4882,7 @@ export default function HomePage() {
                             boxShadow: 'none',
                             border: '1px solid var(--border)',
                             position: 'relative',
-                            opacity: isProductClosed ? 0.6 : 1,
-                            filter: isProductClosed ? 'grayscale(1)' : 'none',
-                            transition: 'opacity 0.2s ease, filter 0.2s ease, border-color 0.15s ease',
+                            transition: 'opacity 0.2s ease, border-color 0.15s ease',
                             '&:hover': isProductAvailable ? {
                               borderColor: 'color-mix(in srgb, var(--foreground) 45%, transparent)',
                             } : {},
@@ -4890,13 +4909,17 @@ export default function HomePage() {
                               style={{
                                 position: 'absolute',
                                 inset: 0,
-                                filter: isComingSoon ? 'blur(8px)' : 'none',
-                                transform: isComingSoon ? 'scale(1.12)' : undefined,
+                                filter: isComingSoon
+                                  ? 'blur(4px) grayscale(0.25)'
+                                  : isProductClosed
+                                  ? 'grayscale(0.65)'
+                                  : 'none',
+                                transform: isComingSoon ? 'scale(1.1)' : undefined,
                                 transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                               }}
                               className={!isProductClosed ? 'product-image-zoom' : ''}
                             />
-                            {/* Status Overlay for closed / OOS products */}
+                            {/* Status Overlay for closed / OOS products — single clear status badge */}
                             {isProductClosed && (
                               <Box sx={{
                                 position: 'absolute',
@@ -4905,22 +4928,28 @@ export default function HomePage() {
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                background: 'rgba(0,0,0,0.45)',
-                                backdropFilter: isComingSoon ? 'blur(6px)' : 'none',
+                                background: 'rgba(15, 23, 42, 0.3)',
+                                backdropFilter: isComingSoon ? 'blur(3px)' : 'none',
+                                px: 1.5,
                               }}>
                                 <Box
                                   sx={{
                                     px: 1.5,
                                     py: 0.6,
                                     borderRadius: '999px',
-                                    bgcolor: 'rgba(24,24,27,0.85)',
-                                    border: '1px solid rgba(255,255,255,0.12)',
-                                    color: 'rgba(255,255,255,0.85)',
+                                    bgcolor: 'rgba(24, 24, 27, 0.84)',
+                                    border: '1px solid rgba(255,255,255,0.16)',
+                                    color: '#ffffff',
                                     fontSize: '0.72rem',
                                     fontWeight: 700,
-                                    letterSpacing: '0.02em',
+                                    letterSpacing: '0.01em',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 0.6,
+                                    boxShadow: '0 4px 14px rgba(0,0,0,0.22)',
                                   }}
                                 >
+                                  {isUpcomingCard && <Clock size={12} />}
                                   {!catalogContext.isOpen
                                     ? t.shopStatus.closed
                                     : outOfStock && productStatus === 'OPEN' && !isLockedPreview
@@ -5032,11 +5061,12 @@ export default function HomePage() {
                             >
                               <IconButton
                                 size="small"
+                                aria-label={lang === 'en' ? 'Share product' : 'แชร์สินค้า'}
                                 onClick={(e) => { e.stopPropagation(); handleShareProduct(product); }}
                                 sx={{
                                   bgcolor: 'color-mix(in srgb, var(--surface) 92%, transparent)',
                                   border: '1px solid var(--border)',
-                                  borderRadius: '4px',
+                                  borderRadius: '6px',
                                   color: 'var(--foreground)',
                                   width: 30,
                                   height: 30,
@@ -5046,30 +5076,33 @@ export default function HomePage() {
                                 <Share2 size={14} />
                               </IconButton>
 
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const wasInWishlist = wishlistStore.items.includes(product.id);
-                                  wishlistStore.toggleItem(product.id);
-                                  showToast(
-                                    wasInWishlist ? 'info' : 'success',
-                                    wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
-                                  );
-                                }}
-                                sx={{
-                                  bgcolor: 'color-mix(in srgb, var(--surface) 92%, transparent)',
-                                  border: '1px solid var(--border)',
-                                  borderRadius: '4px',
-                                  color: wishlistStore.isInWishlist(product.id) ? 'var(--destructive)' : 'var(--foreground)',
-                                  width: 30,
-                                  height: 30,
-                                  '&:hover': { bgcolor: 'var(--surface)' },
-                                  transition: 'all 0.2s ease',
-                                }}
-                              >
-                                <Heart size={14} fill={wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'none'} />
-                              </IconButton>
+                              {!isUpcomingCard && (
+                                <IconButton
+                                  size="small"
+                                  aria-label={t.wishlist.title}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const wasInWishlist = wishlistStore.items.includes(product.id);
+                                    wishlistStore.toggleItem(product.id);
+                                    showToast(
+                                      wasInWishlist ? 'info' : 'success',
+                                      wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
+                                    );
+                                  }}
+                                  sx={{
+                                    bgcolor: 'color-mix(in srgb, var(--surface) 92%, transparent)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '6px',
+                                    color: isWishlisted ? '#ff453a' : 'var(--foreground)',
+                                    width: 30,
+                                    height: 30,
+                                    '&:hover': { bgcolor: 'var(--surface)' },
+                                    transition: 'all 0.2s ease',
+                                  }}
+                                >
+                                  <Heart size={14} fill={isWishlisted ? '#ff453a' : 'none'} />
+                                </IconButton>
+                              )}
                             </Box>
                           </Box>
 
@@ -5080,7 +5113,7 @@ export default function HomePage() {
                             flex: 1, 
                             display: 'flex', 
                             flexDirection: 'column',
-                            minHeight: { xs: 148, sm: 156 },
+                            minHeight: isComingSoon ? { xs: 104, sm: 112 } : { xs: 148, sm: 156 },
                           }}>
                             {/* Type Label */}
                             <Typography className="store-mono" sx={{
@@ -5093,146 +5126,148 @@ export default function HomePage() {
                               {(t.category as Record<string, string>)[((product as any).category || getCategoryFromType(product.type))] || TYPE_LABELS_I18N[product.type] || product.type}
                             </Typography>
 
-                            {/* Product Name — fixed 2-line block */}
+                            {/* Product Name — crisp readable title */}
                             <Typography sx={{ 
                               fontSize: '0.9rem', 
                               fontWeight: 700, 
-                              color: isProductClosed ? 'var(--text-muted)' : 'var(--foreground)',
-                              mb: 0.5,
+                              color: isProductClosed && !isUpcomingCard ? 'var(--text-muted)' : 'var(--foreground)',
+                              mb: isComingSoon ? 1 : 0.5,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               display: '-webkit-box',
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: 'vertical',
-                              lineHeight: 1.3,
+                              lineHeight: 1.35,
                               letterSpacing: '-0.01em',
-                              minHeight: '2.6em',
+                              minHeight: isComingSoon ? undefined : '2.6em',
                             }}>
                               {getProductName(product, lang)}
                             </Typography>
                             
-                            {/* Description — reserved 1 line (hidden while coming soon) */}
-                            <Typography sx={{ 
-                              fontSize: '0.72rem', 
-                              color: 'var(--text-muted)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              lineHeight: 1.4,
-                              mb: 0.8,
-                              minHeight: '1.05em',
-                              opacity: !isComingSoon && getProductDescription(product, lang) ? 1 : 0,
-                            }}>
-                              {(!isComingSoon && getProductDescription(product, lang)) || '\u00A0'}
-                            </Typography>
+                            {/* Description & Tags — omitted for locked previews to avoid empty gaps */}
+                            {!isComingSoon && (
+                              <>
+                                <Typography sx={{ 
+                                  fontSize: '0.72rem', 
+                                  color: 'var(--text-muted)',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  lineHeight: 1.4,
+                                  mb: 0.8,
+                                  minHeight: '1.05em',
+                                  opacity: getProductDescription(product, lang) ? 1 : 0,
+                                }}>
+                                  {getProductDescription(product, lang) || '\u00A0'}
+                                </Typography>
 
-                            {/* Tags — reserved row so heights stay even */}
-                            <Box sx={{ 
-                              display: 'flex', 
-                              flexWrap: 'nowrap', 
-                              gap: 0.4, 
-                              mb: 0.8,
-                              minHeight: 20,
-                              overflow: 'hidden',
-                            }}>
-                              {(() => {
-                                if (isComingSoon) return null;
-                                const tags = product.customTags && product.customTags.length > 0 
-                                  ? product.customTags 
-                                  : [
-                                      ...(product.options?.hasCustomName ? [{
-                                        text: t.product.customNameAvailable,
-                                        color: 'var(--success)',
-                                        bgColor: 'rgba(16,185,129,0.1)',
-                                        borderColor: 'rgba(16,185,129,0.2)'
-                                      }] : []),
-                                      ...(product.options?.hasCustomNumber ? [{
-                                        text: t.product.customNumberAvailable,
-                                        color: 'var(--secondary)',
-                                        bgColor: 'rgba(0,113,227,0.1)',
-                                        borderColor: 'rgba(0,113,227,0.2)'
-                                      }] : []),
-                                    ];
-                                if (tags.length === 0) return null;
-                                return tags.slice(0, 2).map((tag, idx) => (
-                                  <Box key={idx} sx={{
-                                    px: 0.7,
-                                    py: 0.15,
-                                    borderRadius: '5px',
-                                    bgcolor: (tag as any).bgColor || `${tag.color}15`,
-                                    fontSize: '0.55rem',
-                                    fontWeight: 600,
-                                    color: tag.color,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 0.2,
-                                    whiteSpace: 'nowrap',
-                                    maxWidth: '100%',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                  }}>
-                                    {lang === 'en' 
-                                      ? ((tag as any).textEn || TAG_TRANSLATIONS_TH_TO_EN[tag.text] || tag.text)
-                                      : tag.text}
-                                  </Box>
-                                ));
-                              })()}
-                            </Box>
+                                {/* Tags — reserved row so heights stay even */}
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  flexWrap: 'nowrap', 
+                                  gap: 0.4, 
+                                  mb: 0.8,
+                                  minHeight: 20,
+                                  overflow: 'hidden',
+                                }}>
+                                  {(() => {
+                                    const tags = product.customTags && product.customTags.length > 0 
+                                      ? product.customTags 
+                                      : [
+                                          ...(product.options?.hasCustomName ? [{
+                                            text: t.product.customNameAvailable,
+                                            color: 'var(--success)',
+                                            bgColor: 'rgba(16,185,129,0.1)',
+                                            borderColor: 'rgba(16,185,129,0.2)'
+                                          }] : []),
+                                          ...(product.options?.hasCustomNumber ? [{
+                                            text: t.product.customNumberAvailable,
+                                            color: 'var(--secondary)',
+                                            bgColor: 'rgba(0,113,227,0.1)',
+                                            borderColor: 'rgba(0,113,227,0.2)'
+                                          }] : []),
+                                        ];
+                                    if (tags.length === 0) return null;
+                                    return tags.slice(0, 2).map((tag, idx) => (
+                                      <Box key={idx} sx={{
+                                        px: 0.7,
+                                        py: 0.15,
+                                        borderRadius: '5px',
+                                        bgcolor: (tag as any).bgColor || `${tag.color}15`,
+                                        fontSize: '0.55rem',
+                                        fontWeight: 600,
+                                        color: tag.color,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.2,
+                                        whiteSpace: 'nowrap',
+                                        maxWidth: '100%',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                      }}>
+                                        {lang === 'en' 
+                                          ? ((tag as any).textEn || TAG_TRANSLATIONS_TH_TO_EN[tag.text] || tag.text)
+                                          : tag.text}
+                                      </Box>
+                                    ));
+                                  })()}
+                                </Box>
+                              </>
+                            )}
 
                             {/* ---- Price + ATC locked to bottom ---- */}
+                            {(!isProductClosed || isUpcomingCard || (outOfStock && productStatus === 'OPEN' && catalogContext.isOpen && !isLockedPreview)) && (
                             <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 1 }}>
-                              {/* Price Display — single location */}
-                              <Box sx={{ minWidth: 0 }}>
-                                {!isProductClosed && (
-                                  <>
-                                    {eventDiscount ? (
-                                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
-                                        <Typography className="store-mono" sx={{
-                                          fontSize: '1.05rem',
-                                          fontWeight: 600,
-                                          color: '#ff453a',
-                                          lineHeight: 1,
-                                          letterSpacing: '-0.02em',
-                                        }}>
-                                          ฿{eventDiscount.discountedPrice(getBasePrice(product))?.toLocaleString()}
-                                        </Typography>
-                                        <Typography sx={{
-                                          fontSize: '0.68rem',
-                                          color: 'var(--text-muted)',
-                                          textDecoration: 'line-through',
-                                          lineHeight: 1,
-                                        }}>
-                                          ฿{getBasePrice(product)?.toLocaleString()}
-                                        </Typography>
-                                      </Box>
-                                    ) : (
+                              {/* Price Display — single location (only for open / OOS non-locked products) */}
+                              {(!isProductClosed || (outOfStock && productStatus === 'OPEN' && catalogContext.isOpen && !isLockedPreview)) && (
+                                <Box sx={{ minWidth: 0 }}>
+                                  {eventDiscount && !isProductClosed ? (
+                                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
                                       <Typography className="store-mono" sx={{
                                         fontSize: '1.05rem',
                                         fontWeight: 600,
-                                        color: 'var(--foreground)',
+                                        color: '#ff453a',
                                         lineHeight: 1,
                                         letterSpacing: '-0.02em',
                                       }}>
+                                        ฿{eventDiscount.discountedPrice(getBasePrice(product))?.toLocaleString()}
+                                      </Typography>
+                                      <Typography sx={{
+                                        fontSize: '0.68rem',
+                                        color: 'var(--text-muted)',
+                                        textDecoration: 'line-through',
+                                        lineHeight: 1,
+                                      }}>
                                         ฿{getBasePrice(product)?.toLocaleString()}
                                       </Typography>
-                                    )}
-                                    {Object.keys(product.sizePricing || {}).length > 1 && (
-                                      <Typography sx={{
-                                        fontSize: '0.58rem',
-                                        color: 'var(--text-muted)',
-                                        mt: 0.2,
-                                      }}>
-                                        {t.product.startingFrom}
-                                      </Typography>
-                                    )}
-                                  </>
-                                )}
-                              </Box>
+                                    </Box>
+                                  ) : (
+                                    <Typography className="store-mono" sx={{
+                                      fontSize: '1.05rem',
+                                      fontWeight: 600,
+                                      color: isProductClosed ? 'var(--text-muted)' : 'var(--foreground)',
+                                      lineHeight: 1,
+                                      letterSpacing: '-0.02em',
+                                    }}>
+                                      ฿{getBasePrice(product)?.toLocaleString()}
+                                    </Typography>
+                                  )}
+                                  {!isProductClosed && Object.keys(product.sizePricing || {}).length > 1 && (
+                                    <Typography sx={{
+                                      fontSize: '0.58rem',
+                                      color: 'var(--text-muted)',
+                                      mt: 0.2,
+                                    }}>
+                                      {t.product.startingFrom}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              )}
                               
-                              {/* Always show ATC for sellable products; opens dialog when options needed */}
+                              {/* Action row — no duplicate status pill (status is already centered on image) */}
                               {!isProductClosed ? (
                                 <Button
-                                                                    disabled={!isProductAvailable}
+                                  disabled={!isProductAvailable}
                                   size="small"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -5274,51 +5309,45 @@ export default function HomePage() {
                                     ? t.product.shopClosedTemp
                                     : t.product.quickAdd}
                                 </Button>
-                              ) : (
-                                <Box
+                              ) : isUpcomingCard ? (
+                                <Button
+                                  fullWidth
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const wasInWishlist = wishlistStore.items.includes(product.id);
+                                    wishlistStore.toggleItem(product.id);
+                                    showToast(
+                                      wasInWishlist ? 'info' : 'success',
+                                      wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
+                                    );
+                                  }}
+                                  startIcon={<Heart size={13} fill={isWishlisted ? '#ff453a' : 'none'} />}
                                   sx={{
-                                    px: 1.2,
-                                    py: 0.5,
+                                    py: 0.65,
+                                    px: 1.25,
                                     borderRadius: '8px',
-                                    background: outOfStock && productStatus === 'OPEN'
-                                      ? 'rgba(120,120,128,0.2)'
-                                      : SHOP_STATUS_CONFIG[productStatus].bgGradient,
-                                    border: `1px solid ${outOfStock && productStatus === 'OPEN' ? 'rgba(120,120,128,0.35)' : SHOP_STATUS_CONFIG[productStatus].borderColor}`,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 0.5,
-                                    flexShrink: 0,
+                                    textTransform: 'none',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    bgcolor: isWishlisted ? 'rgba(255,69,58,0.08)' : 'var(--surface-2)',
+                                    color: isWishlisted ? '#ff453a' : 'var(--foreground)',
+                                    border: `1px solid ${isWishlisted ? 'rgba(255,69,58,0.32)' : 'var(--border)'}`,
+                                    boxShadow: 'none',
+                                    '&:hover': {
+                                      bgcolor: isWishlisted ? 'rgba(255,69,58,0.14)' : 'var(--surface-3)',
+                                      boxShadow: 'none',
+                                    },
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
-                                  {outOfStock && productStatus === 'OPEN' ? (
-                                    <Package size={12} color="var(--text-muted)" />
-                                  ) : (() => {
-                                    const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
-                                    return <IconComponent size={12} color={SHOP_STATUS_CONFIG[productStatus].color} />;
-                                  })()}
-                                  <Typography 
-                                    sx={{ 
-                                      fontSize: '0.65rem', 
-                                      fontWeight: 700, 
-                                      color: outOfStock && productStatus === 'OPEN'
-                                        ? 'var(--text-muted)'
-                                        : SHOP_STATUS_CONFIG[productStatus].color,
-                                      whiteSpace: 'nowrap',
-                                    }}
-                                  >
-                                    {outOfStock && productStatus === 'OPEN'
-                                      ? t.product.soldOut
-                                      : ({
-                                      OPEN: t.shopStatus.open,
-                                      COMING_SOON: t.shopStatus.comingSoon,
-                                      ORDER_ENDED: t.shopStatus.closedEnded,
-                                      TEMPORARILY_CLOSED: t.shopStatus.closed,
-                                      WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
-                                    } as Record<ShopStatusType, string>)[productStatus]}
-                                  </Typography>
-                                </Box>
-                              )}
+                                  {isWishlisted
+                                    ? (lang === 'en' ? 'Saved in wishlist' : 'บันทึกในรายการสนใจแล้ว')
+                                    : (lang === 'en' ? 'Save to wishlist' : 'บันทึกในรายการสนใจ')}
+                                </Button>
+                              ) : null}
                             </Box>
+                            )}
                           </Box>
                         </Box>
                       </Box>
@@ -5786,13 +5815,22 @@ export default function HomePage() {
               <Chip label={`${wishlistStore.items.length} ${t.wishlist.items}`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: 'rgba(255,69,58,0.1)', color: '#ff453a' }} />
             )}
           </Box>
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             {wishlistStore.items.length > 0 && (
-              <IconButton size="small" onClick={() => { wishlistStore.clearWishlist(); showToast('info', t.wishlist.clearAll); }} sx={{ color: 'var(--text-muted)' }}>
-                <X size={16} />
-              </IconButton>
+              <Button
+                size="small"
+                onClick={() => { wishlistStore.clearWishlist(); showToast('info', t.wishlist.clearAll); }}
+                sx={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'none', minWidth: 0, px: 1 }}
+              >
+                {t.wishlist.clearAll}
+              </Button>
             )}
-            <IconButton size="small" onClick={() => setShowWishlistDrawer(false)} sx={{ color: 'var(--text-muted)' }}>
+            <IconButton
+              size="small"
+              aria-label={lang === 'en' ? 'Close' : 'ปิด'}
+              onClick={() => setShowWishlistDrawer(false)}
+              sx={{ color: 'var(--text-muted)' }}
+            >
               <X size={20} />
             </IconButton>
           </Box>
@@ -5871,9 +5909,26 @@ export default function HomePage() {
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                         {isLocked ? (
-                          <Typography sx={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              px: 0.9,
+                              py: 0.2,
+                              borderRadius: '999px',
+                              bgcolor: 'var(--surface-2)',
+                              border: '1px solid var(--border)',
+                              fontSize: '0.68rem',
+                              fontWeight: 600,
+                              color: 'var(--text-muted)',
+                            }}
+                          >
                             {lockedLabel}
-                          </Typography>
+                            {product.startDate && product.showStartDate !== false && productStatus === 'COMING_SOON' && (
+                              <span>· {t.product.opensOn} {parseThailandDateTime(product.startDate, false).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}</span>
+                            )}
+                          </Box>
                         ) : eventDiscount ? (
                           <>
                             <Typography sx={{ fontSize: '0.75rem', color: '#86868b', textDecoration: 'line-through' }}>฿{(product.basePrice || 0)?.toLocaleString()}</Typography>
