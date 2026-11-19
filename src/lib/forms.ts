@@ -177,11 +177,18 @@ export type FormStatus = 'draft' | 'open' | 'closed';
 export interface FormBanner {
   type: 'image' | 'video';
   url: string;
+  /** Optional uploaded thumbnail image shown before video playback / in form lists */
+  posterUrl?: string;
 }
 
 /** Banner images must come from our own upload storage (Supabase public bucket or the image proxy). */
 export function isAllowedBannerImageUrl(url: string): boolean {
   return /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/[^\s"'<>]+$/i.test(url) || /^\/api\/image\/[^\s"'<>]+$/.test(url);
+}
+
+/** Uploaded banner videos must come from our own Supabase public `videos` bucket. */
+export function isAllowedBannerVideoUrl(url: string): boolean {
+  return /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/videos\/[^\s"'<>]+$/i.test(url);
 }
 
 export interface VideoEmbed {
@@ -432,8 +439,17 @@ function sanitizeBanner(input: unknown): FormBanner | null {
     return { type: 'image', url };
   }
   if (raw.type === 'video') {
-    if (!getVideoEmbed(url)) throw new Error('ลิงก์วิดีโอต้องเป็น YouTube หรือ Vimeo');
-    return { type: 'video', url };
+    const isUploadedVideo = isAllowedBannerVideoUrl(url);
+    const isEmbedVideo = Boolean(getVideoEmbed(url));
+    if (!isUploadedVideo && !isEmbedVideo) {
+      throw new Error('วิดีโอแบนเนอร์ต้องอัปโหลดผ่านระบบ หรือเป็นลิงก์ YouTube / Vimeo');
+    }
+    const posterUrl = String(raw.posterUrl ?? '').trim().slice(0, 1000);
+    return {
+      type: 'video',
+      url,
+      ...(posterUrl && isAllowedBannerImageUrl(posterUrl) ? { posterUrl } : {}),
+    };
   }
   return null;
 }

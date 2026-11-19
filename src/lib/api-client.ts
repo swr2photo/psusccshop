@@ -236,6 +236,121 @@ export async function uploadAudioApi(
   return res;
 }
 
+export interface VideoUploadResult {
+  url: string;
+  path: string;
+  contentType: string;
+}
+
+/**
+ * Upload a video file directly to Supabase Storage using a server-issued signed upload URL.
+ * Bypasses serverless request-size limits (supports up to 50 MB) with real-time upload progress.
+ */
+export async function uploadVideoFileApi(
+  file: File,
+  options?: {
+    folder?: 'form-banners' | 'banners';
+    onProgress?: (percent: number) => void;
+    signal?: AbortSignal;
+  },
+): Promise<VideoUploadResult> {
+  const requestSigned = () =>
+    apiFetch('/api/upload/video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        mime: file.type,
+        size: file.size,
+        folder: options?.folder || 'form-banners',
+      }),
+      credentials: 'same-origin',
+      cache: 'no-store',
+      signal: options?.signal,
+    });
+
+  let signRes = await requestSigned();
+  if (signRes.status === 401) {
+    await syncAuthCookieQuiet();
+    signRes = await requestSigned();
+  }
+
+  const signJson = await signRes.json().catch(() => ({}));
+  const signedUrl = signJson?.data?.signedUrl as string | undefined;
+  const publicUrl = signJson?.data?.publicUrl as string | undefined;
+  const path = signJson?.data?.path as string | undefined;
+  const contentType = (signJson?.data?.contentType as string | undefined) || file.type || 'video/mp4';
+
+  if (!signRes.ok || signJson?.status !== 'success' || !signedUrl || !publicUrl || !path) {
+    throw new Error(signJson?.message || 'สร้างลิงก์อัปโหลดวิดีโอไม่สำเร็จ');
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', signedUrl, true);
+    xhr.setRequestHeader('x-upsert', 'false');
+
+    const onAbort = () => xhr.abort();
+    if (options?.signal) {
+      if (options.signal.aborted) {
+        reject(new DOMException('Upload aborted', 'AbortError'));
+        return;
+      }
+      options.signal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    const cleanup = () => {
+      options?.signal?.removeEventListener('abort', onAbort);
+    };
+
+    xhr.upload.onprogress = (event) => {
+      if (!options?.onProgress) return;
+      if (event.lengthComputable && event.total > 0) {
+        options.onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+      }
+    };
+
+    xhr.onload = () => {
+      cleanup();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        options?.onProgress?.(100);
+        resolve();
+      } else {
+        let msg = `อัปโหลดวิดีโอไม่สำเร็จ (HTTP ${xhr.status})`;
+        try {
+          const parsed = JSON.parse(xhr.responseText);
+          if (parsed?.message || parsed?.error) {
+            msg = String(parsed.message || parsed.error);
+          }
+        } catch {
+          // ignore non-JSON storage error body
+        }
+        reject(new Error(msg));
+      }
+    };
+
+    xhr.onerror = () => {
+      cleanup();
+      reject(new Error('เชื่อมต่อเพื่ออัปโหลดวิดีโอไม่สำเร็จ กรุณาลองใหม่'));
+    };
+
+    xhr.onabort = () => {
+      cleanup();
+      reject(new DOMException('Upload aborted', 'AbortError'));
+    };
+
+    const formData = new FormData();
+    formData.append('cacheControl', '31536000');
+    const typedBlob = file.type === contentType ? file : new Blob([file], { type: contentType });
+    formData.append('', typedBlob, file.name || 'banner.mp4');
+
+    options?.onProgress?.(0);
+    xhr.send(formData);
+  });
+
+  return { url: publicUrl, path, contentType };
+}
+
 // ============== TYPES ==============
 
 export interface APIResponse<T = any> {

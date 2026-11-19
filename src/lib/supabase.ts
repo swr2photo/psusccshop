@@ -1432,6 +1432,86 @@ export function isSupabaseStorageUrl(url: string): boolean {
   return url.includes(`${supabaseUrl}/storage/`) || url.includes('supabase.co/storage/');
 }
 
+// ==================== SUPABASE STORAGE FOR VIDEOS ====================
+
+export const VIDEO_STORAGE_BUCKET = 'videos';
+export const ALLOWED_VIDEO_MIME_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'] as const;
+export const MAX_VIDEO_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
+
+let videoBucketEnsured = false;
+
+async function ensureVideoBucket(adminClient: SupabaseClient): Promise<void> {
+  if (videoBucketEnsured) return;
+  const { error: getErr } = await adminClient.storage.getBucket(VIDEO_STORAGE_BUCKET);
+  if (!getErr) {
+    videoBucketEnsured = true;
+    return;
+  }
+  const { error: createErr } = await adminClient.storage.createBucket(VIDEO_STORAGE_BUCKET, {
+    public: true,
+    fileSizeLimit: MAX_VIDEO_UPLOAD_BYTES,
+    allowedMimeTypes: [...ALLOWED_VIDEO_MIME_TYPES],
+  });
+  if (createErr && !/already exists|duplicate/i.test(createErr.message)) {
+    throw new Error(`Failed to initialize video storage bucket: ${createErr.message}`);
+  }
+  videoBucketEnsured = true;
+}
+
+function videoExtFromMime(contentType: string, filename?: string): string {
+  const ct = contentType.toLowerCase();
+  if (ct.includes('webm')) return 'webm';
+  if (ct.includes('quicktime')) return 'mov';
+  if (ct.includes('mp4')) return 'mp4';
+  const rawExt = filename?.split('.').pop()?.toLowerCase();
+  if (rawExt === 'webm' || rawExt === 'mov' || rawExt === 'mp4') return rawExt;
+  return 'mp4';
+}
+
+/**
+ * Create a short-lived signed upload URL in the public `videos` bucket so
+ * browsers can upload video clips directly to Supabase Storage (bypassing serverless body limits).
+ */
+export async function createSignedVideoUpload(
+  filename: string,
+  contentType: string,
+  folderPrefix = 'form-banners',
+): Promise<{ signedUrl: string; token: string; path: string; publicUrl: string }> {
+  const adminClient = getSupabaseAdmin();
+  if (!adminClient) {
+    throw new Error('Storage is not configured (missing SUPABASE_SERVICE_ROLE_KEY or Supabase URL)');
+  }
+
+  await ensureVideoBucket(adminClient);
+
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const ext = videoExtFromMime(contentType, filename);
+  const uniqueName = `vid_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+  const safeFolder = folderPrefix.replace(/[^a-zA-Z0-9/_-]/g, '').replace(/^\/+|\/+$/g, '') || 'form-banners';
+  const path = `${safeFolder}/${yearMonth}/${uniqueName}`;
+
+  const { data, error } = await adminClient.storage
+    .from(VIDEO_STORAGE_BUCKET)
+    .createSignedUploadUrl(path);
+
+  if (error || !data?.signedUrl) {
+    throw new Error(`Failed to create signed video upload URL: ${error?.message || 'unknown error'}`);
+  }
+
+  const finalPath = data.path || path;
+  const { data: urlData } = adminClient.storage
+    .from(VIDEO_STORAGE_BUCKET)
+    .getPublicUrl(finalPath);
+
+  return {
+    signedUrl: data.signedUrl,
+    token: data.token,
+    path: finalPath,
+    publicUrl: urlData.publicUrl,
+  };
+}
+
 // ==================== ADMIN PERMISSIONS ====================
 
 /** DB column names → camelCase mapping */
