@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   BarChart3,
   ClipboardList,
-  Download,
   ExternalLink,
   Eye,
   GitBranch,
@@ -31,7 +30,6 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import FormResults from '@/components/forms/FormResults';
 import FormQuestionField from '@/components/forms/FormQuestionField';
 import FormPdpaConsentBox from '@/components/forms/FormPdpaConsentBox';
 import { FormBannerThumb, FormBannerView } from '@/components/forms/FormBanner';
@@ -39,6 +37,7 @@ import FormBannerEditor from '@/components/admin/forms/FormBannerEditor';
 import FormAccessSettings from '@/components/admin/forms/FormAccessSettings';
 import FormFontPicker from '@/components/admin/forms/FormFontPicker';
 import FormPdpaSettings from '@/components/admin/forms/FormPdpaSettings';
+import FormResultsDashboard from '@/components/admin/forms/FormResultsDashboard';
 import { useFormFont } from '@/components/forms/useFormFont';
 import { QuestionEditor, QUESTION_TYPE_META, arrayMove, useReorder } from '@/components/admin/forms/FormQuestionEditor';
 import {
@@ -47,10 +46,8 @@ import {
   createEmptyQuestion,
   describeAccess,
   evaluateFormLogic,
-  formatAnswer,
   getFormAccess,
   getFormPdpa,
-  isAnonymousRespondent,
   isFormAcceptingResponses,
   makeFormId,
   optionDetailAnswerKey,
@@ -59,9 +56,7 @@ import {
   type FormDefinition,
   type FormQuestion,
   type FormQuestionType,
-  type FormResponse,
   type FormStatus,
-  type FormSummary,
 } from '@/lib/forms';
 
 type Toast = (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
@@ -69,8 +64,6 @@ type Toast = (type: 'success' | 'error' | 'info' | 'warning', message: string) =
 interface Props {
   showToast: Toast;
 }
-
-type AdminResponse = FormResponse & { respondentId: string };
 
 const STATUS_LABEL: Record<FormStatus, string> = { draft: 'ฉบับร่าง', open: 'เปิดรับคำตอบ', closed: 'ปิดแล้ว' };
 const STATUS_HINT: Record<FormStatus, string> = {
@@ -123,178 +116,6 @@ function countFormRules(form: FormDefinition): number {
     }
   }
   return n;
-}
-
-// ───────────────────────── Results panel ─────────────────────────
-
-function ResultsPanel({ formId, onBack, showToast }: { formId: string; onBack: () => void; showToast: Toast }) {
-  const { confirm, ConfirmDialog } = useConfirmDialog();
-  const [data, setData] = useState<{ form: FormDefinition; responses: AdminResponse[]; summary: FormSummary } | null>(null);
-  const [tab, setTab] = useState<'summary' | 'table'>('summary');
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    const res = await apiFetch(`/api/admin/forms/${encodeURIComponent(formId)}`, { cache: 'no-store' });
-    const json = await readJson(res);
-    setLoading(false);
-    if (json?.status === 'success') setData(json);
-    else showToast('error', json?.message || 'โหลดคำตอบไม่สำเร็จ');
-  }, [formId, showToast]);
-
-  useEffect(() => {
-    const t = setTimeout(() => { void load(); }, 0);
-    return () => clearTimeout(t);
-  }, [load]);
-
-  const answerText = (q: FormQuestion, r: AdminResponse) =>
-    formatAnswer(q, r.answers?.[q.id], r.answers?.[otherAnswerKey(q.id)], r.answers);
-
-  const hasPdpaData = Boolean(
-    data && (getFormPdpa(data.form).enabled || data.responses.some((r) => Boolean(r.pdpaConsent))),
-  );
-
-  const exportCsv = () => {
-    if (!data) return;
-    const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const pdpaCols = hasPdpaData
-      ? ['สถานะ PDPA', 'เวลาที่ยินยอม PDPA', 'เวอร์ชัน PDPA', 'ยินยอมข่าวสารเพิ่มเติม', 'วันหมดอายุข้อมูล']
-      : [];
-    const header = ['เวลา', 'ชื่อ', 'อีเมล', ...pdpaCols, ...data.form.questions.map((q) => q.title)];
-    const rows = data.responses.map((r) => {
-      const pdpaVals = hasPdpaData
-        ? [
-            r.pdpaConsent?.accepted ? 'ยินยอม' : '-',
-            r.pdpaConsent?.acceptedAt ? formatDate(r.pdpaConsent.acceptedAt) : '-',
-            r.pdpaConsent?.policyVersion || '-',
-            r.pdpaConsent?.marketingAccepted === undefined ? '-' : r.pdpaConsent.marketingAccepted ? 'ยินยอม' : 'ไม่ยินยอม',
-            r.pdpaConsent?.expiresAt ? formatDate(r.pdpaConsent.expiresAt) : 'ไม่กำหนด',
-          ]
-        : [];
-      return [
-        formatDate(r.updatedAt || r.submittedAt),
-        isAnonymousRespondent(r.email) ? 'ไม่ระบุตัวตน' : r.name || '',
-        isAnonymousRespondent(r.email) ? '' : r.email,
-        ...pdpaVals,
-        ...data.form.questions.map((q) => answerText(q, r)),
-      ];
-    });
-    const csv = '\uFEFF' + [header, ...rows].map((row) => row.map(esc).join(',')).join('\r\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${data.form.title.replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60) || 'form'}-responses.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const removeResponse = async (r: AdminResponse) => {
-    const ok = await confirm({ title: 'ลบคำตอบนี้?', message: `คำตอบของ ${isAnonymousRespondent(r.email) ? 'ผู้ตอบไม่ระบุตัวตน' : r.name || r.email} จะถูกลบถาวร และผู้ตอบจะตอบใหม่ได้`, destructive: true, confirmText: 'ลบ' });
-    if (!ok) return;
-    const res = await apiFetch(`/api/admin/forms/${encodeURIComponent(formId)}?r=${encodeURIComponent(r.respondentId)}`, { method: 'DELETE' });
-    const json = await readJson(res);
-    if (json?.status === 'success') { showToast('success', 'ลบคำตอบแล้ว'); void load(); }
-    else showToast('error', json?.message || 'ลบไม่สำเร็จ');
-  };
-
-  return (
-    <div className="mx-auto max-w-[900px]">
-      <ConfirmDialog />
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Button variant="ghost" onClick={onBack}><ArrowLeft size={16} /> กลับ</Button>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setLoading(true); void load(); }} disabled={loading}>{loading ? <Loader2 size={16} className="animate-spin" /> : 'รีเฟรช'}</Button>
-          <Button variant="outline" onClick={exportCsv} disabled={!data?.responses.length}><Download size={16} /> CSV</Button>
-        </div>
-      </div>
-
-      {!data ? (
-        <div className="py-16 text-center text-muted-foreground"><Loader2 className="mx-auto animate-spin" /></div>
-      ) : (
-        <>
-          <div className="mb-4 flex items-center gap-3">
-            <FormBannerThumb banner={data.form.banner} className="h-12 w-20" />
-            <div className="min-w-0">
-              <h2 className="text-[1.2rem] font-extrabold break-words text-foreground">{data.form.title}</h2>
-              <p className="text-[0.82rem] text-muted-foreground">ผู้ตอบ {data.responses.length} คน</p>
-            </div>
-          </div>
-
-          <div className="mb-4 inline-flex rounded-xl bg-muted p-1">
-            {(['summary', 'table'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={cn('rounded-lg px-4 py-1.5 text-[0.85rem] font-semibold transition-colors', tab === t ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
-              >
-                {t === 'summary' ? 'สรุปผล' : 'รายชื่อผู้ตอบ'}
-              </button>
-            ))}
-          </div>
-
-          {tab === 'summary' ? (
-            <FormResults form={data.form} summary={data.summary} showTexts final={!isFormAcceptingResponses(data.form)} />
-          ) : data.responses.length === 0 ? (
-            <p className="py-10 text-center text-muted-foreground">ยังไม่มีผู้ตอบ</p>
-          ) : (
-            <div className="overflow-x-auto rounded-2xl border border-border">
-              <table className="w-full min-w-[640px] text-left text-[0.82rem]">
-                <thead className="bg-muted text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2 font-semibold">ผู้ตอบ</th>
-                    <th className="px-3 py-2 font-semibold">เวลา</th>
-                    {hasPdpaData && <th className="px-3 py-2 font-semibold">ความยินยอม PDPA</th>}
-                    {data.form.questions.map((q) => <th key={q.id} className="max-w-[220px] px-3 py-2 font-semibold">{q.title}</th>)}
-                    <th className="px-3 py-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.responses.map((r) => (
-                    <tr key={r.respondentId} className="border-t border-border align-top">
-                      <td className="px-3 py-2">
-                        {isAnonymousRespondent(r.email) ? (
-                          <div className="font-semibold text-muted-foreground">ไม่ระบุตัวตน</div>
-                        ) : (
-                          <>
-                            <div className="font-semibold text-foreground">{r.name || '-'}</div>
-                            <div className="text-[0.75rem] text-muted-foreground">{r.email}</div>
-                          </>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{formatDate(r.updatedAt || r.submittedAt)}</td>
-                      {hasPdpaData && (
-                        <td className="px-3 py-2 whitespace-nowrap text-[0.75rem]">
-                          {r.pdpaConsent?.accepted ? (
-                            <div>
-                              <span className="font-semibold text-success">ยินยอม (v{r.pdpaConsent.policyVersion})</span>
-                              {r.pdpaConsent.marketingAccepted && (
-                                <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[0.68rem] font-semibold text-primary">+ข่าวสาร</span>
-                              )}
-                              <div className="text-[0.7rem] text-muted-foreground">
-                                {r.pdpaConsent.expiresAt ? `หมดอายุ ${formatDate(r.pdpaConsent.expiresAt)}` : 'ไม่กำหนดหมดอายุ'}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                      )}
-                      {data.form.questions.map((q) => (
-                        <td key={q.id} className="max-w-[220px] px-3 py-2 whitespace-pre-wrap break-words text-foreground">{answerText(q, r) || '-'}</td>
-                      ))}
-                      <td className="px-3 py-2">
-                        <Button variant="ghost" size="icon" aria-label="ลบคำตอบ" className="text-destructive" onClick={() => void removeResponse(r)}><Trash2 size={15} /></Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
 }
 
 // ───────────────────────── Editor ─────────────────────────
@@ -688,7 +509,7 @@ export function FormsView({ showToast }: Props) {
   };
 
   if (viewingResults) {
-    return <ResultsPanel formId={viewingResults} onBack={() => { setViewingResults(null); void load(); }} showToast={showToast} />;
+    return <FormResultsDashboard formId={viewingResults} onBack={() => { setViewingResults(null); void load(); }} showToast={showToast} />;
   }
 
   if (editing) {

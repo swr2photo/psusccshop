@@ -24,15 +24,18 @@ import {
   type FormPdpaConsentRecord,
   type FormResponse,
 } from '@/lib/forms';
+import type { FormAiAnalysis } from '@/lib/form-ai-types';
 
 const DEF_PREFIX = 'form:def:';
 const RESP_PREFIX = 'form:resp:';
+const AI_PREFIX = 'form:ai:';
 const LIST_CACHE_KEY = 'forms:defs';
 const LIST_TTL_MS = 15_000;
 
 const safeId = (id: string) => String(id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
 const defKey = (formId: string) => `${DEF_PREFIX}${safeId(formId)}`;
 const respPrefix = (formId: string) => `${RESP_PREFIX}${safeId(formId)}:`;
+const aiKey = (formId: string) => `${AI_PREFIX}${safeId(formId)}`;
 
 export function hashRespondent(email: string): string {
   return createHash('sha256').update(email.toLowerCase().trim()).digest('hex').slice(0, 32);
@@ -90,8 +93,32 @@ export async function deleteFormDefinition(formId: string): Promise<void> {
   const id = safeId(formId);
   if (!id) return;
   await db.delete(keyValueStore).where(like(keyValueStore.key, `${respPrefix(id)}%`));
+  await db.delete(keyValueStore).where(eq(keyValueStore.key, aiKey(id)));
   await db.delete(keyValueStore).where(eq(keyValueStore.key, defKey(id)));
   invalidateCachePrefix('forms:');
+}
+
+export async function getFormAiAnalysis(formId: string): Promise<FormAiAnalysis | null> {
+  const id = safeId(formId);
+  if (!id) return null;
+  const rows = await db
+    .select({ value: keyValueStore.value })
+    .from(keyValueStore)
+    .where(eq(keyValueStore.key, aiKey(id)))
+    .limit(1);
+  return (rows[0]?.value as unknown as FormAiAnalysis) || null;
+}
+
+export async function saveFormAiAnalysis(formId: string, analysis: FormAiAnalysis): Promise<void> {
+  const id = safeId(formId);
+  if (!id) return;
+  await db
+    .insert(keyValueStore)
+    .values({ key: aiKey(id), value: analysis as unknown as Record<string, unknown> })
+    .onConflictDoUpdate({
+      target: keyValueStore.key,
+      set: { value: analysis as unknown as Record<string, unknown>, updatedAt: new Date() },
+    });
 }
 
 /** Response counts for every form in one query. */

@@ -5,7 +5,7 @@
 // option order (never by rank), so a choice keeps its colour as the votes move.
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Crown, MessageSquareText, Radio, Scale, ShieldCheck, Star, Users } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Crown, MessageSquareText, Radio, Scale, Search, ShieldCheck, Star, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CHOICE_QUESTION_TYPES, getFormPdpa, type FormDefinition, type FormQuestion, type FormSummary, type QuestionSummary } from '@/lib/forms';
 
@@ -275,12 +275,71 @@ function RatingResult({ s, mine }: { s: QuestionSummary; mine: Set<string> }) {
 }
 
 function TextList({ texts }: { texts: string[] }) {
+  const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return texts;
+    return texts.filter((t) => t.toLowerCase().includes(q));
+  }, [texts, query]);
+
   if (texts.length === 0) return <p className="text-[0.85rem] text-muted-foreground">ยังไม่มีคำตอบ</p>;
+
+  const INITIAL_VISIBLE = 6;
+  const visible = expanded ? filtered : filtered.slice(0, INITIAL_VISIBLE);
+  const hasMore = filtered.length > INITIAL_VISIBLE;
+
   return (
-    <div className="flex max-h-72 flex-col gap-1.5 overflow-y-auto pr-1">
-      {texts.map((t, i) => (
-        <div key={i} className="rounded-xl bg-muted/60 px-3.5 py-2 text-[0.875rem] whitespace-pre-wrap break-words">{t}</div>
-      ))}
+    <div className="flex flex-col gap-2.5">
+      {texts.length > 5 && (
+        <div className="relative">
+          <Search size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setExpanded(true); }}
+            placeholder={`ค้นหาใน ${texts.length} ความคิดเห็น...`}
+            className="h-9 w-full rounded-xl border border-border bg-background pr-3 pl-8 text-[0.82rem] text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+          />
+        </div>
+      )}
+
+      {visible.length === 0 ? (
+        <p className="py-4 text-center text-[0.82rem] text-muted-foreground">ไม่พบความคิดเห็นที่ตรงกับคำค้นหา</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {visible.map((t, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-2.5 rounded-xl border border-border/70 bg-muted/35 px-3.5 py-2.5 text-[0.86rem] leading-relaxed"
+            >
+              <span className="mt-0.5 shrink-0 text-[0.72rem] font-semibold text-muted-foreground tabular-nums">
+                {i + 1}.
+              </span>
+              <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-foreground">{t}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="inline-flex w-fit items-center gap-1 self-center rounded-lg px-3 py-1.5 text-[0.78rem] font-semibold text-primary transition-colors hover:bg-primary/10"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp size={14} /> ย่อรายการ
+            </>
+          ) : (
+            <>
+              <ChevronDown size={14} /> แสดงทั้งหมด ({filtered.length.toLocaleString('th-TH')} ความคิดเห็น)
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }
