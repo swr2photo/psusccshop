@@ -66,7 +66,7 @@ function SettingSection({
     >
       <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3.5 md:px-5">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-4">
+          <span className="mt-0.5 inline-flex shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">
             {icon}
           </span>
           <div className="min-w-0">

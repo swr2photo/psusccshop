@@ -954,11 +954,8 @@ function StatCard({ icon, label, value, color }: { icon: ReactElement; label: st
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
           <div
-            className="grid size-10 place-items-center rounded-[10px]"
-            style={{
-              backgroundColor: `color-mix(in srgb, ${color} 20%, transparent)`,
-              color,
-            }}
+            className="inline-flex shrink-0 items-center justify-center"
+            style={{ color }}
           >
             {icon}
           </div>

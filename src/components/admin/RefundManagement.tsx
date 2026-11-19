@@ -179,8 +179,8 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-[14px] bg-primary shadow-[0_4px_14px_rgba(124,58,237,0.3)]">
-              <RotateCcw size={22} className="text-white" />
+            <div className="inline-flex shrink-0 items-center justify-center text-primary">
+              <RotateCcw size={24} />
             </div>
             <div>
               <h2 className="text-xl font-extrabold text-[var(--foreground)]">จัดการคำขอคืนเงิน</h2>
@@ -261,8 +261,8 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                     className="flex cursor-pointer items-center gap-4 p-4 hover:bg-[var(--surface-2)]"
                   >
                     <div
-                      className="grid size-10 shrink-0 place-items-center rounded-xl"
-                      style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}
+                      className="inline-flex shrink-0 items-center justify-center"
+                      style={{ color: statusInfo.color }}
                     >
                       {statusInfo.icon}
                     </div>

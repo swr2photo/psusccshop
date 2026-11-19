@@ -27,13 +27,9 @@ const FORMAL = {
     border: '1px solid var(--glass-border)',
   },
   iconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: '6px',
-    bgcolor: 'var(--surface-2)',
-    border: '1px solid var(--glass-border)',
-    display: 'grid',
-    placeItems: 'center',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     color: 'var(--foreground)',
     flexShrink: 0,
   },
@@ -833,12 +829,9 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             >
               <Box
                 sx={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '6px',
-                  bgcolor: 'rgba(255, 255, 255, 0.12)',
-                  display: 'grid',
-                  placeItems: 'center',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
@@ -951,11 +944,11 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             </IconButton>
             <UiButton
               type="button"
-              variant="outline"
+              variant="ghost"
               size="icon-sm"
               onClick={onClose}
               aria-label="Close"
-              className="border-[var(--glass-border)] bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+              className="text-[var(--text-muted)] hover:bg-transparent hover:text-[var(--foreground)]"
             >
               <X className="size-4" />
             </UiButton>

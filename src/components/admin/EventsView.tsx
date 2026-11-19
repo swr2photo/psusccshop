@@ -333,8 +333,8 @@ export const EventsView = React.memo(function EventsView({
         {/* Header */}
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-[14px] bg-primary shadow-[0_4px_16px_rgba(251,191,36,0.3)]">
-              <Sparkles size={22} className="text-white" />
+            <div className="inline-flex shrink-0 items-center justify-center text-primary">
+              <Sparkles size={24} />
             </div>
             <div>
               <h2 className="text-[1.3rem] font-extrabold text-[var(--foreground)]">
@@ -559,8 +559,8 @@ export const EventsView = React.memo(function EventsView({
                 <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible p-6">
                 <DialogHeader className="border-b border-[var(--glass-border)] pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="grid size-10 place-items-center rounded-xl bg-primary">
-                      <Sparkles size={20} className="text-white" />
+                    <div className="inline-flex shrink-0 items-center justify-center text-primary">
+                      <Sparkles size={20} />
                     </div>
                     <DialogTitle className="text-[1.1rem] font-bold text-[var(--foreground)]">
                       {events.some((e) => e.id === editingEvent.id)

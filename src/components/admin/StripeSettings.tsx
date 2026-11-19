@@ -88,7 +88,7 @@ interface StripeStatusData {
   chargesEnabled?: boolean;
   detailsSubmitted?: boolean;
   currentlyDue?: string[];
-  payoutSchedule?: Record<string, any> | null;
+  payoutSchedule?: Record<string, unknown> | null;
   payoutBlockReasons?: string[];
   verifyError: string;
   balanceAvailable: { amount: number; currency: string }[];
@@ -174,8 +174,8 @@ function SectionCard({
         onClick={() => setExpanded(!expanded)}
       >
         <div
-          className="flex size-9 shrink-0 items-center justify-center rounded-[10px] text-white"
-          style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}CC 100%)` }}
+          className="inline-flex shrink-0 items-center justify-center"
+          style={{ color }}
         >
           {icon}
         </div>
@@ -247,11 +247,11 @@ function EnvVarRow({ name, isSet, masked }: { name: string; isSet: boolean; mask
     >
       <div
         className={cn(
-          'flex size-5 shrink-0 items-center justify-center rounded-full',
-          isSet ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive',
+          'inline-flex shrink-0 items-center justify-center',
+          isSet ? 'text-success' : 'text-destructive',
         )}
       >
-        {isSet ? <CheckCircle size={12} /> : <Warning size={12} />}
+        {isSet ? <CheckCircle size={14} /> : <Warning size={14} />}
       </div>
       <span className="flex-1 font-mono text-[0.78rem] font-semibold text-[var(--foreground)]">
         {name}
@@ -403,8 +403,8 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
       } else {
         setReportError(data.error || 'Failed to send issue report');
       }
-    } catch (err: any) {
-      setReportError(err?.message || 'Network error');
+    } catch (err: unknown) {
+      setReportError(err instanceof Error ? err.message : 'Network error');
     } finally {
       setSubmittingReport(false);
     }
@@ -429,11 +429,8 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
           </Button>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-3">
-              <div
-                className="flex size-10 items-center justify-center rounded-xl"
-                style={{ background: STRIPE_BRAND_GRADIENT }}
-              >
-                <CreditCard size={22} color="#fff" />
+              <div className="inline-flex shrink-0 items-center justify-center text-[#635bff]">
+                <CreditCard size={24} />
               </div>
               <div>
                 <h2 className="text-[1.2rem] font-extrabold text-[var(--foreground)]">
@@ -737,17 +734,10 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
               )}
             >
               <div className="flex items-center gap-4">
-                <div
-                  className={cn(
-                    'flex size-11 items-center justify-center rounded-xl transition-all duration-300',
-                    stripeConfig.enablePromptPay
-                      ? 'bg-primary'
-                      : 'bg-[var(--surface-2)]',
-                  )}
-                >
+                <div className="inline-flex shrink-0 items-center justify-center">
                   <QrCode
                     size={22}
-                    color={stripeConfig.enablePromptPay ? '#fff' : 'var(--text-muted)'}
+                    color={stripeConfig.enablePromptPay ? 'var(--primary)' : 'var(--text-muted)'}
                   />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -788,17 +778,10 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
               )}
             >
               <div className="flex items-center gap-4">
-                <div
-                  className={cn(
-                    'flex size-11 items-center justify-center rounded-xl transition-all duration-300',
-                    stripeConfig.enableCreditCard
-                      ? 'bg-primary'
-                      : 'bg-[var(--surface-2)]',
-                  )}
-                >
+                <div className="inline-flex shrink-0 items-center justify-center">
                   <CreditCard
                     size={22}
-                    color={stripeConfig.enableCreditCard ? '#fff' : 'var(--text-muted)'}
+                    color={stripeConfig.enableCreditCard ? 'var(--primary)' : 'var(--text-muted)'}
                   />
                 </div>
                 <div className="min-w-0 flex-1">

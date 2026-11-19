@@ -2100,23 +2100,18 @@ ${getStatusLabel(order.status)}
                 </Box>
                 {/* Success Icon with Animation */}
                 <Box sx={{
-                  width: 72,
-                  height: 72,
                   mx: 'auto',
-                  mb: 2,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%)',
+                  mb: 1.5,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  border: '2px solid rgba(34, 197, 94, 0.3)',
                   animation: 'scaleIn 0.3s ease-out',
                   '@keyframes scaleIn': {
                     '0%': { transform: 'scale(0)' },
                     '100%': { transform: 'scale(1)' },
                   },
                 }}>
-                  <CheckCircleIcon size={40} color="#30d158" />
+                  <CheckCircleIcon size={44} color="#30d158" />
                 </Box>
                 
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: 'var(--foreground)' }}>
@@ -2245,18 +2240,13 @@ ${getStatusLabel(order.status)}
                   borderBottom: '1px solid var(--glass-border)',
                 }}>
                   <Box sx={{
-                    width: 64,
-                    height: 64,
                     mx: 'auto',
                     mb: 1.5,
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 8px 24px rgba(0,113,227, 0.3)',
                   }}>
-                    <SupportAgentIcon size={32} color="white" />
+                    <SupportAgentIcon size={36} color="#0071e3" />
                   </Box>
                   <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1.15rem', mb: 0.5 }}>
                     {t.supportChat.chatTitle}
@@ -2737,15 +2727,12 @@ ${getStatusLabel(order.status)}
                                   >
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                       <Box sx={{
-                                        width: 32,
-                                        height: 32,
-                                        borderRadius: 1,
-                                        bgcolor: '#0071e3',
-                                        display: 'flex',
+                                        display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
+                                        flexShrink: 0,
                                       }}>
-                                        <ReceiptIcon size={18} color="white" />
+                                        <ReceiptIcon size={20} color="#0071e3" />
                                       </Box>
                                       <Box sx={{ flex: 1, minWidth: 0 }}>
                                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 600 }}>

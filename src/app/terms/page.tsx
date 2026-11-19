@@ -292,12 +292,9 @@ export default function TermsPage() {
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
             <Box sx={{
-              width: 56, height: 56, borderRadius: '16px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              display: 'grid', placeItems: 'center',
-              boxShadow: '0 8px 24px rgba(16,185,129,0.3)',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
-              <Scale size={28} color="white" />
+              <Scale size={30} color="#10b981" />
             </Box>
             <Box>
               <Typography variant="h4" sx={{ fontWeight: 800, color: THEME.text, mb: 0.5 }}>
@@ -357,8 +354,7 @@ export default function TermsPage() {
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
               <Box sx={{
-                width: 40, height: 40, borderRadius: '12px',
-                bgcolor: 'rgba(16,185,129,0.1)', display: 'grid', placeItems: 'center',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0,
               }}>
                 {ICONS[section.icon] || <FileText size={20} />}
               </Box>
@@ -389,8 +385,7 @@ export default function TermsPage() {
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
             <Box sx={{
-              width: 40, height: 40, borderRadius: '12px',
-              bgcolor: 'rgba(16,185,129,0.1)', display: 'grid', placeItems: 'center',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0,
             }}>
               <Mail size={20} />
             </Box>

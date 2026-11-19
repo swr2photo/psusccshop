@@ -173,14 +173,8 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div
-            className={cn(
-              'flex size-12 items-center justify-center rounded-[14px]',
-              live.enabled && 'animate-pulse bg-destructive',
-              !live.enabled && 'bg-[var(--surface-2)]',
-            )}
-          >
-            <Video size={24} className={live.enabled ? 'text-white' : 'text-muted-foreground'} />
+          <div className="inline-flex shrink-0 items-center justify-center">
+            <Video size={26} className={live.enabled ? 'animate-pulse text-destructive' : 'text-muted-foreground'} />
           </div>
           <div>
             <h2 className="flex items-center gap-2 text-xl font-bold text-[var(--foreground)]">

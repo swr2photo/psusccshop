@@ -305,10 +305,6 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
               {/* Icon */}
               <Box
                 sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  bgcolor: 'rgba(99, 102, 241, 0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -316,9 +312,9 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
                 }}
               >
                 {pk.deviceType === 'multiDevice' ? (
-                  <Key size={20} style={{ color: '#6366f1' }} />
+                  <Key size={22} style={{ color: '#6366f1' }} />
                 ) : (
-                  <Fingerprint size={20} style={{ color: '#6366f1' }} />
+                  <Fingerprint size={22} style={{ color: '#6366f1' }} />
                 )}
               </Box>
 

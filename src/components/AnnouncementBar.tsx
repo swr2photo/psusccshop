@@ -155,13 +155,10 @@ function SocialNewsStrip({ news }: { news: SocialMediaNews[] }) {
           >
             <Box
               sx={{
-                width: 26,
-                height: 26,
-                borderRadius: '50%',
-                bgcolor: `${platform.color}18`,
                 color: platform.color,
-                display: 'grid',
-                placeItems: 'center',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
@@ -671,16 +668,14 @@ export default function AnnouncementBar({
         >
           <Box
             sx={{
-              width: 36,
-              height: 36,
-              borderRadius: '10px',
-              bgcolor: `color-mix(in srgb, ${color} 20%, transparent)`,
-              display: 'grid',
-              placeItems: 'center',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
               color,
             }}
           >
-            <Megaphone size={18} />
+            <Megaphone size={20} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: 'var(--foreground)' }}>
@@ -781,17 +776,14 @@ export default function AnnouncementBar({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               sx={{
-                width: 40,
-                height: 40,
-                borderRadius: '12px',
-                bgcolor: 'color-mix(in srgb, var(--primary) 18%, transparent)',
                 color: 'var(--primary)',
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
-              <History size={20} />
+              <History size={22} />
             </Box>
             <Box>
               <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1.1rem' }}>

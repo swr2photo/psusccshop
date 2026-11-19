@@ -2635,14 +2635,12 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                           <Box sx={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: '8px',
-                            bgcolor: 'rgba(56,189,248,0.2)',
-                            display: 'grid',
-                            placeItems: 'center',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
                           }}>
-                            <Palette size={16} color="#38bdf8" />
+                            <Palette size={18} color="#38bdf8" />
                           </Box>
                           <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                             <span>{lang === 'en' ? 'Select Design/Pattern' : 'เลือกลายสินค้า'}</span>
@@ -2816,9 +2814,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                         }}>
                           <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                             <Box sx={{
-                              width: 36, height: 36, borderRadius: '10px',
-                              bgcolor: 'rgba(0,113,227,0.2)',
-                              display: 'grid', placeItems: 'center',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
                             }}>
                               <Tag size={18} color="#2997ff" />
                             </Box>
@@ -2889,12 +2888,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                         }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
                             <Box sx={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: '10px',
-                              bgcolor: 'rgba(16,185,129,0.15)',
-                              display: 'grid',
-                              placeItems: 'center',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
                             }}>
                               <Tag size={18} color="#30d158" />
                             </Box>

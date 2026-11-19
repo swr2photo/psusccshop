@@ -1046,17 +1046,13 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.75 }}>
                 <Box
                   sx={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                    display: 'grid',
-                    placeItems: 'center',
-                    boxShadow: '0 8px 20px rgba(0,113,227,0.28)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     flexShrink: 0,
                   }}
                 >
-                  <Package size={24} color="white" />
+                  <Package size={26} color="#0071e3" />
                 </Box>
                 <Box>
                   <Typography sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' }, fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
@@ -1195,14 +1191,12 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box sx={{
-                width: 40,
-                height: 40,
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                display: 'grid',
-                placeItems: 'center',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
               }}>
-                <Package size={20} color="white" />
+                <Package size={22} color="#0071e3" />
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
@@ -1263,15 +1257,11 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             } : {}),
           }}>
             <Box sx={{
-              width: 88,
-              height: 88,
-              borderRadius: '22px',
-              bgcolor: 'rgba(100,116,139,0.08)',
-              border: '1px dashed var(--glass-border)',
-              display: 'grid',
-              placeItems: 'center',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}>
-              <Package size={36} style={{ color: 'var(--text-muted)', opacity: 0.7 }} />
+              <Package size={42} style={{ color: 'var(--text-muted)', opacity: 0.65 }} />
             </Box>
             <Typography sx={{ color: 'var(--foreground)', fontSize: '0.98rem', fontWeight: 700, textAlign: 'center' }}>
               {searchQuery.trim()
@@ -2048,15 +2038,12 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                             gap: 1.5,
                           }}>
                             <Box sx={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: '10px',
-                              background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                              display: 'grid',
-                              placeItems: 'center',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               flexShrink: 0,
                             }}>
-                              <Truck size={18} color="#fff" />
+                              <Truck size={20} color="#0071e3" />
                             </Box>
                             <Box>
                               <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--secondary)' }}>

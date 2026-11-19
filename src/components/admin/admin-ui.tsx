@@ -43,7 +43,7 @@ export function Panel({
         <header className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
           <div className="flex min-w-0 items-start gap-2.5">
             {icon ? (
-              <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-4">
+              <span className="mt-1 inline-flex shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">
                 {icon}
               </span>
             ) : null}
@@ -190,7 +190,7 @@ export function EmptyState({
   return (
     <div className={cn('flex flex-col items-center justify-center gap-2 px-6 py-10 text-center', className)}>
       {icon ? (
-        <span className="mb-1 grid size-10 place-items-center rounded-full bg-muted text-muted-foreground [&_svg]:size-5">
+        <span className="mb-1 inline-flex items-center justify-center text-muted-foreground [&_svg]:size-6">
           {icon}
         </span>
       ) : null}

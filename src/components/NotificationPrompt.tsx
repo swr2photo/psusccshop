@@ -376,10 +376,10 @@ export default function NotificationPrompt() {
 
   const getIcon = () => {
     switch (promptMode) {
-      case 'ios-guide': return <PhoneIcon size={20} color="white" />;
-      case 'denied': return <SettingsIcon size={20} color="white" />;
-      case 'unsupported': return <PhoneIcon size={20} color="white" />;
-      default: return <BellIcon size={20} color="white" />;
+      case 'ios-guide': return <PhoneIcon size={20} color="#34c759" />;
+      case 'denied': return <SettingsIcon size={20} color="#ff9f0a" />;
+      case 'unsupported': return <PhoneIcon size={20} color="#8e8e93" />;
+      default: return <BellIcon size={20} color="#0071e3" />;
     }
   };
 
@@ -440,11 +440,8 @@ export default function NotificationPrompt() {
         />
         <Box
           sx={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            background: getGradient(),
-            display: 'flex',
+            mt: 0.25,
+            display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,

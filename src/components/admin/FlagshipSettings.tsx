@@ -133,7 +133,7 @@ function Section({
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary [&_svg]:size-[18px]">{icon}</span>
+          <span className="mt-0.5 inline-flex shrink-0 items-center justify-center text-primary [&_svg]:size-[18px]">{icon}</span>
           <div className="min-w-0">
             <h3 className="text-[0.95rem] font-bold text-foreground">{title}</h3>
             {description && <p className="mt-0.5 text-[0.8rem] text-muted-foreground">{description}</p>}

@@ -2001,8 +2001,8 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
   // ✅ No Permission View
   const NoPermissionView = ({ permission }: { permission: string }): JSX.Element => (
     <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[20px] bg-destructive/10">
-        <Lock size={40} color="#ef4444" />
+      <div className="mb-4 flex items-center justify-center">
+        <Lock size={44} color="#ef4444" />
       </div>
       <p className="mb-1 text-xl font-bold text-[var(--foreground)]">ไม่มีสิทธิ์เข้าถึง</p>
       <p className="mb-2 text-sm text-[var(--text-muted)]">คุณไม่มีสิทธิ์ในการ{permission}</p>
@@ -2726,14 +2726,10 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                           <Box sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: '10px',
-                            bgcolor: statusTheme.bg,
-                            border: `1px solid ${statusTheme.border}`,
-                            display: 'flex',
+                            display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            flexShrink: 0,
                           }}>
                             <LocalMall size={20} color={statusTheme.text} />
                           </Box>
@@ -2796,14 +2792,10 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                             <Box sx={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: '10px',
-                              bgcolor: 'rgba(16, 185, 129, 0.15)',
-                              border: '1px solid rgba(16, 185, 129, 0.3)',
-                              display: 'flex',
+                              display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
+                              flexShrink: 0,
                             }}>
                               <CheckCircle size={20} color="#10b981" />
                             </Box>
@@ -3007,17 +2999,13 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                           bgcolor: 'var(--glass-strong)',
                           zIndex: 30,
                         }}>
-                          <Box sx={{ 
-                            width: 80, 
-                            height: 80, 
-                            borderRadius: '50%',
-                            bgcolor: 'rgba(6, 182, 212, 0.1)',
+                          <Box sx={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            mb: 2,
+                            mb: 1.5,
                           }}>
-                            <CameraAlt size={36} color="#06b6d4" />
+                            <CameraAlt size={40} color="#06b6d4" />
                           </Box>
                           <CircularProgress size={24} sx={{ color: '#06b6d4', mb: 1.5 }} />
                           <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem', fontWeight: 600 }}>
@@ -3161,15 +3149,12 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  flexShrink: 0,
                 }}>
-                  <QrCodeScanner size={24} color="white" />
+                  <QrCodeScanner size={26} color="#06b6d4" />
                 </Box>
                 <Box>
                   <DialogTitle className="p-0 m-0 text-[1.1rem] font-bold text-[var(--foreground)]">
@@ -3941,11 +3926,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
               >
                 {/* Action Icon */}
                 <Box sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '8px',
-                  bgcolor: actionTheme.bg,
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
@@ -4051,8 +4032,8 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
               style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(59,130,246,0.2) 100%)' }}
             >
               {/* Logo */}
-              <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-3xl bg-primary shadow-[0_20px_40px_rgba(139,92,246,0.3)]">
-                <Store size={40} color="#fff" />
+              <div className="mx-auto mb-4 flex items-center justify-center text-primary">
+                <Store size={44} />
               </div>
               <h1 className="mb-1 text-[1.6rem] font-extrabold text-[var(--foreground)]">
                 PSUSCC Admin

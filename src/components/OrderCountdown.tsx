@@ -191,15 +191,12 @@ export function CountdownBadge({ orderDate, compact, tone = 'default', onExpired
       },
     }}>
       <Box sx={{
-        width: 32,
-        height: 32,
-        borderRadius: '10px',
-        bgcolor: `${color}20`,
-        display: 'grid',
-        placeItems: 'center',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         flexShrink: 0,
       }}>
-        <Clock size={16} style={{ color }} />
+        <Clock size={18} style={{ color }} />
       </Box>
       <Box sx={{ flex: 1 }}>
         <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.2 }}>

@@ -350,7 +350,7 @@ function CommandPalette({
                     )}
                   >
                     <span
-                      className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-primary [&_svg]:size-4"
+                      className="inline-flex shrink-0 items-center justify-center text-primary [&_svg]:size-4"
                     >
                       {entry.icon}
                     </span>
@@ -666,8 +666,8 @@ export function AdminShell({
 
   const brandBlock = (compact: boolean) => (
     <div className={cn('flex items-center gap-2.5', compact && 'justify-center')}>
-      <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-        <Zap className="size-4" />
+      <div className="inline-flex shrink-0 items-center justify-center text-primary">
+        <Zap className="size-5" />
       </div>
       {!compact ? (
         <div className="min-w-0">

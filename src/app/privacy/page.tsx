@@ -396,8 +396,8 @@ export default function PrivacyPolicyPage() {
         <main className="privacy-doc min-w-0">
           <div className="mb-8">
             <div className="mb-3 flex items-center gap-3">
-              <div className="grid size-11 place-items-center rounded-xl bg-[#2563eb] text-white shadow-sm">
-                <Shield size={22} />
+              <div className="inline-flex shrink-0 items-center justify-center text-[#2563eb]">
+                <Shield size={26} />
               </div>
               <div>
                 <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{c.title}</h1>

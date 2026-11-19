@@ -1084,16 +1084,13 @@ export default function CheckoutDialog({
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', py: 0.35 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                           <Box sx={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: '8px',
-                            bgcolor: isSelected ? 'rgba(16,185,129,0.2)' : 'var(--surface)',
-                            display: 'flex',
+                            display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            flexShrink: 0,
                             color: isSelected ? '#34c759' : 'var(--text-muted)',
                           }}>
-                            {PAYMENT_ICONS[option.method] || <CreditCard size={16} />}
+                            {PAYMENT_ICONS[option.method] || <CreditCard size={18} />}
                           </Box>
                           <Box>
                             <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
@@ -1222,17 +1219,13 @@ export default function CheckoutDialog({
           alignItems: 'flex-start',
         }}>
           <Box sx={{
-            width: 36,
-            height: 36,
-            borderRadius: '6px',
-            bgcolor: 'color-mix(in srgb, var(--foreground) 6%, transparent)',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
             color: 'var(--text-muted)',
           }}>
-            <QrCode size={18} strokeWidth={1.75} />
+            <QrCode size={20} strokeWidth={1.75} />
           </Box>
           <Box>
             <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.35 }}>

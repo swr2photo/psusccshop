@@ -5558,14 +5558,12 @@ export default function HomePage() {
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-              display: 'grid',
-              placeItems: 'center',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
             }}>
-              <Ruler size={20} color="white" />
+              <Ruler size={22} color="#0071e3" />
             </Box>
             <Box>
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>{t.product.sizeChartTitle}</Typography>
@@ -6126,8 +6124,8 @@ export default function HomePage() {
             {/* Header */}
             <Box sx={{ p: 2.5, pb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box sx={{
-                width: 44, height: 44, borderRadius: '12px', overflow: 'hidden', flexShrink: 0,
-                bgcolor: 'rgba(168,85,247,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <Users size={22} style={{ color: '#a855f7' }} />
               </Box>
@@ -6487,18 +6485,13 @@ export default function HomePage() {
           {/* Header */}
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Box sx={{
-              width: 64,
-              height: 64,
-              borderRadius: '20px',
-              background: 'linear-gradient(135deg, #64d2ff 0%, #34c759 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               mx: 'auto',
-              mb: 2,
-              boxShadow: '0 8px 32px rgba(6, 182, 212, 0.3)',
+              mb: 1.5,
             }}>
-              <Package size={32} color="white" />
+              <Package size={36} color="#0071e3" />
             </Box>
             <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', mb: 0.5 }}>
               {t.qrDialog.title}

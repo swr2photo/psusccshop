@@ -288,8 +288,8 @@ export default function StandaloneCartPage() {
               bgcolor: 'var(--surface, #ffffff)',
             }}
           >
-            <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(30,58,95,0.06)', display: 'grid', placeItems: 'center', mx: 'auto', mb: 2 }}>
-              <ShoppingCart size={40} color="#1e3a5f" />
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+              <ShoppingCart size={44} color="#1e3a5f" />
             </Box>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
               {lang === 'en' ? 'Your cart is empty' : 'ยังไม่มีสินค้าในตะกร้า'}

@@ -79,8 +79,8 @@ export default function CookieConsentBanner() {
         )}
       >
         <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-4 sm:p-5">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#0071e3] text-white shadow-sm">
-            <Cookie size={20} />
+          <div className="mt-0.5 inline-flex shrink-0 items-center justify-center text-[#0071e3]">
+            <Cookie size={22} />
           </div>
 
           <div className="min-w-0 flex-1">

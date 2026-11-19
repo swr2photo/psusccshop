@@ -217,20 +217,15 @@ function AuthErrorContent() {
           {/* Error Icon */}
           <Box
             sx={{
-              width: 100,
-              height: 100,
-              borderRadius: '24px',
-              background: `linear-gradient(135deg, ${errorInfo.color}30 0%, ${errorInfo.color}10 100%)`,
-              border: `2px solid ${errorInfo.color}40`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               mx: 'auto',
-              mb: 3,
+              mb: 2.5,
               animation: 'bounce 2s ease-in-out infinite',
             }}
           >
-            <IconComponent size={48} color={errorInfo.color} />
+            <IconComponent size={52} color={errorInfo.color} />
           </Box>
 
           {/* Error Title */}

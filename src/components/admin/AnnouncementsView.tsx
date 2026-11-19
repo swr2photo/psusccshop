@@ -632,11 +632,11 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
             <DialogHeader className="flex-row items-center gap-3 border-b border-[var(--glass-border)] pb-4">
               <div
                 className={cn(
-                  'flex size-10 items-center justify-center rounded-xl text-white',
-                  isEditingExisting ? 'bg-primary' : 'bg-success',
+                  'inline-flex shrink-0 items-center justify-center',
+                  isEditingExisting ? 'text-primary' : 'text-success',
                 )}
               >
-                {isEditingExisting ? <Edit size={18} /> : <Add size={18} />}
+                {isEditingExisting ? <Edit size={20} /> : <Add size={20} />}
               </div>
               <DialogTitle className="text-[var(--foreground)]">
                 {isEditingExisting ? 'แก้ไขประกาศ' : 'สร้างประกาศใหม่'}
@@ -986,8 +986,8 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
             showCloseButton
           >
             <DialogHeader className="flex-row items-center gap-3 border-b border-[var(--glass-border)] pb-4">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-white">
-                <History size={18} />
+              <div className="inline-flex shrink-0 items-center justify-center text-primary">
+                <History size={20} />
               </div>
               <div>
                 <DialogTitle className="text-[var(--foreground)]">ประวัติประกาศ</DialogTitle>

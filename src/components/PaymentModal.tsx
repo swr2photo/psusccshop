@@ -1042,17 +1042,12 @@ export default function PaymentModal({ orderRef, onClose, onSuccess, standalone 
               textAlign: 'center',
             }}>
               <Box sx={{
-                width: 56,
-                height: 56,
-                borderRadius: '50%',
-                bgcolor: EMERALD_SOFT,
-                border: `2px solid rgba(5,150,105,0.35)`,
-                display: 'grid',
-                placeItems: 'center',
+                display: 'flex',
+                justifyContent: 'center',
                 mx: 'auto',
-                mb: 1.75,
+                mb: 1.5,
               }}>
-                <Check size={28} strokeWidth={3} style={{ color: EMERALD }} />
+                <Check size={36} strokeWidth={2.5} style={{ color: EMERALD }} />
               </Box>
               <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, mb: 0.5, color: 'var(--foreground)' }}>
                 {t.payment.paymentSuccess}
@@ -1769,16 +1764,12 @@ export default function PaymentModal({ orderRef, onClose, onSuccess, standalone 
                         }}
                       >
                         <Box sx={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: '12px',
-                          bgcolor: NAVY_SOFT,
-                          display: 'grid',
-                          placeItems: 'center',
+                          display: 'flex',
+                          justifyContent: 'center',
                           mx: 'auto',
-                          mb: 1.5,
+                          mb: 1.25,
                         }}>
-                          <Upload size={24} style={{ color: NAVY }} />
+                          <Upload size={28} style={{ color: NAVY }} />
                         </Box>
                         <Typography sx={{ color: 'var(--foreground)', fontWeight: 600, mb: 0.4, fontSize: '0.95rem' }}>
                           {t.payment.clickOrDrag}

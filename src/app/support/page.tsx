@@ -69,8 +69,8 @@ export default function StandaloneSupportPage() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3, mb: 6 }}>
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box>
-              <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: 'rgba(30,58,95,0.06)', display: 'grid', placeItems: 'center', mx: 'auto', mb: 2 }}>
-                <MessageCircle size={28} color="#1e3a5f" />
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5 }}>
+                <MessageCircle size={32} color="#1e3a5f" />
               </Box>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>แชทช่วยเหลือสด</Typography>
               <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
@@ -84,8 +84,8 @@ export default function StandaloneSupportPage() {
 
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box>
-              <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: 'rgba(22,163,74,0.06)', display: 'grid', placeItems: 'center', mx: 'auto', mb: 2 }}>
-                <Mail size={28} color="#16a34a" />
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5 }}>
+                <Mail size={32} color="#16a34a" />
               </Box>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>ส่งอีเมลสอบถาม</Typography>
               <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
@@ -99,8 +99,8 @@ export default function StandaloneSupportPage() {
 
           <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box>
-              <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: 'rgba(3,105,161,0.06)', display: 'grid', placeItems: 'center', mx: 'auto', mb: 2 }}>
-                <MapPin size={28} color="#0369a1" />
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5 }}>
+                <MapPin size={32} color="#0369a1" />
               </Box>
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>สถานที่ทำการ</Typography>
               <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>

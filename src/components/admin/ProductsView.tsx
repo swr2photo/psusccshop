@@ -1322,8 +1322,8 @@ const ProductEditDialog = ({
 
               <section id="pe-schedule" className={sectionClass}>
                 <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-primary">
-                    <DateRange size={20} className="text-white" />
+                  <div className="inline-flex shrink-0 items-center justify-center text-primary">
+                    <DateRange size={20} />
                   </div>
                   <div>
                     <p className="text-sm font-bold">กำหนดเวลาขาย</p>

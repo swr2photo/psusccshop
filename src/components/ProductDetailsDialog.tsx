@@ -787,14 +787,11 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                   gap: 1,
                 }}>
                   <Box sx={{ 
-                    width: 56, 
-                    height: 56, 
-                    borderRadius: '16px', 
-                    bgcolor: 'rgba(100,116,139,0.15)',
-                    display: 'grid',
-                    placeItems: 'center',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}>
-                    <Store size={28} color="#86868b" />
+                    <Store size={32} color="#86868b" />
                   </Box>
                   <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>
                     {t.product.noImages}
@@ -1091,12 +1088,10 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                   <Box sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
-                    bgcolor: 'rgba(56,189,248,0.2)',
-                    display: 'grid',
-                    placeItems: 'center',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
                   }}>
                     <Palette size={18} color="#38bdf8" />
                   </Box>
@@ -1404,12 +1399,10 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
                     <Box sx={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '10px',
-                      bgcolor: 'rgba(16,185,129,0.15)',
-                      display: 'grid',
-                      placeItems: 'center',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
                     }}>
                       <Tag size={18} color="#30d158" />
                     </Box>

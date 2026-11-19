@@ -351,8 +351,8 @@ export default function UserLogsView({ showToast }: Props) {
                   onClick={() => setExpandedLog(isExpanded ? null : log.id)}
                 >
                   <div
-                    className="flex size-7 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: `${actionInfo.color}20`, color: actionInfo.color }}
+                    className="inline-flex shrink-0 items-center justify-center"
+                    style={{ color: actionInfo.color }}
                   >
                     {actionInfo.icon}
                   </div>

@@ -81,14 +81,12 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box sx={{
-            width: 40,
-            height: 40,
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-            display: 'grid',
-            placeItems: 'center',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
           }}>
-            <Ruler size={20} color="white" />
+            <Ruler size={22} color="#0071e3" />
           </Box>
           <Box>
             <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>{t.product.sizeChartTitle}</Typography>

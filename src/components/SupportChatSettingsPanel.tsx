@@ -105,7 +105,7 @@ function SettingsRow({
         disabled && 'opacity-50'
       )}
     >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--surface-2)] text-foreground">
+      <span className="inline-flex shrink-0 items-center justify-center text-foreground">
         {icon}
       </span>
       <span className="min-w-0 flex-1">

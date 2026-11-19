@@ -2201,11 +2201,8 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background">
               <div className="flex min-h-full flex-col items-center justify-center p-6 py-8">
                 <div
-                  className="mb-6 flex size-[100px] shrink-0 items-center justify-center rounded-full border-2 border-primary/30"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(30, 64, 175, 0.2) 100%)',
-                    animation: 'chat-pulse 2s infinite',
-                  }}
+                  className="mb-4 flex shrink-0 items-center justify-center"
+                  style={{ animation: 'chat-pulse 2s infinite' }}
                 >
                   <ChatIcon className="size-12 text-primary" />
                 </div>

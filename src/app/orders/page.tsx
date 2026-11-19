@@ -304,8 +304,8 @@ export default function StandaloneOrdersPage() {
           </IconButton>
 
           <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Box sx={{ width: 64, height: 64, borderRadius: '20px', background: 'linear-gradient(135deg, #64d2ff 0%, #34c759 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, boxShadow: '0 8px 32px rgba(6,182,212,0.3)' }}>
-              <Package size={32} color="white" />
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 1.5 }}>
+              <Package size={36} color="#0071e3" />
             </Box>
             <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', mb: 0.5 }}>
               {t.qrDialog.title}
