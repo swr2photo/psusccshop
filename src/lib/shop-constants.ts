@@ -417,7 +417,7 @@ export const getAnnouncementColor = (color: string | undefined): string => {
 };
 
 // ==================== CACHE CONSTANTS ====================
-export const CONFIG_CACHE_KEY = 'shopConfigCache';
+export const CONFIG_CACHE_KEY = 'shopConfigCache_v2';
 export const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // ==================== UTILITY FUNCTIONS ====================

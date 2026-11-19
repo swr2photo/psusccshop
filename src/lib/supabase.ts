@@ -1355,13 +1355,15 @@ const STORAGE_BUCKET = 'images';
 export async function uploadImageToStorage(
   buffer: Buffer | Uint8Array,
   filename: string,
-  contentType: string
+  contentType: string,
+  folderPrefix?: string
 ): Promise<{ url: string; path: string }> {
   const now = new Date();
   const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const ext = filename.split('.').pop()?.toLowerCase() || 'png';
   const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
-  const path = `${yearMonth}/${uniqueName}`;
+  const cleanPrefix = folderPrefix ? `${folderPrefix.replace(/^\/+|\/+$/g, '')}/` : '';
+  const path = `${cleanPrefix}${yearMonth}/${uniqueName}`;
 
   // Service role required — anon client hits RLS and surfaces as a vague 500
   const adminClient = getSupabaseAdmin();

@@ -3,13 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { checkCombinedRateLimitAsync, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { putJson, uploadImageToStorage } from '@/lib/supabase';
+import { uploadBlurredVariantToStorage } from '@/lib/server-image-blur';
 import { validateImageBuffer, isAllowedPassThroughImageUrl } from '@/lib/upload-validation';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Helper to save user log server-side
 const _userLogKey = (id: string) => `user-logs/${id}.json`;
 interface LogEntry {
   id: string;
@@ -50,7 +50,6 @@ const saveUserLogServer = async (params: {
   }
 };
 
-// Generate unique filename from detected content type (ignore client extension)
 const extFromContentType = (contentType: string) => {
   if (contentType.includes('jpeg') || contentType.includes('jpg')) return 'jpg';
   if (contentType.includes('gif')) return 'gif';
@@ -66,22 +65,20 @@ const generateFileName = (contentType: string) => {
 };
 
 export async function POST(req: NextRequest) {
-  // Rate limiting สำหรับ upload
   const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.upload);
   if (!rateLimitResult.allowed) {
     return await secureJsonResponse(
       { status: 'error', message: 'คุณอัปโหลดไฟล์เร็วเกินไป กรุณารอสักครู่' },
-      { 
-        status: 429, 
-        headers: { 
+      {
+        status: 429,
+        headers: {
           'Content-Type': 'application/json; charset=utf-8',
           ...getRateLimitHeaders(rateLimitResult),
-        } 
+        },
       }
     );
   }
 
-  // ต้องเข้าสู่ระบบก่อนถึงจะ upload ได้
   const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
@@ -89,30 +86,25 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await secureJsonRequest(req);
-    const { base64, filename, mime } = body;
+    const { base64, filename, mime, generateBlur } = body;
 
     if (!base64) {
       return await secureJsonResponse({ status: 'error', message: 'Missing base64 data' }, { status: 400 });
     }
 
-    // Validate mime type - only allow images
     const allowedMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
     const contentTypeHint = mime || 'image/png';
     if (!allowedMimes.includes(contentTypeHint)) {
       return await secureJsonResponse({ status: 'error', message: 'Invalid file type. Only images allowed.' }, { status: 400 });
     }
 
-    // Extract base64 data (remove data:image/xxx;base64, prefix if present)
     const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
-    
-    // Validate base64 format
     if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
       return await secureJsonResponse({ status: 'error', message: 'Invalid base64 data' }, { status: 400 });
     }
 
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Check file size (max 5MB)
     const MAX_SIZE = 5 * 1024 * 1024;
     if (buffer.length > MAX_SIZE) {
       return await secureJsonResponse({ status: 'error', message: 'File too large (max 5MB)' }, { status: 413 });
@@ -124,15 +116,21 @@ export async function POST(req: NextRequest) {
     }
     const contentType = validated.contentType;
 
-    // Generate filename and upload to Supabase Storage
     const fileName = generateFileName(contentType);
-    
-    // Upload to Supabase Storage (returns permanent public URL)
-    const { url, path } = await uploadImageToStorage(buffer, fileName, contentType);
 
-    // Log upload action
+    // Upload real image (+ optional server-generated blurred image) to Supabase Storage
+    const [{ url, path }, blurredUpload] = await Promise.all([
+      uploadImageToStorage(buffer, fileName, contentType),
+      generateBlur
+        ? uploadBlurredVariantToStorage(buffer, fileName).catch((blurErr) => {
+            console.warn('[upload] Blurred preview upload failed (will retry on save):', blurErr);
+            return null;
+          })
+        : Promise.resolve(null),
+    ]);
+
     const userAgent = req.headers.get('user-agent') || undefined;
-    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
                      req.headers.get('x-real-ip') || undefined;
     await saveUserLogServer({
       email: authResult.email,
@@ -144,17 +142,22 @@ export async function POST(req: NextRequest) {
         size: buffer.length,
         contentType,
         path,
+        ...(blurredUpload ? { blurredPath: blurredUpload.path } : {}),
       },
       ip: clientIP,
       userAgent,
     });
 
-    // Return public URL directly (no encryption needed, permanent URL)
     return await secureJsonResponse({
       status: 'success',
-      data: { url, path, size: buffer.length },
+      data: {
+        url,
+        path,
+        ...(blurredUpload ? { blurredUrl: blurredUpload.url, blurredPath: blurredUpload.path } : {}),
+        size: buffer.length,
+      },
     });
-  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
+  } catch (error: any) {
     console.error('[upload] error', error);
     const raw = String(error?.message || 'Upload failed');
     const friendly =
@@ -170,7 +173,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Handle multiple images upload
 export async function PUT(req: NextRequest) {
   const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.upload);
   if (!rateLimitResult.allowed) {
@@ -186,7 +188,6 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  // ต้องเข้าสู่ระบบก่อนถึงจะ upload ได้
   const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
@@ -194,20 +195,20 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await secureJsonRequest(req);
-    const { images } = body; // Array of { base64, filename, mime }
+    const { images } = body;
 
     if (!Array.isArray(images) || images.length === 0) {
       return await secureJsonResponse({ status: 'error', message: 'No images provided' }, { status: 400 });
     }
 
     const MAX_SIZE = 5 * 1024 * 1024;
-    const results: { url: string; path: string; originalIndex: number }[] = [];
+    const results: { url: string; path: string; blurredUrl?: string; blurredPath?: string; originalIndex: number }[] = [];
     const errors: { index: number; message: string }[] = [];
 
     for (let i = 0; i < images.length; i++) {
-      const { base64, filename, mime } = images[i];
-      
-      // Only allow known permanent URLs — block arbitrary external URLs
+      const { base64, mime, generateBlur: itemGenerateBlur } = images[i];
+      const shouldGenerateBlur = Boolean(itemGenerateBlur ?? body.generateBlur);
+
       if (typeof base64 === 'string' && isAllowedPassThroughImageUrl(base64)) {
         results.push({ url: base64, path: '', originalIndex: i });
         continue;
@@ -246,10 +247,19 @@ export async function PUT(req: NextRequest) {
         const contentType = validated.contentType;
         const fileName = generateFileName(contentType);
 
-        // Upload to Supabase Storage
-        const { url, path } = await uploadImageToStorage(buffer, fileName, contentType);
-        results.push({ url, path, originalIndex: i });
-      } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
+        const [{ url, path }, blurredUpload] = await Promise.all([
+          uploadImageToStorage(buffer, fileName, contentType),
+          shouldGenerateBlur
+            ? uploadBlurredVariantToStorage(buffer, fileName).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        results.push({
+          url,
+          path,
+          ...(blurredUpload ? { blurredUrl: blurredUpload.url, blurredPath: blurredUpload.path } : {}),
+          originalIndex: i,
+        });
+      } catch (err: any) {
         errors.push({ index: i, message: err?.message || 'Upload failed' });
       }
     }
@@ -258,7 +268,7 @@ export async function PUT(req: NextRequest) {
       status: 'success',
       data: { uploaded: results, errors },
     });
-  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
+  } catch (error: any) {
     console.error('[upload-batch] error', error);
     return await secureJsonResponse({
       status: 'error',

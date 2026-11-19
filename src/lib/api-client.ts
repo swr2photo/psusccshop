@@ -178,6 +178,7 @@ export async function uploadImageApi(
     base64: string;
     filename?: string;
     mime?: string;
+    generateBlur?: boolean;
   },
   options?: {
     onProgress?: (percent: number) => void;

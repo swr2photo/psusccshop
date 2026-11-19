@@ -3,7 +3,7 @@
 // Data sanitization utilities for API responses
 
 import { ShopConfig, Product, NameValidationConfig, ShirtNameConfig } from './config';
-import { encryptImageUrl, encryptBlurredPreviewUrl } from './image-crypto';
+import { encryptImageUrl } from './image-crypto';
 import { isValidDate, parseThailandDateTime } from './shop-constants';
 
 // ==================== IMAGE URL PROXY ====================
@@ -27,101 +27,150 @@ export function encodeImageUrl(url: string | undefined | null): string {
   return encryptImageUrl(url);
 }
 
+export type PublicShopOpenState = {
+  isOpen?: boolean;
+  openDate?: string;
+  closeDate?: string;
+};
+
+function normalizeShopState(shopState?: PublicShopOpenState | string): PublicShopOpenState {
+  if (typeof shopState === 'string') {
+    return { openDate: shopState };
+  }
+  return shopState || {};
+}
+
 /**
- * Encode all image URLs in a product
+ * Encode all real image URLs in an OPEN product (strips internal blur preview fields).
  */
 function sanitizeProductImages(product: Product): Product {
+  const { blurredCoverImage: _blurredCover, blurredCoverSource: _blurredSource, ...rest } = product;
   return {
-    ...product,
+    ...rest,
     images: (product.images || []).map(encodeImageUrl),
     coverImage: encodeImageUrl(product.coverImage),
+    isLockedPreview: false,
   };
 }
 
-function getUnreleasedReleaseMs(
+/**
+ * True when a product is NOT currently open for public sale:
+ * - shop is closed / waiting to open / past closeDate
+ * - product is disabled (`isActive === false`)
+ * - product hasn't opened yet (`startDate > now`) or already ended (`endDate < now`)
+ */
+export function isProductClosedForPublic(
   product: Product,
   now = new Date(),
-  shopOpenDate?: string,
-): number | null {
+  shopState?: PublicShopOpenState | string,
+): boolean {
+  const state = normalizeShopState(shopState);
   const nowMs = now.getTime();
-  let latestFutureMs: number | null = null;
 
+  if (state.isOpen === false) return true;
+  if (state.openDate && isValidDate(state.openDate)) {
+    if (nowMs < parseThailandDateTime(state.openDate, false).getTime()) return true;
+  }
+  if (state.closeDate && isValidDate(state.closeDate)) {
+    if (nowMs > parseThailandDateTime(state.closeDate, true).getTime()) return true;
+  }
+
+  if (product.isActive === false) return true;
   if (product.startDate && isValidDate(product.startDate)) {
-    const startMs = parseThailandDateTime(product.startDate, false).getTime();
-    if (startMs > nowMs) {
-      latestFutureMs = latestFutureMs === null ? startMs : Math.max(latestFutureMs, startMs);
-    }
+    if (nowMs < parseThailandDateTime(product.startDate, false).getTime()) return true;
+  }
+  if (product.endDate && isValidDate(product.endDate)) {
+    if (nowMs > parseThailandDateTime(product.endDate, true).getTime()) return true;
   }
 
-  if (shopOpenDate && isValidDate(shopOpenDate)) {
-    const openMs = parseThailandDateTime(shopOpenDate, false).getTime();
-    if (openMs > nowMs) {
-      latestFutureMs = latestFutureMs === null ? openMs : Math.max(latestFutureMs, openMs);
-    }
-  }
-
-  return latestFutureMs;
+  return false;
 }
 
-/** Earliest future opening timestamp across shop/products (used to cap CDN cache TTL before launch). */
+/** Collect IDs of closed products that have a primary image but still lack a server-uploaded blurred image. */
+export function getClosedProductIdsMissingBlur(
+  products: Product[] | null | undefined,
+  shopState?: PublicShopOpenState | string,
+  now = new Date(),
+): Set<string> {
+  const missing = new Set<string>();
+  for (const product of products || []) {
+    if (!product?.id) continue;
+    const primary = (product.coverImage || product.images?.[0] || '').trim();
+    if (!primary) continue;
+    if (isProductClosedForPublic(product, now, shopState) && !product.blurredCoverImage) {
+      missing.add(product.id);
+    }
+  }
+  return missing;
+}
+
+/** Earliest future opening or closing transition timestamp across shop/products. */
 export function getNextPublicReleaseMs(
   products: Product[] | null | undefined,
-  shopOpenDate?: string,
+  shopState?: PublicShopOpenState | string,
   now = new Date(),
 ): number | null {
+  const state = normalizeShopState(shopState);
   const nowMs = now.getTime();
   let earliest: number | null = null;
 
-  if (shopOpenDate && isValidDate(shopOpenDate)) {
-    const openMs = parseThailandDateTime(shopOpenDate, false).getTime();
-    if (openMs > nowMs) earliest = openMs;
+  const consider = (ts: number) => {
+    if (ts > nowMs && (earliest === null || ts < earliest)) {
+      earliest = ts;
+    }
+  };
+
+  if (state.openDate && isValidDate(state.openDate)) {
+    consider(parseThailandDateTime(state.openDate, false).getTime());
+  }
+  if (state.closeDate && isValidDate(state.closeDate)) {
+    consider(parseThailandDateTime(state.closeDate, true).getTime());
   }
 
   for (const product of products || []) {
     if (product.startDate && isValidDate(product.startDate)) {
-      const startMs = parseThailandDateTime(product.startDate, false).getTime();
-      if (startMs > nowMs && (earliest === null || startMs < earliest)) {
-        earliest = startMs;
-      }
+      consider(parseThailandDateTime(product.startDate, false).getTime());
+    }
+    if (product.endDate && isValidDate(product.endDate)) {
+      consider(parseThailandDateTime(product.endDate, true).getTime());
     }
   }
 
   return earliest;
 }
 
-/** True when a cached public response still contains a redacted item whose release time has passed. */
+/** True when a cached public response has crossed an open/close boundary (needs immediate refresh). */
 export function hasExpiredLockedPreview(
   products: Product[] | null | undefined,
-  shopOpenDate?: string,
+  shopState?: PublicShopOpenState | string,
   now = new Date(),
 ): boolean {
-  return (products || []).some(
-    (product) => Boolean(product?.isLockedPreview) && getUnreleasedReleaseMs(product, now, shopOpenDate) === null,
-  );
+  return (products || []).some((product) => {
+    const shouldBeClosed = isProductClosedForPublic(product, now, shopState);
+    const isCurrentlyLocked = Boolean(product?.isLockedPreview);
+    return shouldBeClosed !== isCurrentlyLocked;
+  });
 }
 
-/** Max safe CDN s-maxage (seconds) before the next scheduled release, or null if none upcoming soon. */
+/** Max safe CDN s-maxage (seconds) before the next scheduled open/close transition. */
 export function getReleaseAwareSmaxAge(
   products: Product[] | null | undefined,
-  shopOpenDate: string | undefined,
+  shopState: PublicShopOpenState | string | undefined,
   defaultSeconds: number,
   now = new Date(),
 ): number {
-  const nextReleaseMs = getNextPublicReleaseMs(products, shopOpenDate, now);
-  if (nextReleaseMs === null) return defaultSeconds;
-  const secsUntil = Math.max(0, Math.floor((nextReleaseMs - now.getTime()) / 1000));
+  const nextTransitionMs = getNextPublicReleaseMs(products, shopState, now);
+  if (nextTransitionMs === null) return defaultSeconds;
+  const secsUntil = Math.max(0, Math.floor((nextTransitionMs - now.getTime()) / 1000));
   return Math.min(defaultSeconds, secsUntil);
 }
 
 /**
- * Redact unreleased product metadata and swap image URLs to server-blurred preview tokens
- * so inspecting DevTools Network/HTML before opening cannot leak clear images or details.
+ * Redact closed/unreleased product metadata and substitute ONLY the pre-uploaded
+ * server-blurred Storage image (fail-closed: never falls back to the real clear photo).
  */
-function redactUnreleasedProduct(product: Product, releaseAtMs: number): Product {
-  const primaryRawImage = product.coverImage || product.images?.[0] || '';
-  const blurredCover = primaryRawImage
-    ? encryptBlurredPreviewUrl(primaryRawImage, releaseAtMs)
-    : '';
+function redactClosedProduct(product: Product): Product {
+  const blurredCover = product.blurredCoverImage ? encodeImageUrl(product.blurredCoverImage) : '';
 
   return {
     id: product.id,
@@ -148,12 +197,11 @@ function redactUnreleasedProduct(product: Product, releaseAtMs: number): Product
 export function sanitizePublicProducts(
   products: Product[] | null | undefined,
   now = new Date(),
-  shopOpenDate?: string,
+  shopState?: PublicShopOpenState | string,
 ): Product[] {
   return (products || []).map((product) => {
-    const releaseAtMs = getUnreleasedReleaseMs(product, now, shopOpenDate);
-    if (releaseAtMs !== null) {
-      return redactUnreleasedProduct(product, releaseAtMs);
+    if (isProductClosedForPublic(product, now, shopState)) {
+      return redactClosedProduct(product);
     }
     return sanitizeProductImages(product);
   });
@@ -380,7 +428,11 @@ export function sanitizeConfigForPublic(config: ShopConfig | null, now = new Dat
     paymentDisabledMessage: config.paymentDisabledMessage,
     nameValidation: config.nameValidation,
     shirtNameConfig: config.shirtNameConfig,
-    products: sanitizePublicProducts(config.products, now, config.openDate),
+    products: sanitizePublicProducts(config.products, now, {
+      isOpen: config.isOpen,
+      openDate: config.openDate,
+      closeDate: config.closeDate,
+    }),
     // REMOVED: sheetUrl, vendorSheetUrl, adminEmails, adminPermissions, slipVerifyConfig - ไม่ส่งให้ frontend
   };
   
@@ -513,11 +565,12 @@ export function sanitizeConfigForAdmin(config: ShopConfig | null): ShopConfig | 
   // Still encode image URLs to prevent exposure
   const result: ShopConfig = {
     ...config,
-    // Encode product images
+    // Encode product images (admin sees real images + keeps encoded blurred variant reference)
     products: (config.products || []).map(p => ({
       ...p,
       images: (p.images || []).map(encodeImageUrl),
       coverImage: encodeImageUrl(p.coverImage),
+      ...(p.blurredCoverImage ? { blurredCoverImage: encodeImageUrl(p.blurredCoverImage) } : {}),
     })),
   };
   

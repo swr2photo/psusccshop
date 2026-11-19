@@ -5,7 +5,12 @@ import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { getShopById, updateShop, getShopAdminRole } from '@/lib/shops';
 import { API_CACHE } from '@/lib/api-helpers';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
-import { sanitizePublicProducts, getReleaseAwareSmaxAge } from '@/lib/sanitize';
+import {
+  sanitizePublicProducts,
+  getReleaseAwareSmaxAge,
+  getClosedProductIdsMissingBlur,
+} from '@/lib/sanitize';
+import { ensureProductsBlurredImages } from '@/lib/server-image-blur';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,9 +26,29 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 
   const now = new Date();
-  const activeProducts = (shop.products || []).filter((p: any) => p.isActive !== false);
-  const products = sanitizePublicProducts(activeProducts, now, shop.settings?.openDate);
-  const maxAge = getReleaseAwareSmaxAge(products, shop.settings?.openDate, 120, now);
+  const shopState = {
+    isOpen: shop.settings?.isOpen ?? true,
+    openDate: shop.settings?.openDate,
+    closeDate: shop.settings?.closeDate,
+  };
+
+  let allProducts = shop.products || [];
+  const missingIds = getClosedProductIdsMissingBlur(allProducts, shopState, now);
+  if (missingIds.size > 0) {
+    try {
+      const ensured = await ensureProductsBlurredImages(allProducts, { onlyIds: missingIds });
+      if (ensured.changed) {
+        allProducts = ensured.products;
+        updateShop(shop.id, { products: allProducts }).catch(() => {});
+      }
+    } catch (blurErr) {
+      console.warn('[shop-products] Blur backfill failed:', blurErr);
+    }
+  }
+
+  const activeProducts = allProducts.filter((p: any) => p.isActive !== false);
+  const products = sanitizePublicProducts(activeProducts, now, shopState);
+  const maxAge = getReleaseAwareSmaxAge(products, shopState, 120, now);
   const cacheControl =
     maxAge <= 2
       ? 'no-store'
@@ -59,7 +84,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return await secureJsonResponse({ status: 'error', message: 'products ต้องเป็น array' }, { status: 400 });
     }
 
-    const shop = await updateShop(shopId, { products });
+    const existingShop = await getShopById(shopId);
+    const ensured = await ensureProductsBlurredImages(products, {
+      existingProducts: existingShop?.products,
+    });
+
+    const shop = await updateShop(shopId, { products: ensured.products });
     if (!shop) {
       return await secureJsonResponse({ status: 'error', message: 'อัปเดตสินค้าไม่สำเร็จ' }, { status: 500 });
     }

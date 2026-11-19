@@ -1276,41 +1276,46 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
       const batch = imagesToUpload.slice(i, i + BATCH_SIZE);
       const uploadPromises = batch.map(async (item) => {
         try {
+          const shouldGenerateBlur = item.field === 'coverImage' || (item.field === 'images' && item.imageIndex === 0);
           const res = await uploadImageApi({
             base64: item.base64,
             filename: `product_${item.productIndex}_${Date.now()}.png`,
             mime: 'image/png',
+            generateBlur: shouldGenerateBlur,
           });
           if (!res.ok) {
             const errText = await res.text().catch(() => '');
             console.error(`Upload HTTP ${res.status}:`, errText.substring(0, 200));
-            return { ...item, url: null, error: `อัปโหลดล้มเหลว (HTTP ${res.status})` };
+            return { ...item, url: null, blurredUrl: null, error: `อัปโหลดล้มเหลว (HTTP ${res.status})` };
           }
           let data;
           try {
             data = await res.json();
           } catch {
-            return { ...item, url: null, error: 'เซิร์ฟเวอร์ตอบกลับผิดปกติ' };
+            return { ...item, url: null, blurredUrl: null, error: 'เซิร์ฟเวอร์ตอบกลับผิดปกติ' };
           }
           if (data.status === 'success' && data.data?.url) {
-            return { ...item, url: data.data.url };
+            return { ...item, url: data.data.url, blurredUrl: data.data.blurredUrl || null };
           }
-          return { ...item, url: null, error: data.message };
+          return { ...item, url: null, blurredUrl: null, error: data.message };
         } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
           console.error('Upload error:', err);
-          return { ...item, url: null, error: err?.message };
+          return { ...item, url: null, blurredUrl: null, error: err?.message };
         }
       });
 
       const results = await Promise.all(uploadPromises);
       
-      // Update products with uploaded URLs
+      // Update products with uploaded URLs (+ server-generated blurred preview image)
       results.forEach((result) => {
         if (result.url) {
           if (result.field === 'coverImage') {
             updatedProducts[result.productIndex] = {
               ...updatedProducts[result.productIndex],
               coverImage: result.url,
+              ...(result.blurredUrl
+                ? { blurredCoverImage: result.blurredUrl, blurredCoverSource: result.url }
+                : {}),
             };
           } else if (result.field === 'images' && typeof result.imageIndex === 'number') {
             const images = [...(updatedProducts[result.productIndex].images || [])];
@@ -1318,6 +1323,9 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
             updatedProducts[result.productIndex] = {
               ...updatedProducts[result.productIndex],
               images,
+              ...(result.imageIndex === 0 && result.blurredUrl && !updatedProducts[result.productIndex].coverImage
+                ? { blurredCoverImage: result.blurredUrl, blurredCoverSource: result.url }
+                : {}),
             };
           } else if (result.field === 'patternImage' && typeof result.patternIndex === 'number') {
             const patterns = [...(updatedProducts[result.productIndex].patterns || [])];

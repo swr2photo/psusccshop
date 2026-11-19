@@ -11,7 +11,9 @@ import {
   sanitizeObjectUtf8,
   hasExpiredLockedPreview,
   getReleaseAwareSmaxAge,
+  getClosedProductIdsMissingBlur,
 } from '@/lib/sanitize';
+import { ensureProductsBlurredImages } from '@/lib/server-image-blur';
 import { saveAllAdminPermissionsToDB, getAllAdminPermissionsFromDB, deleteAdminPermissionsFromDB } from '@/lib/supabase';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import { mergeRealtimeStock } from '@/lib/redis-stock-merge';
@@ -100,13 +102,32 @@ function sanitizeSlip2GoApiUrl(raw?: string): string {
 
 async function loadPublicPayload(now: Date) {
   let cfg = DEFAULT_CONFIG;
+  let loadedFromDb = false;
   try {
     const dbConfig = await getJson<ShopConfig>(CONFIG_KEY);
     if (dbConfig) {
       cfg = dbConfig;
+      loadedFromDb = true;
     }
   } catch (error) {
     console.error('[Config API] Failed to load config from database, falling back to default:', error);
+  }
+
+  // Auto-generate & upload blurred images to Storage for any closed/unreleased products missing one
+  const shopState = { isOpen: cfg.isOpen, openDate: cfg.openDate, closeDate: cfg.closeDate };
+  const missingBlurIds = getClosedProductIdsMissingBlur(cfg.products, shopState, now);
+  if (loadedFromDb && missingBlurIds.size > 0) {
+    try {
+      const ensured = await ensureProductsBlurredImages(cfg.products || [], { onlyIds: missingBlurIds });
+      if (ensured.changed) {
+        cfg = { ...cfg, products: ensured.products };
+        await putJson(CONFIG_KEY, cfg).catch((persistErr) => {
+          console.warn('[Config API] Failed to persist backfilled blurred images:', persistErr);
+        });
+      }
+    } catch (blurErr) {
+      console.warn('[Config API] Auto-backfill blurred images failed:', blurErr);
+    }
   }
 
   const mergedCfg = await mergeRealtimeStock(cfg);
@@ -118,12 +139,22 @@ async function GETHandler() {
   const now = new Date();
   let payload = await getCached(PUBLIC_CONFIG_CACHE_KEY, CACHE_TTL.config, () => loadPublicPayload(new Date()));
 
-  if (hasExpiredLockedPreview(payload.data?.products, payload.data?.openDate, now)) {
+  const cachedShopState = {
+    isOpen: payload.data?.isOpen,
+    openDate: payload.data?.openDate,
+    closeDate: payload.data?.closeDate,
+  };
+  if (hasExpiredLockedPreview(payload.data?.products, cachedShopState, now)) {
     invalidateCacheKey(PUBLIC_CONFIG_CACHE_KEY);
     payload = await getCached(PUBLIC_CONFIG_CACHE_KEY, CACHE_TTL.config, () => loadPublicPayload(new Date()));
   }
 
-  const maxAge = getReleaseAwareSmaxAge(payload.data?.products, payload.data?.openDate, 10, now);
+  const finalShopState = {
+    isOpen: payload.data?.isOpen,
+    openDate: payload.data?.openDate,
+    closeDate: payload.data?.closeDate,
+  };
+  const maxAge = getReleaseAwareSmaxAge(payload.data?.products, finalShopState, 10, now);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json; charset=utf-8',
     ...(maxAge <= 2
@@ -217,6 +248,18 @@ async function POSTHandler(req: NextRequest) {
           : {}
         : { secretKey: rawIncomingSecret }),
     };
+
+    // Ensure every product has its server-uploaded blurred cover image stored alongside the real image
+    if (Array.isArray(config.products) && config.products.length > 0) {
+      try {
+        const ensured = await ensureProductsBlurredImages(config.products, {
+          existingProducts: currentConfig?.products,
+        });
+        config.products = ensured.products;
+      } catch (blurErr) {
+        console.warn('[config] Blurred image generation warning on save:', blurErr);
+      }
+    }
 
     // Sanitize UTF-8 input ก่อนบันทึก
     const sanitizedConfig = sanitizeObjectUtf8(config);

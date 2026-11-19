@@ -41,7 +41,7 @@ export function ProductCardItem({
   const productStatus = getProductStatus(product, now);
   const outOfStock = product.stock !== undefined && product.stock !== null && product.stock <= 0;
   const isLockedPreview = Boolean(product.isLockedPreview);
-  const isComingSoon = productStatus === 'COMING_SOON' || isLockedPreview;
+  const isComingSoon = productStatus !== 'OPEN' || !catalogContext.isOpen || isLockedPreview;
   const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen && !isLockedPreview;
   const handleClick = () => {
     if (!catalogContext.isOpen) {
@@ -107,7 +107,7 @@ export function ProductCardItem({
           style={{
             position: 'absolute',
             inset: 0,
-            ...(isComingSoon ? { filter: 'blur(14px)', transform: 'scale(1.16)' } : {}),
+            ...(isComingSoon ? { filter: 'blur(8px)', transform: 'scale(1.12)' } : {}),
           }}
         />
 
@@ -118,7 +118,7 @@ export function ProductCardItem({
               position: 'absolute',
               inset: 0,
               bgcolor: 'rgba(0,0,0,0.5)',
-              backdropFilter: isComingSoon ? 'blur(8px)' : 'none',
+              backdropFilter: isComingSoon ? 'blur(6px)' : 'none',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -131,9 +131,9 @@ export function ProductCardItem({
               label={
                 !catalogContext.isOpen
                   ? t.shopStatus.closed
-                  : outOfStock
+                  : outOfStock && productStatus === 'OPEN' && !isLockedPreview
                   ? t.product.soldOut
-                  : isComingSoon
+                  : productStatus === 'OPEN' && isLockedPreview
                   ? t.shopStatus.comingSoon
                   : SHOP_STATUS_CONFIG[productStatus]?.label || t.shopStatus.closed
               }

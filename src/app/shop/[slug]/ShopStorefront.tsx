@@ -1873,7 +1873,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   {items.map((product, productIdx) => {
                     const productStatus = getProductStatus(product, now);
                     const isLockedPreview = Boolean(product.isLockedPreview);
-                    const isComingSoon = productStatus === 'COMING_SOON' || isLockedPreview;
+                    const isComingSoon = productStatus !== 'OPEN' || !isShopOpen || isLockedPreview;
                     const isProductAvailable = productStatus === 'OPEN' && isShopOpen && !isLockedPreview;
                     const isProductClosed = productStatus !== 'OPEN' || !isShopOpen || isLockedPreview;
                     const eventDiscount = getEventDiscount(product.id, events);
@@ -1954,7 +1954,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 position: 'absolute',
                                 inset: 0,
                                 transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                                ...(isComingSoon ? { filter: 'blur(14px)', transform: 'scale(1.16)' } : {}),
+                                ...(isComingSoon ? { filter: 'blur(8px)', transform: 'scale(1.12)' } : {}),
                               }}
                               className={!isProductClosed ? 'product-image-zoom' : ''}
                             />
@@ -1966,7 +1966,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 display: 'flex', flexDirection: 'column',
                                 alignItems: 'center', justifyContent: 'center',
                                 background: 'rgba(0,0,0,0.45)',
-                                backdropFilter: isComingSoon ? 'blur(8px)' : 'none',
+                                backdropFilter: isComingSoon ? 'blur(6px)' : 'none',
                               }}>
                                 <Box sx={{
                                   px: 1.5, py: 0.6, borderRadius: '999px',
@@ -1975,10 +1975,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                   color: 'rgba(255,255,255,0.85)',
                                   fontSize: '0.72rem', fontWeight: 700,
                                 }}>
-                                  {isComingSoon
-                                    ? t.shopStatus.comingSoon
+                                  {!isShopOpen
+                                    ? t.shopStatus.closed
                                     : ({
-                                        OPEN: t.shopStatus.open,
+                                        OPEN: isLockedPreview ? t.shopStatus.comingSoon : t.shopStatus.open,
                                         COMING_SOON: t.shopStatus.comingSoon,
                                         ORDER_ENDED: t.shopStatus.closedEnded,
                                         TEMPORARILY_CLOSED: t.shopStatus.closed,

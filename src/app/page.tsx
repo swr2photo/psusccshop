@@ -525,10 +525,16 @@ function readCachedShopConfig(): LeanConfig | null {
     if (!parsed?.timestamp || Date.now() - parsed.timestamp > CONFIG_CACHE_TTL) return null;
     const cfg = parsed.config as LeanConfig;
     const now = new Date();
-    const shopOpenDue = !cfg.openDate || !isValidDate(cfg.openDate) || now >= parseThailandDateTime(cfg.openDate, false);
+    const shopOpenDue =
+      cfg.isOpen !== false &&
+      (!cfg.openDate || !isValidDate(cfg.openDate) || now >= parseThailandDateTime(cfg.openDate, false)) &&
+      (!cfg.closeDate || !isValidDate(cfg.closeDate) || now <= parseThailandDateTime(cfg.closeDate, true));
     const hasExpiredLock = (cfg.products || []).some((p) => {
       if (!p.isLockedPreview) return false;
-      const productOpenDue = !p.startDate || !isValidDate(p.startDate) || now >= parseThailandDateTime(p.startDate, false);
+      const productOpenDue =
+        p.isActive !== false &&
+        (!p.startDate || !isValidDate(p.startDate) || now >= parseThailandDateTime(p.startDate, false)) &&
+        (!p.endDate || !isValidDate(p.endDate) || now <= parseThailandDateTime(p.endDate, true));
       return shopOpenDue && productOpenDue;
     });
     if (hasExpiredLock) return null;
@@ -1302,7 +1308,10 @@ export default function HomePage() {
   const unlockedProductRefreshRef = useRef<string>('');
   const unlockedCatalogRefreshRef = useRef<string>('');
   useEffect(() => {
-    const mainShopOpenDue = !config?.openDate || !isValidDate(config.openDate) || now >= parseThailandDateTime(config.openDate, false);
+    const mainShopOpenDue =
+      config?.isOpen !== false &&
+      (!config?.openDate || !isValidDate(config.openDate) || now >= parseThailandDateTime(config.openDate, false)) &&
+      (!config?.closeDate || !isValidDate(config.closeDate) || now <= parseThailandDateTime(config.closeDate, true));
     if (mainShopOpenDue && config?.products?.length) {
       const dueMainIds = config.products
         .filter((p) => p.isLockedPreview && isProductCurrentlyOpen(p, now))
@@ -1318,7 +1327,13 @@ export default function HomePage() {
     if (subShopCatalog.length > 0) {
       const dueSubIds = subShopCatalog
         .flatMap((shop) => {
-          const shopOpenDue = !shop.openDate || !isValidDate(shop.openDate) || now >= parseThailandDateTime(shop.openDate, false);
+          const shopIsOpenFlag = shop.isOpen ?? shop.settings?.isOpen ?? true;
+          const shopCloseDate = shop.closeDate ?? shop.settings?.closeDate;
+          const shopOpenDate = shop.openDate ?? shop.settings?.openDate;
+          const shopOpenDue =
+            shopIsOpenFlag !== false &&
+            (!shopOpenDate || !isValidDate(shopOpenDate) || now >= parseThailandDateTime(shopOpenDate, false)) &&
+            (!shopCloseDate || !isValidDate(shopCloseDate) || now <= parseThailandDateTime(shopCloseDate, true));
           if (!shopOpenDue) return [];
           return (shop.products || [])
             .filter((p) => p.isLockedPreview && isProductCurrentlyOpen(p, now))
@@ -1336,7 +1351,7 @@ export default function HomePage() {
           .catch(() => {});
       }
     }
-  }, [config?.openDate, config?.products, subShopCatalog, now, refreshConfig]);
+  }, [config?.isOpen, config?.openDate, config?.closeDate, config?.products, subShopCatalog, now, refreshConfig]);
 
   // Auto-open product from URL query param (?p=id or legacy ?product=slug-or-id)
   useEffect(() => {
@@ -3831,11 +3846,22 @@ export default function HomePage() {
                       <Box sx={{ px: 1, pb: 1.5 }}>
                         {previewItems.map((product) => {
                           const eventDisc = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined, now);
+                          const pStatus = getProductStatus(product, now);
+                          const isOpenNow = isProductCurrentlyOpen(product, now) && isShopOpen && !product.isLockedPreview;
+                          const searchStatusLabel = !isShopOpen
+                            ? t.shopStatus.closed
+                            : ({
+                                OPEN: product.isLockedPreview ? t.shopStatus.comingSoon : t.shopStatus.open,
+                                COMING_SOON: t.shopStatus.comingSoon,
+                                ORDER_ENDED: t.shopStatus.closedEnded,
+                                TEMPORARILY_CLOSED: t.shopStatus.closed,
+                                WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+                              } as Record<ShopStatusType, string>)[pStatus];
                           return (
                             <Box
                               key={product.id}
                               onClick={() => {
-                                if (isProductCurrentlyOpen(product, now)) {
+                                if (isOpenNow) {
                                   handleSelectProduct(product);
                                   setShowSearchBar(false);
                                   setProductSearch('');
@@ -3845,8 +3871,8 @@ export default function HomePage() {
                                 display: 'flex', alignItems: 'center', gap: 1.5,
                                 px: 1.5, py: 1,
                                 borderRadius: '12px',
-                                cursor: isProductCurrentlyOpen(product, now) ? 'pointer' : 'default',
-                                opacity: isProductCurrentlyOpen(product, now) ? 1 : 0.5,
+                                cursor: isOpenNow ? 'pointer' : 'default',
+                                opacity: isOpenNow ? 1 : 0.65,
                                 transition: 'all 0.15s ease',
                                 '&:hover': { bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' },
                               }}
@@ -3867,6 +3893,7 @@ export default function HomePage() {
                                   objectFit="cover"
                                   placeholder="none"
                                   showLoadingIndicator={false}
+                                  style={!isOpenNow ? { filter: 'blur(4px)', transform: 'scale(1.1)' } : undefined}
                                 />
                               </Box>
                               {/* Info */}
@@ -3878,9 +3905,13 @@ export default function HomePage() {
                                   {TYPE_LABELS_I18N[product.type] || product.type}
                                 </Typography>
                               </Box>
-                              {/* Price */}
+                              {/* Price or status */}
                               <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                                {eventDisc ? (
+                                {!isOpenNow ? (
+                                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                    {searchStatusLabel}
+                                  </Typography>
+                                ) : eventDisc ? (
                                   <>
                                     <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
                                       ฿{getBasePrice(product)?.toLocaleString()}
@@ -4773,7 +4804,7 @@ export default function HomePage() {
                       const productStatus = getProductStatus(product, now);
                       const outOfStock = isProductOutOfStock(product);
                       const isLockedPreview = Boolean(product.isLockedPreview);
-                      const isComingSoon = productStatus === 'COMING_SOON' || isLockedPreview;
+                      const isComingSoon = productStatus !== 'OPEN' || !catalogContext.isOpen || isLockedPreview;
                       const isProductUnavailable = productStatus !== 'OPEN' || outOfStock || !catalogContext.isOpen || isLockedPreview;
                       const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen && !isLockedPreview;
                       const isProductClosed = isProductUnavailable;
@@ -4859,8 +4890,8 @@ export default function HomePage() {
                               style={{
                                 position: 'absolute',
                                 inset: 0,
-                                filter: isComingSoon ? 'blur(14px)' : 'none',
-                                transform: isComingSoon ? 'scale(1.16)' : undefined,
+                                filter: isComingSoon ? 'blur(8px)' : 'none',
+                                transform: isComingSoon ? 'scale(1.12)' : undefined,
                                 transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                               }}
                               className={!isProductClosed ? 'product-image-zoom' : ''}
@@ -4875,7 +4906,7 @@ export default function HomePage() {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 background: 'rgba(0,0,0,0.45)',
-                                backdropFilter: isComingSoon ? 'blur(8px)' : 'none',
+                                backdropFilter: isComingSoon ? 'blur(6px)' : 'none',
                               }}>
                                 <Box
                                   sx={{
@@ -4890,12 +4921,12 @@ export default function HomePage() {
                                     letterSpacing: '0.02em',
                                   }}
                                 >
-                                  {outOfStock && productStatus === 'OPEN' && !isLockedPreview
+                                  {!catalogContext.isOpen
+                                    ? t.shopStatus.closed
+                                    : outOfStock && productStatus === 'OPEN' && !isLockedPreview
                                     ? t.product.soldOut
-                                    : isComingSoon
-                                    ? t.shopStatus.comingSoon
                                     : ({
-                                    OPEN: t.shopStatus.open,
+                                    OPEN: isLockedPreview ? t.shopStatus.comingSoon : t.shopStatus.open,
                                     COMING_SOON: t.shopStatus.comingSoon,
                                     ORDER_ENDED: t.shopStatus.closedEnded,
                                     TEMPORARILY_CLOSED: t.shopStatus.closed,
@@ -5780,6 +5811,7 @@ export default function HomePage() {
                 if (!product) return null;
                 const eventDiscount = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined, now);
                 const productStatus = getProductStatus(product, now);
+                const isLocked = Boolean(product.isLockedPreview) || productStatus !== 'OPEN' || !isShopOpen;
                 const statusLabelsMap: Record<ShopStatusType, string> = {
                   OPEN: t.shopStatus.open,
                   COMING_SOON: t.shopStatus.comingSoon,
@@ -5787,6 +5819,11 @@ export default function HomePage() {
                   TEMPORARILY_CLOSED: t.shopStatus.closed,
                   WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
                 };
+                const lockedLabel = !isShopOpen
+                  ? t.shopStatus.closed
+                  : productStatus === 'OPEN' && product.isLockedPreview
+                  ? t.shopStatus.comingSoon
+                  : statusLabelsMap[productStatus];
                 return (
                   <Box
                     key={productId}
@@ -5795,8 +5832,8 @@ export default function HomePage() {
                         showToast('warning', t.checkout.shopClosedWarning);
                         return;
                       }
-                      if (productStatus !== 'OPEN') {
-                        showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[productStatus]}`);
+                      if (productStatus !== 'OPEN' || product.isLockedPreview) {
+                        showToast('info', `${getProductName(product, lang)} - ${lockedLabel}`);
                         return;
                       }
                       setShowWishlistDrawer(false);
@@ -5809,9 +5846,9 @@ export default function HomePage() {
                       borderRadius: '16px',
                       bgcolor: 'var(--surface)',
                       border: '1px solid var(--glass-border)',
-                      cursor: 'pointer',
+                      cursor: isLocked ? 'default' : 'pointer',
                       transition: 'all 0.2s ease',
-                      '&:hover': { borderColor: 'rgba(0,113,227,0.3)', transform: 'translateX(4px)' },
+                      '&:hover': isLocked ? {} : { borderColor: 'rgba(0,113,227,0.3)', transform: 'translateX(4px)' },
                     }}
                   >
                     <Box sx={{ width: 72, height: 72, borderRadius: '12px', overflow: 'hidden', flexShrink: 0, bgcolor: 'var(--surface-2)' }}>
@@ -5822,6 +5859,7 @@ export default function HomePage() {
                         width={72}
                         height={72}
                         objectFit="cover"
+                        style={isLocked ? { filter: 'blur(4px) grayscale(0.4)', transform: 'scale(1.12)' } : undefined}
                       />
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -5832,7 +5870,11 @@ export default function HomePage() {
                         {getCategoryLabel(product.category || product.type, lang)}
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                        {eventDiscount ? (
+                        {isLocked ? (
+                          <Typography sx={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                            {lockedLabel}
+                          </Typography>
+                        ) : eventDiscount ? (
                           <>
                             <Typography sx={{ fontSize: '0.75rem', color: '#86868b', textDecoration: 'line-through' }}>฿{(product.basePrice || 0)?.toLocaleString()}</Typography>
                             <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#ff453a' }}>฿{(eventDiscount.discountedPrice(product.basePrice || 0) || 0)?.toLocaleString()}</Typography>
@@ -5900,6 +5942,7 @@ export default function HomePage() {
                 const product = Object.values(allGroupedProducts).flat().find((p) => p.id === productId);
                 if (!product) return null;
                 const productStatus = getProductStatus(product, now);
+                const isLocked = Boolean(product.isLockedPreview) || productStatus !== 'OPEN' || !isShopOpen;
                 const statusLabelsMap: Record<ShopStatusType, string> = {
                   OPEN: t.shopStatus.open,
                   COMING_SOON: t.shopStatus.comingSoon,
@@ -5907,6 +5950,11 @@ export default function HomePage() {
                   TEMPORARILY_CLOSED: t.shopStatus.closed,
                   WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
                 };
+                const lockedLabel = !isShopOpen
+                  ? t.shopStatus.closed
+                  : productStatus === 'OPEN' && product.isLockedPreview
+                  ? t.shopStatus.comingSoon
+                  : statusLabelsMap[productStatus];
                 return (
                   <Box
                     key={productId}
@@ -5915,8 +5963,8 @@ export default function HomePage() {
                         showToast('warning', t.checkout.shopClosedWarning);
                         return;
                       }
-                      if (productStatus !== 'OPEN') {
-                        showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[productStatus]}`);
+                      if (productStatus !== 'OPEN' || product.isLockedPreview) {
+                        showToast('info', `${getProductName(product, lang)} - ${lockedLabel}`);
                         return;
                       }
                       setShowRecentlyViewed(false);
@@ -5929,9 +5977,9 @@ export default function HomePage() {
                       borderRadius: '16px',
                       bgcolor: 'var(--surface)',
                       border: '1px solid var(--glass-border)',
-                      cursor: 'pointer',
+                      cursor: isLocked ? 'default' : 'pointer',
                       transition: 'all 0.2s ease',
-                      '&:hover': { borderColor: 'rgba(0,113,227,0.3)', transform: 'translateX(4px)' },
+                      '&:hover': isLocked ? {} : { borderColor: 'rgba(0,113,227,0.3)', transform: 'translateX(4px)' },
                     }}
                   >
                     <Box sx={{ width: 60, height: 60, borderRadius: '10px', overflow: 'hidden', flexShrink: 0, bgcolor: 'var(--surface-2)' }}>
@@ -5942,15 +5990,22 @@ export default function HomePage() {
                         width={60}
                         height={60}
                         objectFit="cover"
+                        style={isLocked ? { filter: 'blur(4px) grayscale(0.4)', transform: 'scale(1.12)' } : undefined}
                       />
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {getProductName(product, lang)}
                       </Typography>
-                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759', mt: 0.3 }}>
-                        ฿{(product.basePrice || 0)?.toLocaleString()}
-                      </Typography>
+                      {isLocked ? (
+                        <Typography sx={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)', mt: 0.3 }}>
+                          {lockedLabel}
+                        </Typography>
+                      ) : (
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759', mt: 0.3 }}>
+                          ฿{(product.basePrice || 0)?.toLocaleString()}
+                        </Typography>
+                      )}
                     </Box>
                     <IconButton
                       size="small"

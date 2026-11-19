@@ -2,7 +2,9 @@
 // Multi-shop individual storefront page
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getShopBySlug, toPublicShopData } from '@/lib/shops';
+import { getShopBySlug, toPublicShopData, updateShop } from '@/lib/shops';
+import { getClosedProductIdsMissingBlur } from '@/lib/sanitize';
+import { ensureProductsBlurredImages } from '@/lib/server-image-blur';
 import { absoluteUrl } from '@/lib/site';
 import ShopStorefrontClient from './ShopStorefrontClient';
 
@@ -14,7 +16,22 @@ async function getShopData(slug: string) {
   try {
     const shop = await getShopBySlug(slug);
     if (!shop || !shop.isActive) return null;
-    return toPublicShopData(shop);
+    const now = new Date();
+    const shopState = {
+      isOpen: shop.settings?.isOpen ?? true,
+      openDate: shop.settings?.openDate,
+      closeDate: shop.settings?.closeDate,
+    };
+    const missingIds = getClosedProductIdsMissingBlur(shop.products, shopState, now);
+    let effectiveShop = shop;
+    if (missingIds.size > 0) {
+      const ensured = await ensureProductsBlurredImages(shop.products || [], { onlyIds: missingIds }).catch(() => null);
+      if (ensured?.changed) {
+        effectiveShop = { ...shop, products: ensured.products };
+        updateShop(shop.id, { products: ensured.products }).catch(() => {});
+      }
+    }
+    return toPublicShopData(effectiveShop);
   } catch {
     return null;
   }

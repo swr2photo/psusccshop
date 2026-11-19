@@ -230,7 +230,7 @@ export function invalidateCacheKey(key: string) {
   store.delete(key);
   void redisDeleteKey(key);
   try {
-    // @ts-ignore: Next.js 16 types require a second argument but runtime doesn't
+    // @ts-expect-error: Next.js 16 types require a second argument but runtime doesn't
     revalidateTag(key);
   } catch (e) {
     // Ignore context error outside next requests
@@ -243,7 +243,7 @@ export function invalidateCachePrefix(prefix: string) {
   }
   void redisDeletePrefix(prefix);
   try {
-    // @ts-ignore: Next.js 16 types require a second argument but runtime doesn't
+    // @ts-expect-error: Next.js 16 types require a second argument but runtime doesn't
     revalidateTag(prefix);
   } catch (e) {
     // Ignore context error outside next requests
@@ -284,7 +284,7 @@ export const CACHE_TTL = {
 
 
 
-export const PUBLIC_CONFIG_CACHE_KEY = 'config:public-v3';
+export const PUBLIC_CONFIG_CACHE_KEY = 'config:public-v4';
 
 export const LIVE_CACHE_KEY = 'live:public';
 

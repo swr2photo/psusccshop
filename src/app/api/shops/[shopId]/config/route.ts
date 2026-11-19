@@ -5,6 +5,7 @@ import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { getShopById, updateShop, getShopAdminRole } from '@/lib/shops';
 import type { ShopLocalConfig } from '@/lib/shops';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { ensureProductsBlurredImages } from '@/lib/server-image-blur';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -112,7 +113,11 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
     // Extract products
     if (body.products !== undefined) {
-      updates.products = body.products;
+      const existingShop = await getShopById(shopId);
+      const ensured = await ensureProductsBlurredImages(Array.isArray(body.products) ? body.products : [], {
+        existingProducts: existingShop?.products,
+      });
+      updates.products = ensured.products;
     }
 
     // Extract payment info

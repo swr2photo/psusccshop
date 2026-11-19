@@ -184,6 +184,10 @@ export interface Product {
   subType?: ProductSubType;
   images?: string[];
   coverImage?: string;
+  /** รูปปกแบบเบลอที่เซิร์ฟเวอร์สร้างและอัปโหลดแยกไว้ใน Storage เพื่อใช้แสดงแทนรูปจริงตอนปิดขาย/ยังไม่เปิดขาย */
+  blurredCoverImage?: string;
+  /** แหล่งที่มาของรูปจริงล่าสุดที่ใช้สร้าง blurredCoverImage (เพื่อสร้างใหม่เมื่อเปลี่ยนรูปปก) */
+  blurredCoverSource?: string;
   /** ราคาพื้นฐาน */
   basePrice: number;
   /** ราคาตามขนาด (สำหรับเสื้อ) */

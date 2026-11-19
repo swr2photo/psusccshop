@@ -1,15 +1,22 @@
 import { withBackendProxy } from '@/lib/backend-proxy';
 import { supabase } from '@/lib/supabase';
+import { updateShop } from '@/lib/shops';
 import { getCached, invalidateCacheKey, CACHE_TTL } from '@/lib/server-cache';
 import { API_CACHE, API_CDN_HEADERS } from '@/lib/api-helpers';
-import { sanitizePublicProducts, hasExpiredLockedPreview, getReleaseAwareSmaxAge } from '@/lib/sanitize';
+import {
+  sanitizePublicProducts,
+  hasExpiredLockedPreview,
+  getReleaseAwareSmaxAge,
+  getClosedProductIdsMissingBlur,
+} from '@/lib/sanitize';
+import { ensureProductsBlurredImages } from '@/lib/server-image-blur';
 import { secureJsonResponse } from '@/lib/payload-crypto';
 import type { Product } from '@/lib/config';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const CATALOG_CACHE_KEY = 'shops:public-catalog-v4';
+const CATALOG_CACHE_KEY = 'shops:public-catalog-v5';
 
 type ShopCatalogRow = {
   id: string;
@@ -48,25 +55,44 @@ async function buildSanitizedCatalog(now: Date) {
   }
 
   const rows = (data || []) as ShopCatalogRow[];
-  return rows
-    .map((shop) => {
-      const products = sanitizePublicProducts(shop.products, now, shop.settings?.openDate);
+  const mapped = await Promise.all(
+    rows.map(async (shop) => {
+      const shopState = {
+        isOpen: shop.settings?.isOpen ?? true,
+        openDate: shop.settings?.openDate,
+        closeDate: shop.settings?.closeDate,
+      };
+      let rawProducts = shop.products || [];
+      const missingIds = getClosedProductIdsMissingBlur(rawProducts, shopState, now);
+      if (missingIds.size > 0) {
+        try {
+          const ensured = await ensureProductsBlurredImages(rawProducts, { onlyIds: missingIds });
+          if (ensured.changed) {
+            rawProducts = ensured.products;
+            updateShop(shop.id, { products: rawProducts }).catch(() => {});
+          }
+        } catch (blurErr) {
+          console.warn(`[shops-catalog] Blur backfill failed for shop ${shop.id}:`, blurErr);
+        }
+      }
+
+      const products = sanitizePublicProducts(rawProducts, now, shopState);
       return {
         id: shop.id,
         slug: shop.slug,
         name: shop.name,
         nameEn: shop.name_en,
         logoUrl: shop.logo_url,
-        isOpen: shop.settings?.isOpen ?? true,
-        openDate: shop.settings?.openDate,
+        isOpen: shopState.isOpen,
+        openDate: shopState.openDate,
         showOpenDate: shop.settings?.showOpenDate,
-        closeDate: shop.settings?.closeDate,
+        closeDate: shopState.closeDate,
         settings: shop.settings
           ? {
-              isOpen: shop.settings.isOpen ?? true,
-              openDate: shop.settings.openDate,
+              isOpen: shopState.isOpen,
+              openDate: shopState.openDate,
               showOpenDate: shop.settings.showOpenDate,
-              closeDate: shop.settings.closeDate,
+              closeDate: shopState.closeDate,
             }
           : undefined,
         products,
@@ -77,22 +103,40 @@ async function buildSanitizedCatalog(now: Date) {
         nameValidation: shop.config?.nameValidation,
         shippingOptions: shop.config?.shippingOptions || [],
       };
-    })
-    .filter((shop) => shop.products.length > 0);
+    }),
+  );
+
+  return mapped.filter((shop) => shop.products.length > 0);
 }
 
 async function GETHandler() {
   const now = new Date();
   let shops = await getCached(CATALOG_CACHE_KEY, CACHE_TTL.catalog, () => buildSanitizedCatalog(new Date()));
 
-  if (shops.some((shop) => hasExpiredLockedPreview(shop.products, shop.openDate, now))) {
+  if (
+    shops.some((shop) =>
+      hasExpiredLockedPreview(
+        shop.products,
+        { isOpen: shop.isOpen, openDate: shop.openDate, closeDate: shop.closeDate },
+        now,
+      ),
+    )
+  ) {
     invalidateCacheKey(CATALOG_CACHE_KEY);
     shops = await getCached(CATALOG_CACHE_KEY, CACHE_TTL.catalog, () => buildSanitizedCatalog(new Date()));
   }
 
   let minMaxAge = 120;
   for (const shop of shops) {
-    minMaxAge = Math.min(minMaxAge, getReleaseAwareSmaxAge(shop.products, shop.openDate, 120, now));
+    minMaxAge = Math.min(
+      minMaxAge,
+      getReleaseAwareSmaxAge(
+        shop.products,
+        { isOpen: shop.isOpen, openDate: shop.openDate, closeDate: shop.closeDate },
+        120,
+        now,
+      ),
+    );
   }
 
   const headers: Record<string, string> =

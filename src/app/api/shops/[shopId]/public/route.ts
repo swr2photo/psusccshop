@@ -1,9 +1,10 @@
 // /api/shops/[shopId]/public — Public shop data (no auth required)
 import { NextRequest } from 'next/server';
-import { getShopById, toPublicShopData } from '@/lib/shops';
+import { getShopById, toPublicShopData, updateShop } from '@/lib/shops';
 import { API_CACHE } from '@/lib/api-helpers';
 import { secureJsonResponse } from '@/lib/payload-crypto';
-import { getReleaseAwareSmaxAge } from '@/lib/sanitize';
+import { getReleaseAwareSmaxAge, getClosedProductIdsMissingBlur } from '@/lib/sanitize';
+import { ensureProductsBlurredImages } from '@/lib/server-image-blur';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,8 +26,28 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
   }
 
   const now = new Date();
-  const publicShop = toPublicShopData(shop);
-  const maxAge = getReleaseAwareSmaxAge(publicShop.products, publicShop.openDate, 120, now);
+  const shopState = {
+    isOpen: shop.settings?.isOpen ?? true,
+    openDate: shop.settings?.openDate,
+    closeDate: shop.settings?.closeDate,
+  };
+
+  const missingIds = getClosedProductIdsMissingBlur(shop.products, shopState, now);
+  let effectiveShop = shop;
+  if (missingIds.size > 0) {
+    try {
+      const ensured = await ensureProductsBlurredImages(shop.products || [], { onlyIds: missingIds });
+      if (ensured.changed) {
+        effectiveShop = { ...shop, products: ensured.products };
+        updateShop(shop.id, { products: ensured.products }).catch(() => {});
+      }
+    } catch (blurErr) {
+      console.warn('[shop-public] Blur backfill failed:', blurErr);
+    }
+  }
+
+  const publicShop = toPublicShopData(effectiveShop);
+  const maxAge = getReleaseAwareSmaxAge(publicShop.products, shopState, 120, now);
   const cacheControl =
     maxAge <= 2
       ? 'no-store'
