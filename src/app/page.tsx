@@ -3893,7 +3893,13 @@ export default function HomePage() {
                                   objectFit="cover"
                                   placeholder="none"
                                   showLoadingIndicator={false}
-                                  style={!isOpenNow ? { filter: 'blur(4px)', transform: 'scale(1.1)' } : undefined}
+                                  style={
+                                    !isOpenNow
+                                      ? product.isLockedPreview
+                                        ? { transform: 'scale(1.06)' }
+                                        : { filter: 'blur(4px)', transform: 'scale(1.1)' }
+                                      : undefined
+                                  }
                                 />
                               </Box>
                               {/* Info */}
@@ -4910,11 +4916,11 @@ export default function HomePage() {
                                 position: 'absolute',
                                 inset: 0,
                                 filter: isComingSoon
-                                  ? 'blur(4px) grayscale(0.25)'
+                                  ? (isLockedPreview ? 'none' : 'blur(12px)')
                                   : isProductClosed
-                                  ? 'grayscale(0.65)'
+                                  ? 'grayscale(0.55)'
                                   : 'none',
-                                transform: isComingSoon ? 'scale(1.1)' : undefined,
+                                transform: isComingSoon ? (isLockedPreview ? 'scale(1.06)' : 'scale(1.12)') : undefined,
                                 transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                               }}
                               className={!isProductClosed ? 'product-image-zoom' : ''}
@@ -4928,8 +4934,8 @@ export default function HomePage() {
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                background: 'rgba(15, 23, 42, 0.3)',
-                                backdropFilter: isComingSoon ? 'blur(3px)' : 'none',
+                                background: isComingSoon ? 'rgba(0, 0, 0, 0.16)' : 'rgba(15, 23, 42, 0.28)',
+                                backdropFilter: isComingSoon && !isLockedPreview ? 'blur(4px)' : 'none',
                                 px: 1.5,
                               }}>
                                 <Box
@@ -4937,8 +4943,9 @@ export default function HomePage() {
                                     px: 1.5,
                                     py: 0.6,
                                     borderRadius: '999px',
-                                    bgcolor: 'rgba(24, 24, 27, 0.84)',
-                                    border: '1px solid rgba(255,255,255,0.16)',
+                                    bgcolor: 'rgba(24, 24, 27, 0.78)',
+                                    backdropFilter: 'blur(8px)',
+                                    border: '1px solid rgba(255,255,255,0.18)',
                                     color: '#ffffff',
                                     fontSize: '0.72rem',
                                     fontWeight: 700,
@@ -5897,7 +5904,13 @@ export default function HomePage() {
                         width={72}
                         height={72}
                         objectFit="cover"
-                        style={isLocked ? { filter: 'blur(4px) grayscale(0.4)', transform: 'scale(1.12)' } : undefined}
+                        style={
+                          isLocked
+                            ? product.isLockedPreview
+                              ? { transform: 'scale(1.06)' }
+                              : { filter: 'blur(6px)', transform: 'scale(1.12)' }
+                            : undefined
+                        }
                       />
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -6045,7 +6058,13 @@ export default function HomePage() {
                         width={60}
                         height={60}
                         objectFit="cover"
-                        style={isLocked ? { filter: 'blur(4px) grayscale(0.4)', transform: 'scale(1.12)' } : undefined}
+                        style={
+                          isLocked
+                            ? product.isLockedPreview
+                              ? { transform: 'scale(1.06)' }
+                              : { filter: 'blur(6px)', transform: 'scale(1.12)' }
+                            : undefined
+                        }
                       />
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>

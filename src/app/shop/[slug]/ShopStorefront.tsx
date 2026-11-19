@@ -1957,9 +1957,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 inset: 0,
                                 transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                                 ...(isComingSoon
-                                  ? { filter: 'blur(4px) grayscale(0.25)', transform: 'scale(1.1)' }
+                                  ? (isLockedPreview
+                                      ? { transform: 'scale(1.06)' }
+                                      : { filter: 'blur(12px)', transform: 'scale(1.12)' })
                                   : isProductClosed
-                                  ? { filter: 'grayscale(0.65)' }
+                                  ? { filter: 'grayscale(0.55)' }
                                   : {}),
                               }}
                               className={!isProductClosed ? 'product-image-zoom' : ''}
@@ -1971,14 +1973,15 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 position: 'absolute', inset: 0,
                                 display: 'flex', flexDirection: 'column',
                                 alignItems: 'center', justifyContent: 'center',
-                                background: 'rgba(15, 23, 42, 0.3)',
-                                backdropFilter: isComingSoon ? 'blur(3px)' : 'none',
+                                background: isComingSoon ? 'rgba(0, 0, 0, 0.16)' : 'rgba(15, 23, 42, 0.28)',
+                                backdropFilter: isComingSoon && !isLockedPreview ? 'blur(4px)' : 'none',
                                 px: 1.5,
                               }}>
                                 <Box sx={{
                                   px: 1.5, py: 0.6, borderRadius: '999px',
-                                  bgcolor: 'rgba(24,24,27,0.84)',
-                                  border: '1px solid rgba(255,255,255,0.16)',
+                                  bgcolor: 'rgba(24,24,27,0.78)',
+                                  backdropFilter: 'blur(8px)',
+                                  border: '1px solid rgba(255,255,255,0.18)',
                                   color: '#ffffff',
                                   fontSize: '0.72rem', fontWeight: 700,
                                   display: 'inline-flex', alignItems: 'center', gap: 0.6,

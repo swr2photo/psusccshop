@@ -1,6 +1,7 @@
 import zlib from 'zlib';
 import type { Product } from './config';
 import { resolveImageToken } from './image-crypto';
+import { BLUR_VARIANT_VERSION } from './sanitize';
 import { uploadImageToStorage } from './supabase';
 
 const ALLOWED_BLUR_SOURCE_DOMAINS = [
@@ -101,8 +102,9 @@ export function getPrimaryProductImage(product: Pick<Product, 'coverImage' | 'im
 }
 
 /**
- * Downsample heavily + double-blur into a smooth WebP preview buffer.
- * High-frequency logos/text/design details are permanently destroyed on the server.
+ * Aspect-aware proportional Gaussian blur into a smooth WebP preview buffer.
+ * Destroys readable text/logos/fine details permanently on the server while keeping
+ * recognizable composition, lighting, and color mood (avoiding a flat solid-color box).
  */
 export async function generateBlurredImageBuffer(
   sourceBuffer: Buffer,
@@ -111,15 +113,25 @@ export async function generateBlurredImageBuffer(
     const sharpMod = await import('sharp').catch(() => null);
     const sharpFn = sharpMod?.default;
     if (typeof sharpFn === 'function') {
-      const tiny = await sharpFn(sourceBuffer)
+      const metadata = await sharpFn(sourceBuffer).rotate().metadata();
+      const srcW = metadata.width || 400;
+      const srcH = metadata.height || 400;
+      const minSide = Math.min(srcW, srcH);
+      const scale = Math.min(1, 320 / Math.max(1, minSide));
+      let targetW = Math.max(64, Math.round(srcW * scale));
+      let targetH = Math.max(64, Math.round(srcH * scale));
+      if (Math.max(targetW, targetH) > 960) {
+        const cap = 960 / Math.max(targetW, targetH);
+        targetW = Math.max(64, Math.round(targetW * cap));
+        targetH = Math.max(64, Math.round(targetH * cap));
+      }
+      const shortOut = Math.min(targetW, targetH);
+      const sigma = Math.max(6, Math.min(20, Math.round(shortOut * 0.045)));
+      const blurred = await sharpFn(sourceBuffer)
         .rotate()
-        .resize(48, 48, { fit: 'inside', withoutEnlargement: true })
-        .blur(8)
-        .toBuffer();
-      const blurred = await sharpFn(tiny)
-        .resize(360, 360, { fit: 'inside' })
-        .blur(14)
-        .webp({ quality: 58 })
+        .resize(targetW, targetH, { fit: 'fill' })
+        .blur(sigma)
+        .webp({ quality: 82 })
         .toBuffer();
       return { buffer: blurred, contentType: 'image/webp', ext: 'webp' };
     }
@@ -141,7 +153,12 @@ export async function uploadBlurredVariantToStorage(
 ): Promise<{ url: string; path: string }> {
   const blurred = await generateBlurredImageBuffer(sourceBuffer);
   const baseName = (fileNameHint || 'preview').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
-  return uploadImageToStorage(blurred.buffer, `blur_${baseName}.${blurred.ext}`, blurred.contentType, 'blurred');
+  return uploadImageToStorage(
+    blurred.buffer,
+    `blur_${BLUR_VARIANT_VERSION}_${baseName}.${blurred.ext}`,
+    blurred.contentType,
+    'blurred',
+  );
 }
 
 /** Download an allowed image URL server-side, blur it, upload blurred copy to Storage, and return its permanent URL. */
@@ -195,9 +212,21 @@ export async function generateAndUploadBlurredFromUrl(rawUrl: string): Promise<s
   return task;
 }
 
+function parseStoredBlurSource(raw?: string | null): { version: string | null; url: string | null } {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return { version: null, url: null };
+  const match = trimmed.match(/^(v\d+):(.*)$/);
+  if (match) {
+    const version = match[1];
+    const inner = match[2].trim();
+    return { version, url: normalizeRealImageUrl(inner) || inner };
+  }
+  return { version: null, url: normalizeRealImageUrl(trimmed) || trimmed };
+}
+
 /**
  * Ensure every targeted product has a server-uploaded blurred cover image stored in Supabase Storage
- * matching its current primary cover photo.
+ * matching its current primary cover photo and latest blur algorithm version.
  */
 export async function ensureProductsBlurredImages(
   products: Product[],
@@ -241,35 +270,43 @@ export async function ensureProductsBlurredImages(
         return product;
       }
 
+      const expectedBlurSource = `${BLUR_VARIANT_VERSION}:${canonicalSource}`;
+
       // Check existing blurred image on incoming product (unwrap /api/image/ if admin echoed encoded URL)
       const incomingBlurUrl = normalizeRealImageUrl(product.blurredCoverImage);
-      const incomingBlurSource = normalizeRealImageUrl(product.blurredCoverSource) || product.blurredCoverSource;
-      if (incomingBlurUrl && incomingBlurSource === canonicalSource) {
-        if (product.blurredCoverImage !== incomingBlurUrl || product.blurredCoverSource !== canonicalSource) {
+      const incomingParsed = parseStoredBlurSource(product.blurredCoverSource);
+      const incomingIsCurrent =
+        incomingParsed.version === BLUR_VARIANT_VERSION ||
+        Boolean(incomingBlurUrl && incomingBlurUrl.includes(`blur_${BLUR_VARIANT_VERSION}_`));
+      if (incomingBlurUrl && incomingParsed.url === canonicalSource && incomingIsCurrent) {
+        if (product.blurredCoverImage !== incomingBlurUrl || product.blurredCoverSource !== expectedBlurSource) {
           changed = true;
           return {
             ...product,
             blurredCoverImage: incomingBlurUrl,
-            blurredCoverSource: canonicalSource,
+            blurredCoverSource: expectedBlurSource,
           };
         }
         return product;
       }
 
-      // Reuse already-uploaded blurred image from existing DB product if cover photo didn't change
+      // Reuse already-uploaded blurred image from existing DB product if cover photo & version match
       const prev = existingById.get(product.id);
       const prevBlurUrl = normalizeRealImageUrl(prev?.blurredCoverImage);
-      const prevBlurSource = normalizeRealImageUrl(prev?.blurredCoverSource) || prev?.blurredCoverSource;
-      if (prevBlurUrl && prevBlurSource === canonicalSource) {
+      const prevParsed = parseStoredBlurSource(prev?.blurredCoverSource);
+      const prevIsCurrent =
+        prevParsed.version === BLUR_VARIANT_VERSION ||
+        Boolean(prevBlurUrl && prevBlurUrl.includes(`blur_${BLUR_VARIANT_VERSION}_`));
+      if (prevBlurUrl && prevParsed.url === canonicalSource && prevIsCurrent) {
         changed = true;
         return {
           ...product,
           blurredCoverImage: prevBlurUrl,
-          blurredCoverSource: canonicalSource,
+          blurredCoverSource: expectedBlurSource,
         };
       }
 
-      // Generate & upload fresh blurred WebP to Supabase Storage
+      // Generate & upload fresh v2 blurred WebP to Supabase Storage
       const uploadedBlurUrl = await generateAndUploadBlurredFromUrl(canonicalSource);
       if (!uploadedBlurUrl) {
         return product;
@@ -279,7 +316,7 @@ export async function ensureProductsBlurredImages(
       return {
         ...product,
         blurredCoverImage: uploadedBlurUrl,
-        blurredCoverSource: canonicalSource,
+        blurredCoverSource: expectedBlurSource,
       };
     }),
   );

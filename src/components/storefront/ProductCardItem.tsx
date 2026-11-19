@@ -110,9 +110,11 @@ export function ProductCardItem({
             position: 'absolute',
             inset: 0,
             ...(isComingSoon
-              ? { filter: 'blur(4px) grayscale(0.25)', transform: 'scale(1.1)' }
+              ? (isLockedPreview
+                  ? { transform: 'scale(1.06)' }
+                  : { filter: 'blur(12px)', transform: 'scale(1.12)' })
               : !isProductAvailable
-              ? { filter: 'grayscale(0.65)' }
+              ? { filter: 'grayscale(0.55)' }
               : {}),
           }}
         />
@@ -123,8 +125,8 @@ export function ProductCardItem({
             sx={{
               position: 'absolute',
               inset: 0,
-              bgcolor: 'rgba(15, 23, 42, 0.3)',
-              backdropFilter: isComingSoon ? 'blur(3px)' : 'none',
+              bgcolor: isComingSoon ? 'rgba(0, 0, 0, 0.16)' : 'rgba(15, 23, 42, 0.28)',
+              backdropFilter: isComingSoon && !isLockedPreview ? 'blur(4px)' : 'none',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -145,8 +147,9 @@ export function ProductCardItem({
                   : SHOP_STATUS_CONFIG[productStatus]?.label || t.shopStatus.closed
               }
               sx={{
-                bgcolor: 'rgba(24, 24, 27, 0.84)',
-                border: '1px solid rgba(255,255,255,0.16)',
+                bgcolor: 'rgba(24, 24, 27, 0.78)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.18)',
                 color: '#fff',
                 fontWeight: 700,
                 fontSize: '0.74rem',

@@ -86,7 +86,21 @@ export function isProductClosedForPublic(
   return false;
 }
 
-/** Collect IDs of closed products that have a primary image but still lack a server-uploaded blurred image. */
+/** Bump when server-side blurred preview algorithm changes so stale variants regenerate automatically. */
+export const BLUR_VARIANT_VERSION = 'v2';
+
+export function hasCurrentBlurVariant(
+  product: Pick<Product, 'blurredCoverImage' | 'blurredCoverSource'>,
+): boolean {
+  if (!product.blurredCoverImage) return false;
+  const src = product.blurredCoverSource || '';
+  return (
+    src.startsWith(`${BLUR_VARIANT_VERSION}:`) ||
+    product.blurredCoverImage.includes(`blur_${BLUR_VARIANT_VERSION}_`)
+  );
+}
+
+/** Collect IDs of closed products that have a primary image but lack an up-to-date server-uploaded blurred image. */
 export function getClosedProductIdsMissingBlur(
   products: Product[] | null | undefined,
   shopState?: PublicShopOpenState | string,
@@ -97,7 +111,7 @@ export function getClosedProductIdsMissingBlur(
     if (!product?.id) continue;
     const primary = (product.coverImage || product.images?.[0] || '').trim();
     if (!primary) continue;
-    if (isProductClosedForPublic(product, now, shopState) && !product.blurredCoverImage) {
+    if (isProductClosedForPublic(product, now, shopState) && !hasCurrentBlurVariant(product)) {
       missing.add(product.id);
     }
   }
